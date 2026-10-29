@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #4588 — dropping no-signal prompt groups: the old way and the new one</title>
+<style>
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2128; --border:#30363d;
+  --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --green:#3fb950;
+  --orange:#d29922; --red:#f85149;
+}
+:root[data-theme="light"]{
+  --bg:#ffffff; --surface:#f6f8fa; --surface2:#eaeef2; --border:#d0d7de;
+  --text:#1f2328; --dim:#59636e; --accent:#0969da; --green:#1a7f37;
+  --orange:#9a6700; --red:#cf222e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 20px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.mono{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:13px;overflow-x:auto;white-space:pre}
+.warn{border-left:3px solid var(--orange);background:var(--surface);
+  padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+.bg{border:1px solid var(--border);background:var(--surface);border-radius:10px;
+  padding:10px 16px;margin:0 0 18px;font-size:14px}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);
+  padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;
+  white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.good{color:var(--green)}
+.kept{color:var(--green);font-weight:700}
+.drop{color:var(--red);font-weight:700}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 12.5px -apple-system,sans-serif}
+svg .c-ok{fill:var(--green);opacity:.5;stroke:var(--green)}
+svg .c-drop{fill:var(--red);opacity:.45;stroke:var(--red)}
+svg .c-new{fill:var(--orange);opacity:.45;stroke:var(--orange)}
+svg .c-txt{fill:var(--text);font:10.5px ui-monospace,Menlo,monospace}
+svg .arr{stroke:var(--dim);stroke-width:1.5;fill:none}
+svg .arrR{stroke:var(--red);stroke-width:1.8;fill:none}
+svg .lane{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:4 4}
+svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Dropping prompt groups that teach nothing: the old way, and the new single-controller way</h1>
+<p class="sub">Companion illustration for
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/4588">NVIDIA-NeMo/RL #4588</a>
+(<em>enable single-controller dynamic sampling</em>) and
+<a href="https://github.com/NVIDIA-NeMo/RL/issues/1365">#1365</a>.
+All permalinks pin the PR head <code>3bfe02f7</code>.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>On the single-controller path, setup refused <code>use_dynamic_sampling</code> outright. The filter existed only in the older training loop.</dd>
+  <dt>This PR</dt>
+  <dd>Turns it on for the single-controller path, and replaces each dropped group one at a time instead of regenerating whole batches.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict good">Implemented in this PR — open, under review.</span> Only the <code>in_order</code> sampler is supported; token capture and PPO are rejected at startup.</dd>
+</dl>
+</div>
+
+<div class="bg">
+<b>Background.</b> In GRPO, one prompt is answered several times, and the group's rewards are
+compared against each other. If every answer in a group scores the <em>same</em>, there is nothing
+to compare, so every answer gets zero advantage and the group teaches the model nothing — it just
+costs generation time and a slot in the batch. <b>Dynamic sampling</b> (from
+<a href="https://arxiv.org/pdf/2503.14476">DAPO</a>) throws those groups away and gets more prompts
+instead. The two training loops below do that at completely different moments, which is the whole
+story on this page. Dotted words have a short explanation: hover or tap them.
+</div>
+
+<p>The older loop filters <b>after</b> a whole batch has been generated and scored, so it can only
+react by generating another whole batch — and training waits. The
+<span class="tip" tabindex="0" data-tip="The newer single-controller design: one process drives a rollout pump that generates and a train pump that consumes, running at the same time through a shared buffer.">single-controller</span>
+path generates and trains at the same time, so it can react per group: it throws the group away
+<b>before</b> it reaches the buffer and sends one fresh prompt after it
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/experience/rollout_manager.py#L2160">rollout_manager.py:2160</a>).
+Both end up training on the configured number of groups; they pay for it very differently.</p>
+
+<h2>The two paths, same five groups</h2>
+
+<svg viewBox="0 0 900 600" role="img" aria-label="Two lanes comparing the old batch-accumulate dynamic sampling with the new per-group replacement on the single-controller path, carrying the same five prompt groups through both">
+  <text class="hdr" x="14" y="20">num_prompts_per_step = 5 · num_generations_per_prompt = 4 · the same 5 groups come back from generation in both lanes</text>
+
+  <rect class="c-ok" x="14" y="32" width="16" height="13"/><text class="note" x="36" y="43">has reward spread — keep</text>
+  <rect class="c-drop" x="210" y="32" width="16" height="13"/><text class="note" x="232" y="43">all four scores equal — no signal, drop</text>
+  <rect class="c-new" x="470" y="32" width="16" height="13"/><text class="note" x="492" y="43">newly generated to replace a dropped group</text>
+
+  <!-- ================= LANE 1 : v1 ================= -->
+  <rect class="lane" x="10" y="58" width="880" height="228" rx="8"/>
+  <text class="lbl-b" x="24" y="80">Older loop — filter the whole batch, then generate another whole batch</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/grpo.py#L2171" target="_blank" rel="noopener"><text x="24" y="97">dynamic_sampling() · grpo.py:2171</text></a>
+
+  <text class="note" x="24" y="124">1 · generate all 5, score all 5</text>
+  <rect class="c-ok"   x="250" y="110" width="52" height="22"/><text class="c-txt" x="258" y="125">1,0,1,0</text>
+  <rect class="c-drop" x="310" y="110" width="52" height="22"/><text class="c-txt" x="318" y="125">0,0,0,0</text>
+  <rect class="c-ok"   x="370" y="110" width="52" height="22"/><text class="c-txt" x="378" y="125">1,0,0,0</text>
+  <rect class="c-drop" x="430" y="110" width="52" height="22"/><text class="c-txt" x="438" y="125">1,1,1,1</text>
+  <rect class="c-ok"   x="490" y="110" width="52" height="22"/><text class="c-txt" x="498" y="125">0,0,1,0</text>
+  <text class="note" x="556" y="125">5 generated → 3 kept, 2 dropped</text>
+
+  <path class="arrR" d="M300 140 L300 162"/><path class="arrR" d="M300 162 L295 155 M300 162 L305 155"/>
+  <text class="note" x="24" y="160">2 · 3 is short of 5, so the kept ones go in a holding cache</text>
+  <text class="lbl" x="316" y="166">batch_cache = 3 groups · training has nothing to run</text>
+
+  <text class="note" x="24" y="196">3 · generate a second full batch of 5</text>
+  <rect class="c-new" x="250" y="182" width="292" height="22"/>
+  <text class="c-txt" x="258" y="197">5 more groups, generated from scratch — the trainer is idle for all of it</text>
+  <text class="note" x="556" y="197">10 generated in total</text>
+
+  <text class="note" x="24" y="232">4 · take the first 5 with spread and train</text>
+  <rect class="c-ok" x="250" y="218" width="52" height="22"/><text class="c-txt" x="268" y="233">5 ✓</text>
+  <text class="note" x="316" y="233">bounded by dynamic_sampling_max_gen_batches — past it the run raises</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/grpo.py#L2287" target="_blank" rel="noopener"><text x="316" y="250">grpo.py:2287-2294</text></a>
+
+  <text class="note" x="24" y="274">Cost: the trainer waits out a whole extra generation batch. 10 groups generated for 5 trained.</text>
+
+  <!-- ================= LANE 2 : SC ================= -->
+  <rect class="lane" x="10" y="300" width="880" height="246" rx="8"/>
+  <text class="lbl-b" x="24" y="322">Single-controller — drop one group, send one fresh prompt after it</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/experience/rollout_manager.py#L2160" target="_blank" rel="noopener"><text x="24" y="339">generate_and_push() · rollout_manager.py:2160</text></a>
+
+  <text class="note" x="24" y="366">0 · before any of this, whole batches are set aside as spares</text>
+  <rect class="box" x="430" y="352" width="200" height="22" rx="5"/>
+  <text class="c-txt" x="438" y="367">spare pool: 5 unsent prompts</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/single_controller.py#L2704" target="_blank" rel="noopener"><text x="644" y="367">_divert_batch_to_reserve :2704</text></a>
+
+  <text class="note" x="24" y="398">1 · each group is checked the moment it finishes, before it is committed</text>
+  <rect class="c-ok"   x="250" y="412" width="52" height="22"/><text class="c-txt" x="258" y="427">1,0,1,0</text>
+  <rect class="c-drop" x="310" y="412" width="52" height="22"/><text class="c-txt" x="318" y="427">0,0,0,0</text>
+  <rect class="c-ok"   x="370" y="412" width="52" height="22"/><text class="c-txt" x="378" y="427">1,0,0,0</text>
+  <rect class="c-drop" x="430" y="412" width="52" height="22"/><text class="c-txt" x="438" y="427">1,1,1,1</text>
+  <rect class="c-ok"   x="490" y="412" width="52" height="22"/><text class="c-txt" x="498" y="427">0,0,1,0</text>
+  <text class="note" x="24" y="427">2 · the 2 red ones never enter the buffer</text>
+
+  <path class="arrR" d="M336 438 L336 456"/><path class="arrR" d="M336 456 L331 449 M336 456 L341 449"/>
+  <path class="arrR" d="M456 438 L456 456"/><path class="arrR" d="M456 456 L451 449 M456 456 L461 449"/>
+  <text class="lbl" x="556" y="430">rows cleared, then FILTERED</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/experience/rollout_manager.py#L2167" target="_blank" rel="noopener"><text x="556" y="446">remove_group :2167</text></a>
+
+  <text class="note" x="24" y="470">3 · 2 spares leave the pool, 2 fresh rollouts start</text>
+  <rect class="c-new" x="310" y="462" width="52" height="22"/><text class="c-txt" x="322" y="477">new</text>
+  <rect class="c-new" x="430" y="462" width="52" height="22"/><text class="c-txt" x="442" y="477">new</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/single_controller.py#L2872" target="_blank" rel="noopener"><text x="556" y="477">_take_filtered_replacement :2872</text></a>
+
+  <text class="note" x="24" y="506">4 · and the step does not wait for them</text>
+  <rect class="box" x="250" y="494" width="292" height="24" rx="5" style="stroke:var(--green);stroke-width:1.8"/>
+  <text class="c-txt" x="258" y="510">a finished group from a later step moves into this one</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/single_controller.py#L2892" target="_blank" rel="noopener"><text x="556" y="510">_promote_into_step :2892</text></a>
+  <text class="note" x="24" y="536">Cost: 7 groups generated for 5 trained, and the fresh prompt repays the step that lent one.</text>
+
+  <text class="note" x="14" y="576">Both lanes train on 5 groups that all have reward spread. The older one buys that with a second full generation batch;</text>
+  <text class="note" x="14" y="592">the newer one buys it with 2 extra rollouts that overlap training, plus a pool of prompts set aside in advance.</text>
+</svg>
+
+<h2>Where the two meet, and what still differs</h2>
+
+<p>They converge on one thing only: the test for "this group teaches nothing". Both ask whether
+every reward in the group is exactly equal — exact equality, not a standard deviation near zero,
+because floating-point rounding can give a flat group a tiny spread. The rule is written twice,
+once per path:</p>
+
+<div class="mono">older loop   <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/utils.py#L237">calculate_trivial_reward_distributions</a>   valid_rewards.numel() &lt;= 1 or (valid_rewards.amin() == valid_rewards.amax())
+single-ctrl  <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/experience/rollout_manager.py#L223">rewards_carry_no_signal</a>                  len(rewards) &lt;= 1 or max(rewards) == min(rewards)</div>
+
+<p>Same rule, different <em>input</em>. The older one is handed <code>valid_mask</code> and compares
+only the rows that will actually vote on the advantage; the new one compares every answer in the
+group. Under the default settings those are the same set, so the two agree. They part company when
+<code>masked_reward_policy: exclude</code> and <code>overlong_filtering</code> are both on, which is
+when the trainer stops counting rows whose answer was cut off — then the older path would drop a
+group that the single-controller path keeps.</p>
+
+<p>Everything else is different, and the table is the short version:</p>
+
+<div class="mono">                       older loop                          single-controller
+unit of replacement    a whole generation batch            one prompt group
+when it is decided     after the batch is scored           before the group is committed
+who waits              the trainer, for a full batch       nobody — the step borrows and moves on
+spare prompts          none; it just generates more        a pool set aside ahead of time
+the budget             <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/grpo.py#L2287">dynamic_sampling_max_gen_batches</a>    <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/grpo.py#L424">dynamic_sampling_max_replacements_per_slot</a>
+                       counted per step                    counted per slot, default 32
+over-generation knob   <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/grpo.py#L864">batch_multiplier</a>                    <span class="drop">not read — has no effect here</span>
+samplers               n/a                                 <a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/algorithms/single_controller_utils/config.py#L1222">in_order only</a> (or a custom one that
+                                                           marks which step a group is for)</div>
+
+<p>One consequence worth stating on its own: every replacement on the new path is a prompt taken
+from the same dataloader, and the number of training steps a run can reach is bounded by how many
+batches the dataloader holds. So at a drop rate <em>p</em>, a run reaches roughly
+<em>(1&nbsp;&minus;&nbsp;p)</em> of the steps it was configured for and then stops cleanly. The older
+path has <code>batch_multiplier</code> to pay for that; the new path has no equivalent knob.</p>
+
+<h2>What you watch while it runs</h2>
+
+<p>Filtering changes what <code>reward</code> means. Only groups <em>with</em> spread get trained on,
+so the trained-rows average can sit flat while the model is in fact improving. The PR adds the
+pre-filter numbers next to it
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/nemo_rl/experience/rollout_manager.py#L2022">rollout_manager.py:2022</a>):</p>
+
+<div class="mono">unfiltered_reward            average over every group generated for the step, kept or dropped ← watch this one
+first_attempt_reward         the same, but ignoring replacements
+generated_prompt_groups      how many were generated for the step, dropped ones included
+zero_variance_fraction       how many of them had no spread
+rollout/zero_variance_groups_total   running count of groups actually thrown away</div>
+
+<div class="warn">
+<b>If you are turning this on.</b> Pick the drop rate you expect and check it against
+<code>zero_variance_fraction</code> on a short run first — it decides both how many extra rollouts
+you pay for and how far short of <code>max_num_steps</code> the run will stop. Keep
+<code>replacement_reserve_prompts</code> at 1 or more, or the spare pool is never filled and every
+dropped group shrinks its step instead of being replaced. The sizing advice in
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/3bfe02f7cf0ad14bce374b65571964c8686b9034/docs/guides/single-controller.md#L381">the guide</a>
+is the place to start, with the correction noted in the review.
+</div>
+
+</div>
+</body>
+</html>
