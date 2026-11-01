@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #3353 — merging grouped-expert LoRA into the refit</title>
+<style>
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2128; --border:#30363d;
+  --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --green:#3fb950;
+  --orange:#d29922; --red:#f85149;
+}
+:root[data-theme="light"]{
+  --bg:#ffffff; --surface:#f6f8fa; --surface2:#eaeef2; --border:#d0d7de;
+  --text:#1f2328; --dim:#59636e; --accent:#0969da; --green:#1a7f37;
+  --orange:#9a6700; --red:#cf222e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 20px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.warn{border-left:3px solid var(--orange);background:var(--surface);
+  padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+.bg{border:1px solid var(--border);background:var(--surface);border-radius:10px;
+  padding:10px 16px;margin:0 0 18px;font-size:14px}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);
+  padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;
+  white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.good{color:var(--green)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:10px 0}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)}
+.diff .del{color:var(--red)}
+.diff .hunk{color:var(--accent)}
+.trace{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:13px;overflow-x:auto;white-space:pre;margin:10px 0}
+.trace .c{color:var(--dim)}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 12.5px -apple-system,sans-serif}
+svg .ok{fill:var(--green);opacity:.16;stroke:var(--green);stroke-width:1.3}
+svg .bad{fill:var(--red);opacity:.16;stroke:var(--red);stroke-width:1.3}
+svg .skip{fill:var(--dim);opacity:.13;stroke:var(--dim);stroke-width:1.1}
+svg .oktx{fill:var(--green);font:bold 11px -apple-system,sans-serif}
+svg .badtx{fill:var(--red);font:bold 11px -apple-system,sans-serif}
+svg .sktx{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .mono{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .arr{stroke:var(--dim);stroke-width:1.5;fill:none}
+svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Copying a LoRA-trained MoE model to the generation engine — and why the grouped experts arrived untrained</h1>
+<p class="sub">Companion illustration for
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/3353">NVIDIA-NeMo/RL #3353</a>
+(<em>merge grouped-expert LoRA weights during refit</em>).
+All permalinks pin the PR head <code>34451c1a93</code>; upstream links pin the
+Automodel submodule at <code>b916107a</code>.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>With LoRA on Automodel's grouped MoE experts, the weight copy sent the expert
+      adapters to the engine as unknown keys. The first copy crashed with
+      <code>KeyError: 'layers.0.moe.experts.lora_gate_and_up_A'</code>; had it not crashed,
+      generation would have run the experts <em>without</em> their trained update.</dd>
+  <dt>This PR</dt>
+  <dd>Folds each expert's adapter into the fused base weight before the copy, and leaves
+      the adapter tensors out of the stream — so the engine gets the trained experts and
+      nothing it cannot name.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict good">Fixed by this PR.</span> A real GRPO run (a Gemma MoE model,
+      8&times;B200, merged refit) now trains with generation&ndash;training logprob gaps
+      below the test threshold.</dd>
+</dl>
+</div>
+
+<div class="bg">
+<b>Background — what "refit" is.</b> In RL training, the model is trained in one place and
+answers prompts (<span class="tip" tabindex="0" data-tip="Generating answers to prompts with the current policy, used to score and improve it.">rollout</span>)
+in another — a fast inference engine like vLLM. Every step, the fresh weights are copied
+from the trainer into the engine. That copy is the <b>refit</b>. If the copy hands over the
+wrong weights, the engine generates from a different model than the one being trained, and
+the two drift apart. Dotted words have a short explanation: hover or tap them.
+</div>
+
+<p>With <span class="tip" tabindex="0" data-tip="Low-Rank Adaptation: freeze the big weight W, train two small matrices A and B, and use W + A·B·scale. Far fewer trained parameters.">LoRA</span>,
+the trainer does not hold one finished weight. It holds the frozen base weight
+<code>W</code> plus two small matrices <code>A</code>, <code>B</code>, and the real weight
+is <code>W + A·B·scale</code>. The refit exporter must hand the engine that combined
+weight. For ordinary <code>nn.Linear</code> layers it already does. The break was in how
+Automodel stores LoRA for <b>grouped MoE experts</b>, where all experts share one fused
+tensor and the adapters sit beside it as plain parameters — a shape the exporter's filter
+did not recognise. The figure shows what each of the module's six tensors became on the way
+to the engine, before and after this PR.</p>
+
+<svg viewBox="0 0 940 470" role="img" aria-label="Fate of each grouped-expert tensor during refit, before and after the PR">
+  <!-- left: module state_dict -->
+  <text x="20" y="20" class="hdr">one MoE layer's state_dict</text>
+  <text x="20" y="36" class="note">Automodel GroupedExpertsLoRA — fused experts + bare adapters</text>
+  <rect x="20" y="48" width="250" height="372" rx="8" class="box"/>
+
+  <!-- base weights -->
+  <rect x="34" y="62" width="222" height="40" rx="5" class="box"/>
+  <text x="44" y="80" class="lbl">gate_and_up_projs</text>
+  <text x="44" y="95" class="note">base · [E, 2, 2] · fused over all experts</text>
+  <rect x="34" y="108" width="222" height="40" rx="5" class="box"/>
+  <text x="44" y="126" class="lbl">down_projs</text>
+  <text x="44" y="141" class="note">base · [E, 2, 2] · fused over all experts</text>
+
+  <!-- adapters -->
+  <rect x="34" y="162" width="222" height="34" rx="5" class="box"/>
+  <text x="44" y="183" class="lbl">lora_gate_and_up_A</text>
+  <rect x="34" y="202" width="222" height="34" rx="5" class="box"/>
+  <text x="44" y="223" class="lbl">lora_gate_and_up_B</text>
+  <rect x="34" y="242" width="222" height="34" rx="5" class="box"/>
+  <text x="44" y="263" class="lbl">lora_down_A</text>
+  <rect x="34" y="282" width="222" height="34" rx="5" class="box"/>
+  <text x="44" y="303" class="lbl">lora_down_B</text>
+  <text x="44" y="338" class="note">The four adapters are plain</text>
+  <text x="44" y="353" class="note">Parameters on the expert module,</text>
+  <text x="44" y="368" class="note">not <tspan class="mono">.lora_A.weight</tspan> / <tspan class="mono">.lora_B.weight</tspan></text>
+  <text x="44" y="383" class="note">sub-modules — so the old filter</text>
+  <text x="44" y="398" class="note">below never saw them.</text>
+
+  <!-- OLD lane -->
+  <text x="560" y="20" class="hdr">BEFORE · what the engine received</text>
+  <rect x="560" y="48" width="360" height="174" rx="8" class="bad"/>
+  <rect x="574" y="62" width="332" height="44" rx="5" class="box"/>
+  <text x="584" y="80" class="lbl">gate_and_up_projs</text>
+  <text x="584" y="96" class="badtx">streamed unmerged → experts run untrained</text>
+  <rect x="574" y="112" width="332" height="44" rx="5" class="box"/>
+  <text x="584" y="130" class="lbl">down_projs</text>
+  <text x="584" y="146" class="badtx">streamed unmerged → experts run untrained</text>
+  <rect x="574" y="162" width="332" height="50" rx="5" class="box"/>
+  <text x="584" y="181" class="lbl">lora_gate_and_up_A, …B, down_A, …B</text>
+  <text x="584" y="198" class="badtx">streamed as unknown keys → KeyError, copy dies</text>
+
+  <!-- NEW lane -->
+  <text x="560" y="258" class="hdr">AFTER · what the engine receives</text>
+  <rect x="560" y="286" width="360" height="168" rx="8" class="ok"/>
+  <rect x="574" y="300" width="332" height="48" rx="5" class="box"/>
+  <text x="584" y="318" class="lbl">gate_and_up_projs</text>
+  <text x="584" y="334" class="oktx">= base + bmm(A,B)·scale  →  [[11,6],[0,4]]</text>
+  <rect x="574" y="354" width="332" height="44" rx="5" class="box"/>
+  <text x="584" y="372" class="lbl">down_projs</text>
+  <text x="584" y="388" class="oktx">= base + bmm(A,B)·scale  → trained experts</text>
+  <rect x="574" y="404" width="332" height="40" rx="5" class="skip"/>
+  <text x="584" y="422" class="lbl">the four adapters</text>
+  <text x="584" y="437" class="sktx">skipped — folded into the base above, not sent</text>
+
+  <!-- filter box in the middle -->
+  <rect x="300" y="150" width="236" height="150" rx="8" class="box"/>
+  <text x="312" y="172" class="lbl-b">the exporter</text>
+  <text x="312" y="192" class="note">for each state_dict tensor:</text>
+  <text x="312" y="212" class="note">1. is it a LoRA adapter? skip it</text>
+  <text x="312" y="232" class="note">2. else fold any adapter in,</text>
+  <text x="312" y="248" class="note">   then send the merged weight</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/34451c1a93a5ee7143838be6f536a3395a450894/nemo_rl/models/policy/workers/automodel_policy_worker.py#L329">
+    <text x="312" y="272">_is_lora_adapter_tensor L329</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/34451c1a93a5ee7143838be6f536a3395a450894/nemo_rl/models/policy/workers/automodel_policy_worker.py#L357">
+    <text x="312" y="290">_maybe_merge_lora_weight L357</text></a>
+
+  <!-- arrows -->
+  <path class="arr" d="M270 128 H300 M536 190 H560" marker-end="url(#a)"/>
+  <path class="arr" d="M536 215 C548 215 548 135 560 135"/>
+  <path class="arr" d="M536 240 C548 240 548 370 560 370"/>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+    <path d="M0 0 L8 4 L0 8 z" fill="var(--dim)"/></marker></defs>
+</svg>
+
+<p class="note" style="margin-top:-4px">The numbers come from the tiny case in the fix
+section below: one expert, <code>scale = 2</code>, worked through both projections.</p>
+
+<h2>The fix: fold A·B into the base, in the experts' own orientation</h2>
+
+<p class="where"><b>Where the fix lands: RL only, one file.</b>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/34451c1a93a5ee7143838be6f536a3395a450894/nemo_rl/models/policy/workers/automodel_policy_worker.py#L320-L374"><code>automodel_policy_worker.py</code></a>.
+<b>No Automodel change:</b> the adapter math already lives upstream in
+<a href="https://github.com/NVIDIA-NeMo/Automodel/blob/b916107a5ce8e77a3f18682f8b0eaa46a4b54389/nemo_automodel/components/_peft/lora_experts.py#L274"><code>lora_experts.py</code></a>;
+this PR only teaches the exporter to reproduce it.</p>
+
+<p>Two changes. First, the "is this an adapter?" test learns the four bare grouped-expert
+names, so they are skipped instead of streamed as unknown keys:</p>
+
+<pre class="diff"><span class="hunk">@@ automodel_policy_worker.py L247-L248 · _module_params_generator  (and again at L1375)</span>
+     for name, tensor in state_dict.items():
+<span class="del">-        if name.endswith(".lora_A.weight") or name.endswith(".lora_B.weight"):
+</span><span class="add">+        if _is_lora_adapter_tensor(name):   # now also matches lora_gate_and_up_A, …B, lora_down_A, …B
+</span>             continue
+
+<span class="hunk">@@ automodel_policy_worker.py L329-L334 · new helper</span>
+<span class="add">+def _is_lora_adapter_tensor(fqn: str) -> bool:
++    if fqn.endswith(".lora_A.weight") or fqn.endswith(".lora_B.weight"):
++        return True
++    return fqn.rpartition(".")[2] in _GROUPED_EXPERT_LORA_ADAPTERS   # the four bare names</span></pre>
+
+<p>Second, when the exporter reaches a fused base weight, it folds that expert module's
+adapter into it — a per-expert batched matmul, done in fp32, without touching the training
+weights:</p>
+
+<pre class="diff"><span class="hunk">@@ automodel_policy_worker.py L357-L374 · _maybe_merge_lora_weight (new branch, runs first)</span>
+<span class="add">+    expert_module, expert_adapters = _grouped_expert_lora_adapters(module_map, fqn)
++    if expert_module is not None and expert_adapters is not None:
++        lora_a, lora_b = (                          # gather all experts under expert parallelism
++            adapter.full_tensor() if isinstance(adapter, DTensor) else adapter
++            for adapter in expert_adapters
++        )
++        delta = torch.bmm(                          # [E, in, r] · [E, r, out] = [E, in, out], same shape as W
++            lora_a.to(device=tensor.device, dtype=torch.float32),
++            lora_b.to(device=tensor.device, dtype=torch.float32),
++        )
++        merged = tensor.to(torch.float32) + delta * expert_module.scale
++        return merged.to(tensor.dtype)              # single fp32 round-trip, base weight untouched
+</span>     if not fqn.endswith(".weight"):
+         return tensor</pre>
+
+<p>The orientation matters and is easy to get backwards. For a plain <code>nn.Linear</code>
+the stored weight is <code>[out, in]</code> and the merge is <code>B·A</code>; for grouped
+experts the fused weight is <code>[E, in, out]</code>, so the merge is <code>A·B</code> with
+no transpose — exactly the order the
+<a href="https://github.com/NVIDIA-NeMo/Automodel/blob/b916107a5ce8e77a3f18682f8b0eaa46a4b54389/nemo_automodel/components/_peft/lora_experts.py#L274">upstream forward</a>
+uses when it computes <code>x·W + (x·A·B)·scale</code>.</p>
+
+<p>Worked through one expert, with <code>scale = 2</code>:</p>
+
+<pre class="trace">base W = [[1, 0],      A = [[1],   B = [[5, 3]]   <span class="c"># gate_and_up: in=2, r=1, out=2</span>
+          [0, 4]]       [0]]
+
+A · B        = [[5, 3],        <span class="c"># torch.bmm, per expert, fp32</span>
+                [0, 0]]
+delta·scale  = [[10, 6],       <span class="c"># × scale (2)</span>
+                [0,  0]]
+merged = W + delta·scale = [[11, 6],   <span class="c"># this is what the engine gets for this expert</span>
+                            [0,  4]]</pre>
+
+<p>A third change keeps the path honest: the reachability guard now also covers grouped
+experts, so if a future module wrapper renames these weights the refit
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/34451c1a93a5ee7143838be6f536a3395a450894/nemo_rl/models/policy/workers/automodel_policy_worker.py#L297">raises loudly</a>
+instead of silently shipping untrained experts again.</p>
+
+<div class="warn">
+<b>So what.</b> Before this PR, LoRA on Automodel grouped experts could not be used with
+merged refit at all — the run died on the first weight copy. Worse than the crash was the
+near miss: if the keys had lined up, training would have "worked" while generation quietly
+ran the experts with their <em>untrained</em> weights, showing up only as a slowly widening
+training&ndash;generation gap many steps later. The merge closes both doors, and the gap on
+a real 8&times;B200 GRPO run stayed below the existing test threshold.
+</div>
+
+</div>
+</body>
+</html>
