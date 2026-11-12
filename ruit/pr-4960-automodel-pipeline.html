@@ -1,0 +1,112 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RL #4960 — How Automodel splits a model without moving the RL loss</title><style>
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2128; --border:#30363d;
+  --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --green:#3fb950;
+  --orange:#d29922; --red:#f85149;
+}
+:root[data-theme="light"]{
+  --bg:#ffffff; --surface:#f6f8fa; --surface2:#eaeef2; --border:#d0d7de;
+  --text:#1f2328; --dim:#59636e; --accent:#0969da; --green:#1a7f37;
+  --orange:#9a6700; --red:#cf222e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 20px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.mono{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:13px;overflow-x:auto;white-space:pre}
+.warn{border-left:3px solid var(--red);background:var(--surface);
+  padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+.kept{color:var(--green);font-weight:700}
+.drop{color:var(--red);font-weight:700}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 12.5px -apple-system,sans-serif}
+svg .c-ok{fill:var(--green);opacity:.55;stroke:var(--green)}
+svg .c-fly{fill:var(--red);opacity:.5;stroke:var(--red)}
+svg .c-und{fill:var(--dim);opacity:.28;stroke:var(--dim)}
+svg .c-txt{fill:var(--text);font:10px ui-monospace,Menlo,monospace}
+svg .cursor{stroke:var(--orange);stroke-width:2.4;fill:none}
+svg .cursor-lbl{fill:var(--orange);font:bold 12px -apple-system,sans-serif}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+
+.wrap{max-width:980px} h1{font-size:27px;max-width:780px} h2{margin:20px 0 10px}
+.status{display:grid;grid-template-columns:75px 1fr;gap:5px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:13px 16px;margin:14px 0;font-size:14px}
+.status b{color:var(--dim)}.status strong{color:var(--green)}
+.background{border-left:3px solid var(--accent);padding:8px 13px;background:var(--surface);font-size:14px}
+.key{color:var(--orange)} .subtle{font-size:12px;color:var(--dim)}
+.figure{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:6px;overflow-x:auto;margin:14px 0}
+.figure svg{min-width:690px;margin:0}svg .node{fill:var(--bg);stroke:var(--border);stroke-width:1.3}svg .new{stroke:var(--orange);stroke-width:1.8}svg .merge{stroke:var(--green);stroke-width:1.8}
+svg .text{font:13px -apple-system,sans-serif;fill:var(--text)}svg .small{font:12px -apple-system,sans-serif;fill:var(--dim)}svg .data{font:12px ui-monospace,monospace;fill:var(--text)}svg .heading{font:bold 15px -apple-system,sans-serif;fill:var(--text)}
+svg .flow{fill:none;stroke:var(--dim);stroke-width:1.5;marker-end:url(#arrow)}svg .flow-green{stroke:var(--green)}
+svg a text{fill:var(--accent);font:12px ui-monospace,monospace;text-decoration:underline}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}th{color:var(--dim);font-weight:500}td:first-child{width:21%}.hl{border-left:3px solid var(--green);padding:9px 13px;background:var(--surface);margin-top:16px}
+@media(max-width:640px){.wrap{padding:25px 14px 40px}h1{font-size:23px;padding-right:30px}.status{grid-template-columns:62px 1fr}table{font-size:13px}}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}})();</script></head><body>
+<button id="theme-toggle" aria-label="Toggle light or dark theme">dark / light</button>
+<script>document.getElementById('theme-toggle').onclick=function(){var r=document.documentElement;var v=r.dataset.theme==='light'?'dark':'light';r.dataset.theme=v;try{localStorage.setItem('gh-pages-theme',v)}catch(e){}};</script>
+<main class="wrap"><h1>How Automodel splits a model without moving the RL loss</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4960">NVIDIA-NeMo/RL #4960</a> · Reviewed code: <code>6bbc949d</code> · Feature comparison</p>
+<div class="status"><b>Before</b><span>Each worker executed all model layers; weights could still be sharded across workers.</span><b>This PR</b><span>Automodel runs the stages; NeMo RL keeps loss computation and parameter updates.</span><b>Status</b><span><strong>Implemented in the PR; not merged.</strong> No major bug confirmed by this review. The branch needs a rebase.</span></div>
+<div class="background"><b>Two jobs, two owners.</b> Automodel builds and runs the neural network. NeMo RL trains it using losses and token logprobs—the log of each token's probability. Pipeline parallelism (PP) divides successive model layers across workers; a microbatch is the small group of rows they process at once.</div>
+<p>The <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/setup.py#L1227">new setup</a> gives each worker one stage. Its <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/pipeline_parallel.py#L276">schedule</a> moves each microbatch through those stages, then the <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/pipeline_parallel.py#L238">last-stage callback</a> sends logits—the model's token scores—to the <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/train.py#L398">same loss and logprob code as PP1</a>. The <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/policy/workers/automodel_policy_worker.py#L911">optimizer update</a> stays in the policy worker.</p>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 580" role="img" aria-labelledby="figtitle figdesc">
+<title id="figtitle">Same input and same loss code; the new path divides model execution between stages.</title>
+<desc id="figdesc">A CPU planning trace has eleven rows of seven tokens; tensor and context parallelism are off. PP1 makes eleven single-row microbatches. PP2 plans three five-row calls, including four masked copies. Each microbatch crosses two model stages. Both paths use post_process_logits; the optimizer stays in the worker.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--dim)"/></marker></defs>
+<text class="heading" x="24" y="29">Existing: each worker runs all layers</text><text class="heading" x="474" y="29">This PR: two stages across workers</text>
+<rect class="node" x="24" y="47" width="402" height="66" rx="8"/><rect class="node" x="474" y="47" width="402" height="66" rx="8"/>
+<text class="data" x="40" y="69">input_ids [11,7] · sample_mask = all 1</text><text class="data" x="490" y="69">input_ids [11,7] · sample_mask = all 1</text>
+<text class="small" x="40" y="94">Row starts: 10, 17, 24, …, 80</text><text class="small" x="490" y="94">Row starts: 10, 17, 24, …, 80</text>
+<path class="flow" d="M225 113 V145"/><path class="flow" d="M675 113 V145"/>
+<rect class="node" x="24" y="145" width="402" height="95" rx="8"/><rect class="node new" x="474" y="145" width="402" height="95" rx="8"/>
+<text class="data" x="40" y="170">11 microbatches of input_ids [1,7]</text><text class="data" x="490" y="170">3 calls of input_ids [5,7]</text>
+<text class="small" x="40" y="192">Each real row runs once; no call padding.</text><text class="data" x="490" y="192">Last call starts: [80,10,10,10,10]</text>
+<text class="small" x="490" y="212">Its sample mask is [1,0,0,0,0].</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/data.py#L215"><text x="40" y="224">get_microbatch_iterator</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/pipeline_parallel.py#L94"><text x="490" y="230">plan_execution_batches</text></a>
+<path class="flow" d="M225 240 V278"/><path class="flow" d="M675 240 V278"/>
+<text class="small" x="40" y="265">forward each [1,7] row</text><text class="small" x="490" y="265">schedule splits each call into five [1,7] rows</text>
+<rect class="node" x="24" y="278" width="402" height="95" rx="8"/>
+<text class="text" x="40" y="303">All model layers</text><text class="data" x="40" y="327">tokens [1,7] → logits [1,7,V]</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/train.py#L336"><text x="40" y="354">forward_with_post_processing_fn</text></a>
+<rect class="node new" x="474" y="278" width="190" height="95" rx="8"/><rect class="node new" x="686" y="278" width="190" height="95" rx="8"/>
+<text class="text" x="488" y="303">First stage</text><text class="data" x="488" y="325">tokens [1,7]</text><text class="data" x="488" y="345">→ hidden [1,7,H]</text>
+<path class="flow" d="M664 315 H686"/>
+<text class="text" x="700" y="303">Last stage</text><text class="data" x="700" y="325">hidden [1,7,H]</text><text class="data" x="700" y="345">→ logits [1,7,V]</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/pipeline_parallel.py#L276"><text x="490" y="368">_run_schedule_call → schedule.step</text></a>
+<path class="flow flow-green" d="M225 373 V420 H450 V440"/><path class="flow flow-green" d="M780 373 V420 H450"/>
+<text class="small" x="40" y="399">logits + original row + masks</text><text class="small" x="490" y="399">last-stage callback + original row + masks</text>
+<rect class="node merge" x="180" y="440" width="540" height="68" rx="8"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/train.py#L398"><text x="200" y="465">post_process_logits(logits, original_microbatch, …)</text></a>
+<text class="text" x="200" y="486">Same loss or token logprobs; worker still owns optimizer.step.</text>
+<text class="small" x="24" y="535">V = vocabulary size; H = hidden width. Shapes assume no tensor/context parallelism.</text>
+<rect x="24" y="550" width="11" height="11" fill="var(--orange)"/><text class="small" x="43" y="560">new execution work</text>
+<rect x="240" y="550" width="11" height="11" fill="var(--green)"/><text class="small" x="259" y="560">shared postprocessing</text>
+</svg>
+<p class="subtle">Data above comes from a CPU planning trace using the PR's real planning and input helpers. Activation shapes are code contracts, not measurements. CUDA movement and a single data-parallel collective were mocked; no model or pipeline schedule ran. Data-parallel workers train on different rows and synchronize gradients.</p>
+<h2>Why the new path adds four masked rows</h2>
+<p>With one row per microbatch and five microbatches per call, the planner rounds 11 real rows up to 15 rows. The <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/pipeline_parallel.py#L129">four added rows copy the first row, with zero sample and token masks</a>; they keep fixed-size calls running without adding training targets. A larger data-parallel shard can make the planner add more calls. For logprobs, the <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/policy/workers/automodel_policy_worker.py#L1109">last stage removes added rows and broadcasts the result</a>.</p>
+<h2>What changes, and what still matches</h2>
+<table><thead><tr><th>Work</th><th>Existing PP1</th><th>New PP path</th></tr></thead><tbody>
+<tr><td>Model execution</td><td>A worker runs all model layers on each microbatch; its weights can still be sharded.</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/setup.py#L1227">One stage per worker</a>; alternate forward and backward passes through the stages.</td></tr>
+<tr><td>Loss and update</td><td colspan="2">Both use <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/train.py#L398">post_process_logits</a>. The <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/policy/workers/automodel_policy_worker.py#L911">worker clips gradients and updates weights</a>; the pipeline does not introduce a new RL objective.</td></tr>
+<tr><td>Use and limits</td><td>Keep the existing path for configurations excluded by PP.</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/policy/utils.py#L175">Startup checks</a> restrict PP combinations. It supports SFT and GRPO; tied embeddings, dynamic batching, sequence packing and LoRA are excluded.</td></tr>
+</tbody></table>
+<div class="hl"><b>The tradeoff:</b> split model execution across workers, pay for stage communication and padded calls. The paths meet at loss processing, while execution and <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/nemo_rl/models/automodel/pipeline_parallel.py#L495">full-model weight export</a> remain different. See the <a href="https://github.com/NVIDIA-NeMo/RL/blob/6bbc949df4e19e1083a00ce35d2722fc4bf6b763/docs/design-docs/automodel-pipeline-parallel.md#L1">design note</a> for setup details. This review inspected pinned upstream code and existing CI; it did not rerun GPU training.</div>
+</main></body></html>
