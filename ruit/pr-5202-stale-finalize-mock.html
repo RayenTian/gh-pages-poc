@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5202 — a commit-path change needs three fields the old test's mock never set</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 20px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--red)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.cref{margin:6px 0 0}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);
+  border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)}
+.diff .del{color:var(--red)}
+.diff .hunk{color:var(--accent)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+.warn{border-left:3px solid var(--red);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 12.5px -apple-system,sans-serif}
+svg .val{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .good{stroke:var(--green)}
+svg .bad{stroke:var(--red)}
+svg .gtxt{fill:var(--green);font:bold 11.5px -apple-system,sans-serif}
+svg .rtxt{fill:var(--red);font:bold 11.5px -apple-system,sans-serif}
+svg .arrow{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .arrow-bad{stroke:var(--red);stroke-width:1.6;fill:none;marker-end:url(#ahr)}
+svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>A commit-path change reads three new fields the old test's mock never sets</h1>
+<p class="sub">Companion illustration for
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5202">NVIDIA-NeMo/RL #5202</a>.
+All permalinks pin the PR head <code>2a522a6</code>.</p>
+
+<nav class="chain">
+  <a href="https://RayenTian.github.io/gh-pages-poc/ruit/pr-5202-capture-dynamic-sampling.html">1 · what it adds</a>
+  <span class="here">2 · the broken test</span>
+</nav>
+<p class="chainnote">Two pages on this PR — this one: a test the feature change leaves failing, and the one-line fix.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>On the committed path, the per-step "no reward signal" tally read only <code>finalized.reward_observations</code> — a field the test's stand-in object already had.</dd>
+  <dt>This PR</dt>
+  <dd>The same tally now calls <code>_voting_rewards(finalized)</code>, which also reads <code>reward_mask_sample</code>, <code>reward_truncated</code> and <code>loss_multiplier</code>. The real object has all three; one existing test's stand-in does not.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Open — not fixed in this PR.</span> The test <code>test_actor_path_releases_generation_permit_before_finalization</code> raises <code>AttributeError</code> in CI. Flagged in review; the one-line fix is below.</dd>
+</dl>
+</div>
+
+<p>The production code is correct: the real
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/experience/rollout_reassembler.py#L200"><code>FinalizedGroup</code></a>
+always carries <code>reward_mask_sample</code>, <code>reward_truncated</code> and <code>loss_multiplier</code>
+(reassembler :200-202). The problem is only in a test: <code>test_rollout_pump.py</code> mocks the finalizer
+with a bare
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/tests/unit/single_controller/test_rollout_pump.py#L1795"><code>SimpleNamespace</code> (:1795)</a>
+that only has <code>valid_row_count</code>, <code>total_row_count</code> and <code>reward_observations</code>.
+After the group commits, the pump computes its reward metric through
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/algorithms/single_controller.py#L1944"><code>_voting_rewards(finalized)</code> (:1944-1950)</a>,
+which reaches for the three missing fields.</p>
+
+<h2>Where it breaks</h2>
+
+<svg viewBox="0 0 900 360" role="img" aria-label="The committed path calls _voting_rewards, which reads three fields. The real FinalizedGroup has them; the test's SimpleNamespace mock does not, so it raises AttributeError.">
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 z" fill="var(--dim)"/></marker>
+    <marker id="ahr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 z" fill="var(--red)"/></marker>
+  </defs>
+  <text class="hdr" x="16" y="22">committed path: tally the step's reward metric</text>
+
+  <rect class="box" x="16" y="40" width="210" height="44" rx="6"/>
+  <text class="lbl" x="28" y="60">finalize returns a</text>
+  <text class="lbl" x="28" y="76">non-rejected group</text>
+  <path class="arrow" d="M228 62 L286 62"/>
+  <rect class="box" x="288" y="40" width="250" height="44" rx="6" style="stroke:var(--accent)"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/algorithms/single_controller.py#L1396" target="_blank" rel="noopener"><text x="300" y="60">_voting_rewards(finalized)</text></a>
+  <text class="lbl" x="300" y="78">reads 3 fields ↓</text>
+
+  <rect class="box" x="288" y="100" width="250" height="60" rx="6"/>
+  <text class="val" x="300" y="120">finalized.reward_mask_sample</text>
+  <text class="val" x="300" y="136">finalized.reward_truncated</text>
+  <text class="val" x="300" y="152">finalized.loss_multiplier</text>
+
+  <!-- real object -->
+  <rect class="box good" x="590" y="36" width="294" height="118" rx="8" style="stroke-width:2"/>
+  <text class="gtxt" x="604" y="58">real FinalizedGroup  ✓</text>
+  <text class="val" x="604" y="80">reward_observations = [1.0, 0.0]</text>
+  <text class="val" x="604" y="98">reward_mask_sample  = [False, False]</text>
+  <text class="val" x="604" y="116">reward_truncated    = [False, False]</text>
+  <text class="val" x="604" y="134">loss_multiplier     = 1.0</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/experience/rollout_reassembler.py#L200" target="_blank" rel="noopener"><text x="604" y="150">reassembler :200-202</text></a>
+  <path class="arrow" d="M538 120 L584 100"/>
+  <text class="gtxt" x="548" y="112">prod</text>
+
+  <!-- mock object -->
+  <rect class="box bad" x="590" y="190" width="294" height="104" rx="8" style="stroke-width:2"/>
+  <text class="rtxt" x="604" y="212">test mock SimpleNamespace  ✗</text>
+  <text class="val" x="604" y="234">valid_row_count = 1</text>
+  <text class="val" x="604" y="252">total_row_count = 1</text>
+  <text class="val" x="604" y="270">reward_observations = []</text>
+  <text class="rtxt" x="604" y="288">(no mask_sample / truncated / loss_multiplier)</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/tests/unit/single_controller/test_rollout_pump.py#L1795" target="_blank" rel="noopener"><text x="604" y="178">test_rollout_pump.py :1795</text></a>
+  <path class="arrow-bad" d="M538 140 L584 232"/>
+  <text class="rtxt" x="548" y="200">test</text>
+
+  <text class="rtxt" x="16" y="210">AttributeError:</text>
+  <text class="val" x="16" y="228">'types.SimpleNamespace'</text>
+  <text class="val" x="16" y="244">object has no attribute</text>
+  <text class="val" x="16" y="260">'reward_mask_sample'</text>
+  <text class="note" x="16" y="286">The call is not guarded by</text>
+  <text class="note" x="16" y="302">dynamic_sampling_enabled — it runs</text>
+  <text class="note" x="16" y="318">on every committed group, so the test</text>
+  <text class="note" x="16" y="334">fails even with the feature off.</text>
+</svg>
+
+<p>I reproduced it directly, independent of any Ray cluster:
+<code>ctrl._voting_rewards(SimpleNamespace(valid_row_count=1, total_row_count=1, reward_observations=[]))</code>
+→ <code>AttributeError: 'types.SimpleNamespace' object has no attribute 'reward_mask_sample'</code>.
+On the parent commit the committed-path tally was
+<code>rewards_carry_no_signal([row.reward for row in finalized.reward_observations])</code>, which needed
+only <code>reward_observations</code> — so the test passed before this PR and fails after it.</p>
+
+<h2>The fix — add the three fields to the mock</h2>
+
+<p class="where"><b>Where the fix lands: one test file.</b>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/tests/unit/single_controller/test_rollout_pump.py#L1795"><code>test_rollout_pump.py</code> <code>_delayed_finalize</code> (:1795)</a>.
+<b>No source change:</b> production is already correct — the real object carries all three fields. This is a stale test stand-in, not a logic bug.</p>
+
+<pre class="diff"><span class="hunk">@@ test_rollout_pump.py L1795-L1799 · _delayed_finalize (mock return)</span>
+             return SimpleNamespace(
+                 valid_row_count=1,
+                 total_row_count=1,
+                 reward_observations=[],
+<span class="add">+                reward_mask_sample=[],   # fields _voting_rewards now reads
++                reward_truncated=[],
++                loss_multiplier=1.0,
++                dropped=False,            # matches the real object's shape
+</span>             )</pre>
+
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5202">review comment — test_rollout_pump.py:1795 (link added once the review is posted)</a></p>
+
+<div class="warn">
+<strong>So what.</strong> This test runs in the L0 unit suite, so CI goes red until the mock is updated —
+it is a merge blocker, not a silent problem. The fix is mechanical and touches no production code. While
+here, it is worth adding one test for the untested combination the PR introduces: a single slot that drops
+once below the valid-fraction limit and once for zero variance, which is the only case that exercises the
+new <code>replacement_index = replacements + filtered_replacements</code> sum.
+</div>
+
+</div>
+</body>
+</html>

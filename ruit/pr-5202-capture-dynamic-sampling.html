@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5202 — dropping a flat-reward prompt group when token capture is on</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 20px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.bg{border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:12px 16px;margin:0 0 18px;font-size:14px}
+.bg b{color:var(--text)}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.good{color:var(--green)}
+.verdict.open{color:var(--red)}
+.verdict.feat{color:var(--accent)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)}
+.diff .del{color:var(--red)}
+.diff .hunk{color:var(--accent)}
+.warn{border-left:3px solid var(--orange);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 12.5px -apple-system,sans-serif}
+svg .val{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .ok{fill:var(--green);font:bold 12px -apple-system,sans-serif}
+svg .merge{fill:var(--orange);font:bold 11.5px -apple-system,sans-serif}
+svg .arrow{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Dropping a flat-reward prompt group when token capture is on</h1>
+<p class="sub">Companion illustration for
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5202">NVIDIA-NeMo/RL #5202</a>
+(dynamic sampling on the token-capture path), stacked on
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/4958">#4958</a>.
+All permalinks pin the PR head <code>2a522a6</code>.</p>
+
+<nav class="chain">
+  <span class="here">1 · what it adds</span>
+  <a href="https://RayenTian.github.io/gh-pages-poc/ruit/pr-5202-stale-finalize-mock.html">2 · the broken test</a>
+</nav>
+<p class="chainnote">Two pages on this PR — this one: the new capability and how it lines up with the path that already existed.</p>
+
+<div class="bg">
+<b>Two words first.</b>
+<b>Dynamic sampling</b> drops a prompt group whose generations all scored the <i>same</i> reward. GRPO
+trains on how much better each answer is than the group's average, so a group with no reward spread gives
+every row zero advantage — it teaches the policy nothing. The controller throws it away and rolls a
+replacement prompt instead.
+<b>Token capture</b> is a second rollout path: the generator stages the heavy token tensors, then a separate
+<i>finalizer</i> actor assembles and verifies the group's rows before the group is allowed to become training
+data. The reward is final only <i>after</i> that verify step.
+</div>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>Turning on both <code>grpo.use_dynamic_sampling</code> and <code>token_capture.enabled</code> was rejected at startup with a <code>ValueError</code> — the two could not run together.</dd>
+  <dt>This PR</dt>
+  <dd>Allows the combination. On the capture path the flat-reward drop runs inside the finalize step, right after the group's rows are verified, before the group becomes selectable.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict feat">New capability.</span> It extends the flat-reward drop that already ran on the non-capture path. (This page's sibling covers a test the change leaves broken.)</dd>
+</dl>
+</div>
+
+<p>On the <b>non-capture</b> path the drop has always happened right after generation, inside
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/experience/rollout_manager.py#L2670">rollout_manager.py <code>generate_and_push</code> :2670</a>:
+the group is scored, and if its voting rewards carry no signal the reservation is removed and the call returns
+<code>FILTERED</code>. The capture path could not do that, because its rewards are not final until the finalizer
+has verified the rows. So this PR moves the same check into the finalize step
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/algorithms/single_controller.py#L1582"><code>_finalize_with_actor</code> :1582</a>),
+and both paths decide which rows vote through one shared function,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/experience/dynamic_sampling.py#L50"><code>voting_rewards</code></a>.</p>
+
+<h2>Same group, two paths, one decision</h2>
+
+<p>A group of two generations that both score reward <code>1.0</code> (no spread) runs down each path:</p>
+
+<svg viewBox="0 0 900 470" role="img" aria-label="Two lanes: the non-capture path drops a flat-reward group right after generation; the capture path drops it inside the finalize step. Both call voting_rewards and reach the same drop-and-replace outcome.">
+  <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 z" fill="var(--dim)"/></marker></defs>
+  <text class="hdr" x="16" y="22">group = 2 generations, both reward 1.0  →  no spread  →  dropped on both paths</text>
+
+  <!-- lane A: non-capture -->
+  <text class="lbl-b" x="16" y="58">non-capture path</text>
+  <rect class="box" x="16" y="70" width="150" height="46" rx="6"/>
+  <text class="lbl" x="28" y="90">generate +</text>
+  <text class="lbl" x="28" y="106">score group</text>
+  <text class="val" x="180" y="88">rewards</text>
+  <text class="val" x="180" y="103">[1.0, 1.0]</text>
+  <path class="arrow" d="M300 92 L344 92"/>
+  <rect class="box" x="346" y="70" width="168" height="46" rx="6" style="stroke:var(--accent)"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/experience/dynamic_sampling.py#L50" target="_blank" rel="noopener"><text x="358" y="90">voting_rewards(...)</text></a>
+  <text class="lbl" x="358" y="106">→ [1.0, 1.0]</text>
+  <path class="arrow" d="M514 92 L558 92"/>
+  <rect class="box" x="560" y="70" width="170" height="46" rx="6" style="stroke:var(--green)"/>
+  <text class="lbl" x="572" y="90">remove_group,</text>
+  <text class="lbl" x="572" y="106">return FILTERED</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/experience/rollout_manager.py#L2674" target="_blank" rel="noopener"><text x="744" y="88">manager</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/experience/rollout_manager.py#L2674" target="_blank" rel="noopener"><text x="744" y="103">:2674</text></a>
+
+  <!-- lane B: capture -->
+  <text class="lbl-b" x="16" y="166">capture path <tspan class="note">(new)</tspan></text>
+  <rect class="box" x="16" y="178" width="150" height="46" rx="6"/>
+  <text class="lbl" x="28" y="198">generate,</text>
+  <text class="lbl" x="28" y="214">stage tokens</text>
+  <path class="arrow" d="M168 201 L210 201"/>
+  <rect class="box" x="212" y="178" width="130" height="46" rx="6"/>
+  <text class="lbl" x="224" y="198">finalizer:</text>
+  <text class="lbl" x="224" y="214">verify rows</text>
+  <text class="val" x="212" y="244">reward_observations [1.0, 1.0]</text>
+  <text class="val" x="212" y="258">+ mask_sample / truncated flags</text>
+  <path class="arrow" d="M344 201 L388 201"/>
+  <rect class="box" x="390" y="178" width="168" height="46" rx="6" style="stroke:var(--accent)"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/algorithms/single_controller.py#L1396" target="_blank" rel="noopener"><text x="402" y="198">_voting_rewards(fin)</text></a>
+  <text class="lbl" x="402" y="214">→ [1.0, 1.0]</text>
+  <path class="arrow" d="M558 201 L602 201"/>
+  <rect class="box" x="604" y="178" width="180" height="46" rx="6" style="stroke:var(--green)"/>
+  <text class="lbl" x="616" y="198">reject in finalize cut,</text>
+  <text class="lbl" x="616" y="214">_ZeroVarianceGroup</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/algorithms/single_controller.py#L1582" target="_blank" rel="noopener"><text x="700" y="244">single_controller.py :1582</text></a>
+
+  <!-- converge -->
+  <text class="merge" x="16" y="300">both reach the same outcome ↓</text>
+  <rect class="box" x="16" y="312" width="868" height="40" rx="8" style="stroke:var(--orange)"/>
+  <text class="lbl" x="30" y="337">drop the group · roll a replacement prompt · tally it under the step's <tspan class="val">zero_variance</tspan> metric</text>
+
+  <!-- the one difference -->
+  <text class="lbl-b" x="16" y="386">What still differs after they merge</text>
+  <text class="note" x="16" y="406">• Non-capture takes its replacement inline; capture reserves a spare first with</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/algorithms/single_controller.py#L1411" target="_blank" rel="noopener"><text x="470" y="406">_claim_filtered_spare :1411</text></a>
+  <text class="note" x="650" y="406">(the finalize cut cannot wait).</text>
+  <text class="note" x="16" y="424">• A dropped capture group already paid for row assembly + the token write, so a high drop rate costs more here.</text>
+  <text class="note" x="16" y="442">• Which rows vote is identical: both pass <tspan class="val">masked_reward_policy</tspan> / <tspan class="val">overlong_filtering</tspan> / per-row <tspan class="val">mask_sample</tspan> into the one shared function.</text>
+</svg>
+
+<h2>What changed in the code</h2>
+
+<p class="chainnote">RL only. The setup rejection is deleted; the drop gains a second home next to the existing one.</p>
+
+<pre class="diff"><span class="hunk">@@ config.py L1457-L1464 · _validate_algo_settings (removed, shown at base b9df420)</span>
+<span class="del">-        # Capture cannot borrow future groups, so routine filtering would stall training.
+-        if master_config.token_capture.enabled:
+-            raise ValueError(
+-                "...use_dynamic_sampling is not supported together with token_capture.enabled..."
+-            )</span>
+
+<span class="hunk">@@ single_controller.py L1582-L1616 · _finalize_with_actor (new branch, after the min-valid-fraction check)</span>
+         elif (counts := self._valid_fraction_counts(finalized)) is not None:
+             ...                                      # #4958's below-fraction drop
+<span class="add">+        elif self._dynamic_sampling_enabled and zero_variance:
++            # flat voting rewards: reject before commit, take a spare from the
++            # filtering pool (already claimed, so the cut never waits on it)
++            replacement = self._pop_filtered_replacement(target_step)
++            ...
++            rejected = _ZeroVarianceGroup(replacement=replacement, ...)</span></pre>
+
+<p>The deleted lines are shown at the parent commit
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b9df42087459eec9b30d7e3f8a3de532abff56e2/nemo_rl/algorithms/single_controller_utils/config.py#L1457">config.py :1457 (base)</a>,
+since they no longer exist at head. The <code>_ZeroVarianceGroup</code> is a sibling of #4958's
+<code>_BelowValidFraction</code>; both share a new
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/algorithms/single_controller.py#L255"><code>_RejectedGroup</code></a>
+base. The below-fraction check is kept first, so a group failing both is replaced from the fault-tolerance
+pool, not the filtering pool
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/2a522a668d8aeb3afc9840cf5d55374d28d843ff/nemo_rl/algorithms/single_controller.py#L1553">:1553</a>).</p>
+
+<div class="warn">
+<strong>So what.</strong> A capture run can now throw away prompt groups that carry no learning signal,
+the same way a non-capture run already did — no more "disable one of the two." The price is only on the
+capture side: a dropped group has already done its token assembly and write, so if your
+<code>zero_variance_fraction</code> is high, each drop costs more than it would without capture. Size
+<code>grpo.dynamic_sampling_max_gen_batches</code> from the drop rate the run reports.
+</div>
+
+</div>
+</body>
+</html>
