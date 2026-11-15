@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR #5176: what can shrink</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--orange:#9a6700;--red:#cf222e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--orange)}
+.bg{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 14px;font-size:14px;margin:0 0 14px}
+.hl{border-left:3px solid var(--accent);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .t{fill:var(--text);font:12px -apple-system,sans-serif}
+svg .tb{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .m{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .d{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .prep{fill:var(--accent);opacity:.35}
+svg .put{fill:var(--orange);opacity:.55}
+svg .seal{fill:var(--green);opacity:.55}
+svg .lane{fill:var(--surface);stroke:var(--border)}
+svg .ax{stroke:var(--border)}
+svg .conv{stroke:var(--green);stroke-dasharray:5 4;fill:none}
+svg a text{text-decoration:underline}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12.5px ui-monospace,Menlo,monospace;margin:2px 4px 2px 0}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px;font-size:14px}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)}.diff .del{color:var(--red)}.diff .hunk{color:var(--accent)}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>About 500 of #5176's 2,281 added lines can go without losing a measured speedup</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176">NVIDIA-NeMo/RL #5176</a>, part 11 of 11 in the partial-checkpointing stack.
+Counts are the PR's own commit <code>788133a..981376a</code> (+2,281 / −49). Permalinks pin <code>981376a</code>.
+The review is pending; its comment links work once it is published.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>#4508 writes generation-prefix rows in batches from one thread, with the worker's own TransferQueue client.</dd>
+  <dt>This PR</dt>
+  <dd>Adds a column encoder, a prepare/write pipeline and a writer actor: 1,390 source lines and 880 test lines.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Proposed in the review, not done:</span> the cuts below. Each one keeps the behavior the benchmark measured.</dd>
+</dl>
+</div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-write-paths.html">1 · new path vs old path</a>
+  <span class="here">2 · what can shrink</span>
+</nav>
+<p class="chainnote">Two pages on this PR. This one: which lines can go, and why each cut is safe.</p>
+
+<p>The biggest piece is the writer actor's transport. <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95-L170"><code>pack_columns</code> / <code>unpack_columns</code></a>
+turn each column into NumPy bytes for the trip to the actor, and
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L280-L373"><code>RayPrefixWriterClient</code></a> wraps the actor.
+But the sink already knows how to call an actor:
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L408-L414"><code>_call_dp</code></a> does <code>ray.get(method.remote(...))</code> when given an actor handle,
+and Ray pickles a TensorDict with jagged and bf16 columns exactly (checked on the pinned torch, tensordict and Ray versions, not through a live actor).
+The PR body itself says the packing "did not improve total snapshot latency".</p>
+
+<svg viewBox="0 0 960 300" role="img" aria-label="Added lines per file, with the part the review asks to remove">
+<style>.lbl{fill:var(--text);font:11px ui-monospace,Menlo,monospace}.num{fill:var(--dim);font:11px ui-monospace,Menlo,monospace}
+.keep{fill:var(--surface2);stroke:var(--border)}.cut{fill:var(--orange);opacity:.9}.lg{fill:var(--text);font:12px -apple-system,sans-serif}</style>
+<rect x="200" y="12" width="14" height="12" class="keep"/><text x="220" y="22" class="lg">stays</text>
+<rect x="280" y="12" width="14" height="12" class="cut"/><text x="300" y="22" class="lg">review asks to remove (comment IDs in brackets)</text>
+<text x="190" y="53" class="lbl" text-anchor="end">tests (3 files)</text>
+<rect x="200" y="40" width="466" height="18" class="keep"/>
+<rect x="666" y="40" width="81" height="18" class="cut"/>
+<text x="753" y="53" class="num">+882 → −130  (C2 C3 C7 C8)</text>
+<text x="190" y="79" class="lbl" text-anchor="end">prefix_pipeline.py</text>
+<rect x="200" y="66" width="249" height="18" class="keep"/>
+<rect x="449" y="66" width="25" height="18" class="cut"/>
+<text x="479" y="79" class="num">+441 → −40  (C3 C5 C6 C7)</text>
+<text x="190" y="105" class="lbl" text-anchor="end">prefix_writer_actor.py</text>
+<rect x="200" y="92" width="92" height="18" class="keep"/>
+<rect x="292" y="92" width="158" height="18" class="cut"/>
+<text x="456" y="105" class="num">+404 → −255  (C2 C3 C8)</text>
+<text x="190" y="131" class="lbl" text-anchor="end">direct_prefix_batch.py</text>
+<rect x="200" y="118" width="128" height="18" class="keep"/>
+<rect x="328" y="118" width="5" height="18" class="cut"/>
+<text x="339" y="131" class="num">+214 → −8  (C9)</text>
+<text x="190" y="157" class="lbl" text-anchor="end">recovery.py</text>
+<rect x="200" y="144" width="68" height="18" class="keep"/>
+<rect x="268" y="144" width="2" height="18" class="cut"/>
+<text x="275" y="157" class="num">+112 → −3  (C5)</text>
+<text x="190" y="183" class="lbl" text-anchor="end">tq_token_sink.py</text>
+<rect x="200" y="170" width="39" height="18" class="keep"/>
+<rect x="239" y="170" width="5" height="18" class="cut"/>
+<text x="250" y="183" class="num">+71 → −8  (C6)</text>
+<text x="190" y="209" class="lbl" text-anchor="end">vllm_worker_async.py</text>
+<rect x="200" y="196" width="24" height="18" class="keep"/>
+<rect x="224" y="196" width="17" height="18" class="cut"/>
+<text x="247" y="209" class="num">+66 → −28  (C2 C4 C6 C7)</text>
+<text x="190" y="235" class="lbl" text-anchor="end">vllm/config.py</text>
+<rect x="200" y="222" width="12" height="18" class="keep"/>
+<rect x="212" y="222" width="10" height="18" class="cut"/>
+<text x="228" y="235" class="num">+36 → −16  (C4 (moves))</text>
+<text x="190" y="261" class="lbl" text-anchor="end">docs + 6 YAML</text>
+<rect x="200" y="248" width="17" height="18" class="keep"/>
+<rect x="217" y="248" width="15" height="18" class="cut"/>
+<text x="238" y="261" class="num">+52 → −24  (C4 C6)</text>
+
+<text x="200" y="290" class="lg">Total: about 510 of 2,281 → about +1,770. Source estimates; exact counts depend on how each ask is written.</text>
+</svg>
+
+<h2>Each cut, and why the behavior stays</h2>
+<table>
+<tr><th>ID</th><th>What goes</th><th>Why nothing measured is lost</th><th>Lines</th></tr>
+<tr><td>C2</td><td>NumPy pack/unpack + <code>RayPrefixWriterClient</code>; pass the actor handle to <code>set_prefix_writer</code></td><td>Ray sends the TensorDict as is; the actor's <code>max_concurrency=1</code> and <code>max_restarts=0</code> keep writes ordered and failures loud. Costs one extra copy each way.</td><td>≈ 245</td></tr>
+<tr><td>C3</td><td>Timing fields, per-write INFO logs, <code>snapshot()</code>, <code>stats()</code></td><td>Only log lines and tests read them.</td><td>≈ 130</td></tr>
+<tr><td>C4</td><td>The knobs in <code>vllm_cfg</code>, the 6 YAML edits, a second validator</td><td>Their siblings already live in <code>rollout_recovery</code>; only single-controller setup reads them.</td><td>≈ 100 net</td></tr>
+<tr><td>C5</td><td><code>max_batch_rows</code>, <code>max_batch_tokens</code></td><td>Same defaults (256, 4,194,304) as the existing <code>generation_prefix_batch_*</code>; today the smaller one silently wins.</td><td>≈ 10</td></tr>
+<tr><td>C6</td><td><code>direct_column_encoding</code></td><td>The pipeline requires it and it was never measured alone; turn it on with the pipeline.</td><td>≈ 25</td></tr>
+<tr><td>C7</td><td>Two of the three copies of the same config check</td><td>One pydantic validator enforces it wherever the config is parsed.</td><td>≈ 35</td></tr>
+<tr><td>C8</td><td><code>_validate_keys</code> in the actor</td><td>Its only caller sends generation-cut keys for the same partition, so it never fires.</td><td>≈ 26</td></tr>
+<tr><td>C9</td><td>Copied dense-or-jagged tail in the encoder</td><td>One helper, same output.</td><td>≈ 8</td></tr>
+</table>
+<p class="cref" id="crefs"></p>
+
+<h2>The biggest cut, as a diff (proposed, not in the PR)</h2>
+<p class="where"><b>Where it lands: RL only.</b> <code>prefix_writer_actor.py</code> loses the packing and the client class; <code>vllm_worker_async.py</code> keeps the actor handle and kills it at shutdown.</p>
+<pre class="diff"><span class="hunk">@@ prefix_writer_actor.py · PrefixWriterService (actor side)</span>
+<span class="del">-    def put(self, batch: PrefixPut) -> PrefixWriteReply:
+-        ...
+-        fields = unpack_columns(batch.columns, len(batch.sample_ids))</span>
+<span class="add">+    # Same keyword names as DataPlaneClient, so _call_dp can reach it via .remote
++    def put_samples(self, *, sample_ids, partition_id, fields, tags) -> None:
++        self._client.put_samples(
++            sample_ids=sample_ids, partition_id=partition_id, fields=fields, tags=tags
++        )</span>
+<span class="hunk">@@ vllm_worker_async.py · setup_token_capture</span>
+<span class="del">-                sink.set_prefix_writer(writer)   # RayPrefixWriterClient wrapping the actor</span>
+<span class="add">+                sink.set_prefix_writer(actor)    # _call_dp does ray.get(actor.put_samples.remote(...))</span></pre>
+
+<div class="hl"><b>So what.</b> The three speedups the PR measured all survive: the column encoder, the prepare/write overlap and the separate writer process.
+What goes is transport code Ray already provides, metrics nothing reads, and config that repeats existing knobs.
+The PR would then be about +1,770 lines. A further option is to split it: encoder + pipeline first (the bigger win), then the writer actor.</div>
+
+</div>
+</body>
+</html>

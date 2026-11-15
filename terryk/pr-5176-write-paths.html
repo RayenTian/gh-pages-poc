@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR #5176: new prefix write path vs the existing one</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--orange:#9a6700;--red:#cf222e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--orange)}
+.bg{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 14px;font-size:14px;margin:0 0 14px}
+.hl{border-left:3px solid var(--accent);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .t{fill:var(--text);font:12px -apple-system,sans-serif}
+svg .tb{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .m{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .d{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .prep{fill:var(--accent);opacity:.35}
+svg .put{fill:var(--orange);opacity:.55}
+svg .seal{fill:var(--green);opacity:.55}
+svg .lane{fill:var(--surface);stroke:var(--border)}
+svg .ax{stroke:var(--border)}
+svg .conv{stroke:var(--green);stroke-dasharray:5 4;fill:none}
+svg a text{text-decoration:underline}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12.5px ui-monospace,Menlo,monospace;margin:2px 4px 2px 0}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How #5176's new prefix write path differs from the one #4508 already has</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176">NVIDIA-NeMo/RL #5176</a>, part 11 of 11 in the partial-checkpointing stack.
+Only the PR's own commit counts: <code>788133a..981376a</code>, +2,281 / −49 (GitHub shows more because the base branch moved).
+Permalinks pin the PR head <code>981376a</code>.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>At a checkpoint, one thread per generation worker prepares a batch of cut rows, writes it to TransferQueue, waits, seals it, then starts the next batch.</dd>
+  <dt>This PR</dt>
+  <dd>Adds three opt-in pieces: a faster column encoder, a pipeline that prepares the next batch while the last one is written, and a separate CPU process that does the writes.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">New feature, off by default. Review open:</span> the design holds up; the review asks to shrink it by about 500 lines and to make CI actually run its tests.</dd>
+</dl>
+</div>
+
+<nav class="chain">
+  <span class="here">1 · new path vs old path</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-what-can-shrink.html">2 · what can shrink</a>
+</nav>
+<p class="chainnote">Two pages on this PR. This one: what the new write path does differently and where it joins the old one.</p>
+
+<div class="bg"><b>Background.</b> During a long generation, a checkpoint can save each request's tokens so far (its "prefix") instead of throwing them away.
+Gym sends each generation worker an <span class="tip" tabindex="0" data-tip="Gym's frozen list of the model calls to cut at this checkpoint. A worker can get several of them per checkpoint; the PR's benchmark saw 39 per engine.">inventory</span>;
+the worker cuts each call, writes one row per call to <span class="tip" tabindex="0" data-tip="The data plane store. Rows are written with put_samples and read back by key on restore.">TransferQueue (TQ)</span>,
+and only after the write is acknowledged does it <span class="tip" tabindex="0" data-tip="Mark the row as part of the call's saved chain and build the acknowledgement Gym puts in the checkpoint.">seal</span> the row. Dotted words have a short explanation: hover or tap them.</div>
+
+<p>Today, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L352-L363"><code>run_cut</code></a> hands each inventory to one control thread, which runs
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L740-L753"><code>checkpoint_cut</code></a> from start to end.
+The PR turns the cut into a generator that stops at each write
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L925"><code>keys = yield PrefixWrite(...)</code></a>).
+With the pipeline off, <code>checkpoint_cut</code> drives that generator itself, so the old behavior stays.
+With it on, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L190"><code>_advance</code></a> prepares on one thread and
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L224"><code>_write</code></a> writes on another, merging rows from different inventories into one write.</p>
+
+<svg viewBox="0 0 960 400" role="img" aria-label="Timeline: old path writes inventory A then B in sequence; the pipeline prepares B while A is written, or merges A and B into one write">
+  <!-- legend -->
+  <rect x="20" y="10" width="14" height="12" class="prep"/><text x="40" y="20" class="t">prepare rows (cut calls, encode)</text>
+  <rect x="270" y="10" width="14" height="12" class="put"/><text x="290" y="20" class="t">TQ write (waits for the ack)</text>
+  <rect x="480" y="10" width="14" height="12" class="seal"/><text x="500" y="20" class="t">seal rows, build Gym's receipt</text>
+  <text x="660" y="20" class="d">example: inventory A = 3 calls, B = 2 calls</text>
+
+  <!-- BEFORE -->
+  <text x="20" y="56" class="tb">Before (#4508): one control thread</text>
+  <rect x="20" y="64" width="920" height="40" class="lane"/>
+  <rect x="150" y="70" width="80" height="28" class="prep"/><text x="158" y="89" class="m">prep A·3</text>
+  <rect x="230" y="70" width="120" height="28" class="put"/><text x="240" y="89" class="m">write 3 rows</text>
+  <rect x="350" y="70" width="40" height="28" class="seal"/><text x="355" y="89" class="m">seal</text>
+  <rect x="390" y="70" width="60" height="28" class="prep"/><text x="394" y="89" class="m">prep B·2</text>
+  <rect x="450" y="70" width="110" height="28" class="put"/><text x="458" y="89" class="m">write 2 rows</text>
+  <rect x="560" y="70" width="40" height="28" class="seal"/><text x="565" y="89" class="m">seal</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L360-L363"><text x="24" y="89" class="m">checkpoint_cut</text></a>
+  <text x="610" y="89" class="d">2 writes, each waits alone</text>
+
+  <!-- AFTER -->
+  <text x="20" y="146" class="tb">This PR, pipeline on: a prepare thread and a writer thread</text>
+  <rect x="20" y="154" width="920" height="40" class="lane"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L190"><text x="24" y="179" class="m">_advance</text></a>
+  <rect x="150" y="160" width="80" height="28" class="prep"/><text x="158" y="179" class="m">prep A·3</text>
+  <rect x="230" y="160" width="60" height="28" class="prep"/><text x="234" y="179" class="m">prep B·2</text>
+  <rect x="400" y="160" width="60" height="28" class="seal"/><text x="404" y="179" class="m">seal A,B</text>
+
+  <rect x="20" y="198" width="920" height="40" class="lane"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L224"><text x="24" y="223" class="m">_write</text></a>
+  <rect x="290" y="204" width="110" height="28" class="put"/><text x="296" y="223" class="m">write 5 rows</text>
+  <text x="470" y="179" class="d">finishes sooner: A and B share one write</text>
+  <text x="410" y="223" class="d">merged by _collect (≤ 256 rows, ≤ 128 MiB) after a 10 ms wait</text>
+
+  <!-- data at each hop -->
+  <text x="20" y="276" class="tb">The data at each hop (same 5 rows in both)</text>
+  <text x="20" y="300" class="t">old encoder</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L851"><text x="130" y="300" class="m">_encode_record × 5 → 5 one-row tensor dicts → stack_or_nest</text></a>
+  <text x="20" y="322" class="t">new encoder</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L840"><text x="130" y="322" class="m">encode_prefix_groups → one TensorDict [rows=5], ids/mask/logprobs jagged by row</text></a>
+  <text x="20" y="344" class="t">TQ client</text>
+  <text x="130" y="344" class="m">old: worker's own client   new (optional): RayPrefixWriterClient → CPU actor → its client</text>
+
+  <!-- convergence -->
+  <line x1="20" y1="364" x2="940" y2="364" class="conv"/>
+  <text x="20" y="384" class="t">Both paths meet at</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L795"><text x="150" y="384" class="m">stage_generation_prefix_batch</text></a>
+  <text x="380" y="384" class="t">and seal with the same loop:</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L943"><text x="560" y="384" class="m">transaction.send(key)</text></a>
+  <text x="720" y="384" class="d">(times are illustrative)</text>
+</svg>
+
+<h2>Where they join, and what still differs</h2>
+<table>
+<tr><th></th><th>Old path (#4508)</th><th>New path (#5176, all three pieces on)</th></tr>
+<tr><td>Who runs the cut</td><td>One control thread, start to end</td><td>Prepare thread owns every call's lock; writer thread only writes. A write's rows are sealed back on the prepare thread.</td></tr>
+<tr><td>Rows per write</td><td>One inventory, up to <code>generation_prefix_batch_size</code> (256)</td><td>Rows from several inventories, up to the smaller of that and <code>max_batch_rows</code> (also 256)</td></tr>
+<tr><td>Encoder</td><td><code>_encode_record</code> per row</td><td><code>encode_prefix_groups</code> per batch; same columns and tags (a parity test checks this)</td></tr>
+<tr><td>Who talks to TQ</td><td>The worker's client</td><td>A CPU actor on the same node, reached through NumPy byte buffers</td></tr>
+<tr><td>Oversized single row</td><td>Written alone</td><td>Fails its cut and regenerates (documented)</td></tr>
+</table>
+<p>They meet at <code>stage_generation_prefix_batch</code>: same staging keys, same columns, same seal loop.
+Before that point the difference is only <em>when</em> rows are prepared and <em>who</em> sends them.
+The measured gain (single runs, prefix cut + save): 52.4 s → 31.7 s with the encoder and pipeline, → 25.2 s with the actor added.</p>
+
+<div class="hl"><b>So what.</b> The design is sound: one generator serves both the old and the new path, and nothing is acknowledged before TQ confirms the write.
+The review's asks are about size and CI. The NumPy packing layer and its client wrapper can go, since Ray already sends a TensorDict and the author's own data says packing did not change total time.
+The new knobs duplicate two existing ones and are validated in three places. CI never runs the 78 new tests.
+Page 2 lists each cut and why it is safe.</div>
+
+</div>
+</body>
+</html>
