@@ -164,7 +164,7 @@ The PR body itself says the packing "did not improve total snapshot latency".</p
 <tr><td>C8</td><td><code>_validate_keys</code> in the actor</td><td>Its only caller sends generation-cut keys for the same partition, so it never fires.</td><td>≈ 26</td></tr>
 <tr><td>C9</td><td>Copied dense-or-jagged tail in the encoder</td><td>One helper, same output.</td><td>≈ 8</td></tr>
 </table>
-<p class="cref" id="crefs"></p>
+<p class="cref" id="crefs">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · prefix_writer_actor.py:95</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656734">C3 · prefix_writer_actor.py:86</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656737">C4 · vllm/config.py:119</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656743">C5 · prefix_pipeline.py:41</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656745">C6 · prefix_pipeline.py:36</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656749">C7 · prefix_pipeline.py:98</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656753">C8 · prefix_writer_actor.py:202</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656754">C9 · direct_prefix_batch.py:70</a></p>
 
 <h2>The biggest cut, as a diff (proposed, not in the PR)</h2>
 <p class="where"><b>Where it lands: RL only.</b> <code>prefix_writer_actor.py</code> loses the packing and the client class; <code>vllm_worker_async.py</code> keeps the actor handle and kills it at shutdown.</p>

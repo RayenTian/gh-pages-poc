@@ -177,6 +177,7 @@ The measured gain (single runs, prefix cut + save): 52.4 s → 31.7 s with the e
 The review's asks are about size and CI. The NumPy packing layer and its client wrapper can go, since Ray already sends a TensorDict and the author's own data says packing did not change total time.
 The new knobs duplicate two existing ones and are validated in three places. CI never runs the 78 new tests.
 Page 2 lists each cut and why it is safe.</div>
+<p class="cref">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · drop packing</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656743">C5 · duplicate knobs</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656749">C7 · one validator</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656722">C1 · tests never run in CI</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656755">C10 · end-to-end run</a></p>
 
 </div>
 </body>
