@@ -102,8 +102,9 @@ The review comments are in a pending review; their links work once it is publish
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4508-size-and-reuse.html">round 1 · size and reuse</a>
   <span class="here">round 2 · old vs new path</span>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4508-v2-what-can-shrink.html">round 2 · what can shrink</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4508-v3-more-cuts.html">round 3 · one write per cut</a>
 </nav>
-<p class="chainnote">Four pages on this PR. The round-1 pages describe an older head. This one: how the batched path differs from the old one, and what the Dynamo rebase does to it.</p>
+<p class="chainnote">Five pages on this PR. The round-1 pages describe an older head. This one: how the batched path differs from the old one, and what the Dynamo rebase does to it.</p>
 
 <div class="bg"><b>Background.</b> When RL saves a checkpoint in the middle of generation, each unfinished model call writes its tokens so far to
 <span class="tip" tabindex="0" data-tip="TQ: the shared tensor store RL uses to pass rows between processes. One write call is a put; one read call is a get.">TransferQueue (TQ)</span>, one row per call. After a restart, Gym sends the call back with the keys of its saved rows, and the call continues from them instead of starting over.
