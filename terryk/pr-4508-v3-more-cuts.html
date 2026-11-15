@@ -188,7 +188,7 @@ Duplicate keys cannot reach here: <code>_cut_batched</code> already
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L786-L789">rejects duplicate model calls</a>, and each key contains the model call's ID.
 The diff is shortened with <code>...</code>; the review comment has the full block that applies with one click.
 It parses and passes <code>ruff</code>. Not run on GPU. About −30 product lines and −20 test lines.</p>
-<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4508">C15 — tq_token_sink.py:780</a></p>
+<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4508#discussion_r4577656826">C15 — tq_token_sink.py:780</a></p>
 
 <h2>The other round-3 cuts</h2>
 <table>
@@ -206,7 +206,7 @@ It parses and passes <code>ruff</code>. Not run on GPU. About −30 product line
 <td>An existing test already
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/tests/unit/models/generation/test_vllm_token_capture_hosting.py#L2337-L2351">fails a 2-row write</a>, and the healthy call is saved only through the one-row retry.</td></tr>
 </table>
-<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4508">C10</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4508">C11</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4508">C16</a></p>
+<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4508#discussion_r4477538638">C10 — prefix_read_batcher.py:95</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4508#discussion_r4477538660">C11 — test_prefix_read_batcher.py:23</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4508#discussion_r4577656922">C16 — test_vllm_token_capture_hosting.py:3953</a></p>
 
 <div class="hl"><b>So what.</b> With round 2, the review now finds about 90 product lines and 140 test lines that can go with no change in any real run, plus about 25 more from C13. The team also looked for a smaller design and found none: the read batcher has no twin in the repo, and holding each call's lock across the shared write needs the generator shape the PR uses.
 Ideas that did not hold up were left out. One example is the cleanup of written rows that no call received. It looks like dead code, but it still runs when rolling back a call fails.</div>
