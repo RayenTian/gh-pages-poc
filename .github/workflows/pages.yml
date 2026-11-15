@@ -39,45 +39,10 @@ jobs:
               cp "$f" "public/$rel"
             done
 
-      - name: Generate index.html sorted by last commit date
-        run: |
-          cat > public/index.html <<'HEADER'
-          <!DOCTYPE html>
-          <html>
-          <head><meta charset="utf-8"><title>Pages</title>
-          <style>
-            body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
-            a { text-decoration: none; color: #1a73e8; }
-            a:hover { text-decoration: underline; }
-            table { border-collapse: collapse; width: 100%; }
-            th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; }
-            th { border-bottom: 2px solid #ddd; color: #555; }
-            .path { color: #666; font-size: 0.9em; }
-            .date { color: #999; }
-            .type { font-size: 0.8em; color: #888; border: 1px solid #ddd; border-radius: 3px; padding: 1px 5px; }
-          </style>
-          </head>
-          <body><h1>Pages</h1>
-          <table><tr><th>File</th><th>Type</th><th>Last Modified</th></tr>
-          HEADER
-          find . \( -name '*.html' -o -name '*.pdf' \) \
-            -not -path './public/*' -not -path './.git/*' -not -path './.github/*' -print0 \
-            | xargs -0 -I{} git log -1 --format='%at {}' -- '{}' \
-            | sort -rn \
-            | while read -r ts f; do
-                rel="${f#./}"
-                name=$(basename "$rel")
-                dir=$(dirname "$rel")
-                ext="${name##*.}"
-                date=$(TZ='America/Los_Angeles' date -d "@$ts" '+%Y-%m-%d %H:%M %Z')
-                if [ "$dir" = "." ]; then
-                  label="$name"
-                else
-                  label="<span class=\"path\">${dir}/</span>${name}"
-                fi
-                echo "<tr><td><a href=\"$rel\">$label</a></td><td><span class=\"type\">${ext}</span></td><td class=\"date\">${date}</td></tr>"
-              done >> public/index.html
-          echo '</table></body></html>' >> public/index.html
+      - name: Generate index.html
+        # Newest first, with a per-person filter and fuzzy search over file
+        # name + <title>. See .ci/build_index.sh.
+        run: sh .ci/build_index.sh public/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
