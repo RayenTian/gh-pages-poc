@@ -114,7 +114,7 @@ A design proposal from the review, not part of the PR. Permalinks pin <code>9813
   <dt>This PR</dt>
   <dd>Adds a third, <code>PrefixWriterActor</code>, with its own copy of that code and a different way of getting its data.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">Proposed — not implemented, and not in the review yet.</span> Yes: one base class for the client and one pool class, with one pool per user. The net saving is small (≈ 110 lines); the gain is one pattern instead of three.</dd>
+  <dd><span class="verdict open">Proposed, as a draft PR: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5256">#5256</a>, stacked on #5176.</span> One base class for the client and one pool class, with one pool per user. The gain is one pattern instead of three, not fewer lines.</dd>
 </dl>
 </div>
 
@@ -193,7 +193,7 @@ Dotted words have a short explanation: hover or tap them.</div>
 <rect class="cl" x="494" y="390" width="452" height="74" rx="6"/>
 <text class="h" x="504" y="410">OffloadPool  (≈ 45 lines)</text>
 <text class="t" x="504" y="430">OffloadPool.start(cls, n, place): wait ready, kill on fail</text>
-<text class="t" x="504" y="450">submit(request) → Ray reference · kill()</text>
+<text class="t" x="504" y="450">wait_ready() · acquire() / release() · kill()</text>
 <rect class="panel2" x="14" y="490" width="300" height="134" rx="8"/>
 <text class="h" x="24" y="508">pool: 1 per vLLM engine</text>
 <rect class="new" x="24" y="518" width="268" height="46" rx="6"/>
@@ -225,7 +225,7 @@ Dotted words have a short explanation: hover or tap them.</div>
 <table>
 <tr><th>Question</th><th>Answer, from the code</th></tr>
 <tr><td>Two ways to get data?</td><td>No second read method needed. A request is either metadata, and the actor reads TQ itself (advantage, reassembler; both already enforce it with <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L74"><code>assert_metadata_only</code></a>), or byte columns sent through Ray (prefix writer), which the writer turns back into a <code>TensorDict</code> with C2's <code>from_bytes</code>. Neither needs anything from the base.</td></tr>
-<tr><td>One caller, many actors?</td><td><code>asyncio.gather</code> over <code>pool.submit</code>, one request per shard; the pool sends each to its least-busy actor. How to split the work stays with the caller: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L232"><code>split_meta_by_prompt_group</code></a> knows prompt groups and which estimators allow a split; generic code cannot.</td></tr>
+<tr><td>One caller, many actors?</td><td><code>asyncio.gather</code> over one call per shard; each call takes a free actor with <code>acquire</code> and gives it back with <code>release</code>. How to split the work stays with the caller: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L232"><code>split_meta_by_prompt_group</code></a> knows prompt groups and which estimators allow a split; generic code cannot.</td></tr>
 <tr><td>One method to override, or read / compute / write?</td><td>One: <code>process(request)</code>. Splitting it into read, compute and write hooks fits only the advantage stage: the writer has nothing to read or compute, and the reassembler reads staging rows, writes finalized rows and clears staging in an order it controls. Extra methods (the writer's <code>clear_samples</code>, the reassembler's <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L204"><code>check_dependencies</code></a>) stay plain methods, called on an actor from <code>pool.acquire()</code>.</td></tr>
 <tr><td>Why does a client need checkpoint and metrics hooks?</td><td>On the <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/interfaces.py#L172">Mooncake</a> TQ backend each client process lends the store memory (64 GiB by default), and the rows it writes live there. A TQ checkpoint therefore asks every such process to save its rows: the controller lists the advantage actors and finalizers for exactly that (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L455-L464">L455-L464</a>). A client built with <code>segment_size=0</code> holds no rows and needs no hook; the prefix writer already does this. So the base holds no rows unless a subclass sets <code>owns_storage</code>. <code>get_data_plane_snapshot</code> returns only I/O counters (bytes, wall time per op), which the controller sums across processes; <code>get_data_plane_metrics</code> says that.</td></tr>
 <tr><td>Why these names?</td><td>"Data-plane actor" sounds like the TQ storage actors that hold the data. "Detached" already means something in Ray: <code>lifetime="detached"</code> is an actor that outlives the process that made it, and these die with their owner. <code>OffloadClient</code> says what it is: a TQ client the caller hands work to. <code>OffloadPool.start</code> is a class method, so there is one entry point.</td></tr>
@@ -293,20 +293,17 @@ class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879
 
 <span class="add">class OffloadPool:</span><span class="cm">                                                                        # one per user; never shared</span>
 <span class="add">    @classmethod</span>
-<span class="add">    def start(cls, client_cls, *args, n, place=None, ready=&#x27;__ray_ready__&#x27;, **ray_opts):</span>
+<span class="add">    def start(cls, client_cls, *args, n, placement=None, **ray_opts):</span>
 <span class="add">        actors = [ray.remote(client_cls).options(num_cpus=1, max_restarts=0,</span><span class="cm">              # the options all three use today</span>
-<span class="add">                  scheduling_strategy=place(i), **ray_opts).remote(*args, label=i) for i in range(n)]</span>
-<span class="add">        ray.get([getattr(a, ready).remote() for a in actors])</span><span class="cm">                             # on failure: kill all, raise</span>
-<span class="add">        return cls(actors)</span>
-<span class="add">    def submit(self, request) -&gt; ObjectRef:</span><span class="cm">                                               # send to the least-busy actor now; never waits</span>
-<span class="add">        ...</span><span class="cm">                                                                               # await it (async code) or .future() (a thread)</span>
-<span class="add">    async def acquire(self) -&gt; ContextManager[actor]:</span><span class="cm">                                     # wait until an actor is free; give it back after</span>
-<span class="add">        ...</span><span class="cm">                                                                               # if the call inside failed, drop that actor</span>
+<span class="add">                  scheduling_strategy=placement(i), **ray_opts).remote(*args, label=i) for i in range(n)]</span>
+<span class="add">        return cls(actors)</span><span class="cm">                                                                # does not wait</span>
+<span class="add">    def wait_ready(self, method=&#x27;__ray_ready__&#x27;, *, timeout_s=None)</span><span class="cm">                       # kill all if one fails</span>
+<span class="add">    async def wait_ready_async(self, method, *, timeout_s=None)</span><span class="cm">                           # for a caller with a serving loop</span>
+<span class="add">    async def acquire(self)</span><span class="cm">                                                               # wait until an actor is free, take it</span>
+<span class="add">    def release(self, actor)</span><span class="cm">                                                              # give it back; never after a failed call</span>
 <span class="add">    size; free; def kill(self)</span><span class="cm">                                                            # free = idle actors (finalizer queue metric); kill at shutdown</span></pre>
-<p class="pcref"><b>How each user calls it.</b> <code>submit</code> sends now and returns a Ray reference; <code>acquire</code> waits for a free actor first, for a caller that must take a lock only once an actor is free.
-Finalizers: <code>async with pool.acquire() as actor</code> (see below).
-Advantage shards: <code>outcomes = await asyncio.gather(*(pool.submit(AdvantageRequest(s)) for s in shards))</code>.
-Prefix writer, from its prepare thread: <code>pool.submit(rows).future().add_done_callback(seal)</code>.</p>
+<p class="pcref"><b>How each user calls it.</b> The controller takes a free actor with <code>acquire</code>, calls <code>process</code>, and <code>release</code>s it unless the call failed (advantage shards and finalizers alike).
+The prefix writer is a pool of one, so it calls <code>pool.actors[0].process</code> directly; Ray runs its calls in order.</p>
 <p class="pcref">Real code it replaces: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L41-L141"><code>advantage_actor.py</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L156-L291"><code>RolloutReassemblerActor</code> and its start function</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L187-L404"><code>PrefixWriterService</code> … <code>create_prefix_writer</code></a>, and the same two hooks in <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/worker_mixin.py#L431-L490"><code>TQWorkerMixin</code></a>.</p>
 <p class="pcref"><b>One pool per use, never shared.</b> Each <code>OffloadPool.start</code> call returns its own pool with its own count and placement: 4 vLLM engines on a node make 4 pools of 1 writer, each pinned to that node; the controller makes one pool of N advantage actors placed anywhere off the head node, and one pool of K finalizers. What is shared is the code, not the actors.</p>
 <p class="pclbl">Migration: the advantage actor</p>
@@ -328,21 +325,21 @@ Prefix writer, from its prepare thread: <code>pool.submit(rows).future().add_don
 <span class="add">pool = OffloadPool.start(AdvantageActor, dp_cfg, stage_cfg, estimator, n=n, place=spread_off_head)</span>
 shards = split_meta_by_prompt_group(meta, pool.size)<span class="cm">                                   # how to split stays here</span>
 <span class="del">outcomes = await gather(*(_run_advantage_stage(AdvantageRequest(s)) for s in shards))</span><span class="cm">  # ≈ 20 lines go</span>
-<span class="add">outcomes = await asyncio.gather(*(pool.submit(AdvantageRequest(s)) for s in shards))</span></pre>
+<span class="add">outcomes = await asyncio.gather(*(run_on_pool(AdvantageRequest(s)) for s in shards))</span><span class="cm">   # acquire, process.remote, release</span></pre>
 <p class="pclbl">Migration: the prefix writer</p>
 <pre class="pc"><span class="who"># PrefixWriter, after (actor process)</span>
 <span class="del">class PrefixWriterActor(PrefixWriterService): put(batch: PrefixPut); ready()</span>
 <span class="add">class PrefixWriter(OffloadClient):</span>
-<span class="add">    def process(self, request):</span><span class="cm">                                                           # request = (keys, byte columns, tags)</span>
-<span class="add">        self.dp.put_samples(request.keys, from_bytes(request.columns), request.tags)</span><span class="cm">      # from_bytes: C2&#x27;s helper, next to the writer</span>
+<span class="add">    def process(self, request):</span><span class="cm">                                                       # request = (keys, byte columns, tags)</span>
+<span class="add">        self.dp.put_samples(request.keys, from_bytes(request.columns), request.tags)</span><span class="cm">  # from_bytes: C2&#x27;s helper, next to the writer</span>
 <span class="add">    def clear_samples(self, keys): self.dp.clear(keys)</span>
 
 <span class="who"># vLLM worker, after (caller side)</span>
-<span class="del">writer = await create_prefix_writer(dp_cfg, partition_id=p)</span><span class="cm">                               # ≈ 30 lines go</span>
+<span class="del">writer = await create_prefix_writer(dp_cfg, partition_id=p)</span><span class="cm">                           # ≈ 30 lines go</span>
 <span class="add">writer = OffloadPool.start(PrefixWriter, dp_cfg, n=1, place=this_node, max_concurrency=1)</span>
-<span class="del">writer.put_samples(sample_ids=, partition_id=, fields=, tags=)</span><span class="cm">                            # RayPrefixWriterClient, 94 lines, goes</span>
-<span class="add">writer.submit(PrefixRows(keys, to_bytes(fields), tags)).future().add_done_callback(seal)</span><span class="cm">  # seal the rows when the write is confirmed</span>
-writer.kill()<span class="cm">                                                                             # at shutdown</span></pre>
+<span class="del">writer.put_samples(sample_ids=, partition_id=, fields=, tags=)</span><span class="cm">                        # RayPrefixWriterClient, 94 lines, goes</span>
+<span class="add">reply = ray.get(pool.actors[0].process.remote(ray.put(batch)))</span><span class="cm">                        # one actor, so no free-actor tracking</span>
+writer.kill()<span class="cm">                                                                         # at shutdown</span></pre>
 <p class="pclbl">Migration: the rollout reassembler</p>
 <pre class="pc"><span class="who"># RolloutReassemblerActor, after</span>
 <span class="del">class RolloutReassemblerActor:</span>
@@ -356,27 +353,28 @@ writer.kill()<span class="cm">                                                  
 <span class="who"># controller, after</span>
 <span class="del">actors = create_rollout_reassembler_actors(dp_cfg, cfg, num_workers=k)</span><span class="cm">  # ≈ 35 lines go</span>
 <span class="del">self._available_finalizers = asyncio.Queue(actors)</span>
-<span class="add">pool = OffloadPool.start(RolloutReassemblerActor, dp_cfg, cfg, n=k,</span>
-<span class="add">                        runtime_env=env, ready=&#x27;check_dependencies&#x27;)</span>
+<span class="add">pool = OffloadPool.start(RolloutReassemblerActor, dp_cfg, cfg, n=k, runtime_env=env)</span>
+<span class="add">pool.wait_ready(&#x27;check_dependencies&#x27;)</span>
 <span class="del">actor = await self._available_finalizers.get(); ...; put_nowait(actor)</span>
-<span class="add">async with pool.acquire() as actor:</span><span class="cm">                                     # waits for a free one; drops it if the call fails</span>
-    async with checkpoint_barrier.mutation(&#x27;group_commits&#x27;):<span class="cm">            # still taken only once an actor is free</span>
-        finalized = await actor.process.remote(request)</pre>
-<p class="pcref">The one real difference: the controller takes the checkpoint lock only after an actor is free, so the lock never covers time spent waiting in an actor's queue. <code>acquire()</code> keeps that; <code>submit()</code> alone would not.</p>
+<span class="add">actor = await pool.acquire()</span><span class="cm">                                            # waits for a free one</span>
+async with checkpoint_barrier.mutation(&#x27;group_commits&#x27;):<span class="cm">                # still taken only once an actor is free</span>
+    finalized = await actor.process.remote(request)
+<span class="add">pool.release(actor)</span><span class="cm">                                                     # only if the call did not fail</span></pre>
+<p class="pcref">The one real difference: the controller takes the checkpoint lock only after an actor is free, so the lock never covers time spent waiting in an actor's queue. <code>acquire()</code> keeps that: the pool hands out an actor only when it is idle.</p>
 
 <table>
-<tr><th>Change</th><th>Lines (estimate)</th></tr>
-<tr><td>New <code>data_plane/offload.py</code>: client base class and pool</td><td>+90</td></tr>
-<tr><td><code>advantage_actor.py</code>: client, hooks, placement, ready wait, cleanup</td><td>−75</td></tr>
-<tr><td><code>rollout_reassembler_actor.py</code>: client, hooks, ready wait, cleanup</td><td>−40</td></tr>
-<tr><td><code>single_controller.py</code>: two hand-built queues of free actors and <code>_run_advantage_stage</code></td><td>−35</td></tr>
-<tr><td>#5176 <code>prefix_writer_actor.py</code>: start function, service/actor split (on top of C2)</td><td>−50</td></tr>
-<tr><td><b>Net</b></td><td><b>≈ −110</b></td></tr>
+<tr><th>Change in #5256</th><th>Lines</th></tr>
+<tr><td>New <code>data_plane/offload.py</code>: client base class, pool, two placements</td><td>+212</td></tr>
+<tr><td><code>advantage_actor.py</code>: client, hooks, placement, ready wait, cleanup</td><td>−59</td></tr>
+<tr><td><code>rollout_reassembler_actor.py</code>: client, hooks, ready wait, cleanup</td><td>−19</td></tr>
+<tr><td><code>prefix_writer_actor.py</code> and <code>single_controller.py</code></td><td>−6</td></tr>
+<tr><td><b>Net, source only</b></td><td><b>+128</b></td></tr>
 </table>
+<p class="pcref">Measured on the draft, not estimated. An earlier estimate here said ≈ −110; it assumed C2's removal of <code>RayPrefixWriterClient</code> (94 lines), which the draft leaves alone, and a shorter base. The payoff is per new actor: the next one is a subclass with one method instead of another ≈ 100 lines of plumbing.</p>
 
-<div class="hl"><b>So what.</b> The three actors reconcile into one client base class with one method to override, and one pool class that each user starts its own copy of: about 90 lines, and nothing more. No second read method, no read/compute/write hooks, no sharding logic in the base.
-The line count drops only a little, but a fourth actor becomes a ten-line subclass, and the prefix writer gets the checkpoint hooks it lacks today.
-To keep #5176 from growing, the base lands first in its own small PR.</div>
+<div class="hl"><b>So what.</b> The three actors reconcile into one client base class with one method to override, and one pool class that each user starts its own copy of, and nothing more. No second read method, no read/compute/write hooks, no sharding logic in the base.
+Today it adds lines rather than removing them, but a fourth actor becomes a short subclass, and the prefix writer gets the checkpoint hooks it lacks today.
+The draft is <a href="https://github.com/NVIDIA-NeMo/RL/pull/5256">#5256</a>; it is not blocking #5176.</div>
 
 </div>
 </body>
