@@ -60,6 +60,32 @@ nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px soli
 nav.chain a:hover{background:var(--surface2)}
 nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
 p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+
+svg .colh{fill:var(--text);font:bold 14px -apple-system,sans-serif}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .h{fill:var(--dim);font:bold 11.5px -apple-system,sans-serif}
+svg .box{fill:var(--surface);stroke:var(--border)}
+svg .panel{fill:none;stroke:var(--dim);stroke-dasharray:6 4}
+svg .panel2{fill:none;stroke:var(--orange);stroke-dasharray:6 4}
+svg .same{fill:var(--surface2);stroke:var(--border)}
+svg .new{fill:var(--surface2);stroke:var(--green);stroke-width:1.5}
+svg .cl{fill:var(--surface);stroke:var(--accent)}
+svg .tq{fill:var(--surface);stroke:var(--orange);stroke-width:1.5}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg .arw{stroke:var(--orange);stroke-width:1.6;fill:none}
+svg .dash{stroke:var(--accent);stroke-dasharray:4 3;fill:none}
+svg .ahf{fill:var(--dim)}
+svg .w{fill:var(--orange);font:bold 11px -apple-system,sans-serif}
+svg a text{fill:var(--accent);font:12px ui-monospace,Menlo,monospace;text-decoration:underline}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
   document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -91,10 +117,11 @@ Permalinks pin the PR head <code>981376a</code>.</p>
 </div>
 
 <nav class="chain">
-  <span class="here">1 · new path vs old path</span>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-what-can-shrink.html">2 · what can shrink</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-who-calls-what.html">1 · who calls what</a>
+  <span class="here">2 · new path vs old path</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-what-can-shrink.html">3 · what can shrink</a>
 </nav>
-<p class="chainnote">Two pages on this PR. This one: what the new write path does differently and where it joins the old one.</p>
+<p class="chainnote">Three pages on this PR. This one: how the new write path runs next to the old one, as a timeline and as pseudocode.</p>
 
 <div class="bg"><b>Background.</b> During a long generation, a checkpoint can save each request's tokens so far (its "prefix") instead of throwing them away.
 Gym sends each generation worker an <span class="tip" tabindex="0" data-tip="Gym's frozen list of the model calls to cut at this checkpoint. A worker can get several of them per checkpoint; the PR's benchmark saw 39 per engine.">inventory</span>;
@@ -159,6 +186,74 @@ With it on, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3
   <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L943"><text x="560" y="384" class="m">transaction.send(key)</text></a>
   <text x="720" y="384" class="d">(times are illustrative)</text>
 </svg>
+
+
+<h2>The same change as pseudocode</h2>
+<p class="pclbl">The cut, before (#4508)</p>
+<pre class="pc"><span class="who"># serving event loop -&gt; one control thread per worker</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L325">run_cut</a>(inventory):
+    return await loop.<a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L330">run_in_executor</a>(control_thread, cut, inventory)
+
+<span class="who"># control thread: the whole cut runs here, start to end</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L710">cut</a>(inventory):
+    for call in <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L912">inventory.calls</a>:
+        tx = <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L924">cut_transaction</a>(call)<span class="cm">                   # generator; holds call.lifecycle_lock</span>
+        <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L946">pending.append</a>(tx, row)
+        if pending is full: <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L950">flush</a>()<span class="cm">                  # 256 rows / 4M tokens</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L951">flush</a>()
+
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L858">flush</a>():
+    keys = <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L871">stage</a>(pending)<span class="cm">                            # encode + TQ put, waits for the ack</span>
+    for tx, key in zip(pending, keys): <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L882">tx.send(key)</a><span class="cm">  # seal the row</span>
+    for tx in pending: <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L887">tx.send(None)</a><span class="cm">                 # build the ack, release the lock</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L325"><code>run_cut</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L710"><code>checkpoint_cut</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L761"><code>_cut_batched</code></a> (at <code>788133a</code>).</p>
+<p class="pclbl">The cut, after (this PR): the same steps, paused at each write</p>
+<pre class="pc"><span class="who"># serving event loop</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L352">run_cut</a>(inventory):
+<span class="add">    if pipeline: return await <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L358">pipeline.submit</a>(inventory)</span><span class="cm">               # pipeline on</span>
+    return await loop.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L360">run_in_executor</a>(control_thread, cut, inventory)<span class="cm">  # pipeline off</span>
+
+<span class="who"># whoever drives it: the control thread (off) or the prepare thread (on)</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L755">cut_steps</a>(inventory):</span><span class="cm">                                              # now a generator</span>
+    for call in <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L974">inventory.calls</a>:
+        tx = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L986">cut_transaction</a>(call)<span class="cm">                                     # holds call.lifecycle_lock</span>
+        <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L1040">pending.append</a>(tx, row)
+        if pending is full: yield from <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L1036">flush</a>()
+
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L911">flush</a>():
+<span class="del">    keys = stage(pending)</span>
+<span class="add">    keys = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L925">yield PrefixWrite</a>(rows, fallback=stage)</span><span class="cm">                     # pause; locks stay held</span>
+    for tx, key in zip(pending, keys): <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L943">tx.send(key)</a><span class="cm">                    # seal, back on this thread</span>
+    for tx in pending: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L948">tx.send(None)</a>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L971">yield BatchReleased</a>()</span><span class="cm">                                              # locks released</span>
+
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L740">cut</a>(inventory):</span><span class="cm">                                                    # pipeline off: drive it inline</span>
+<span class="add">    for req in steps: steps.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L747">send</a>(req.fallback())</span><span class="cm">                       # fallback = stage()</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L352"><code>run_cut</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L740"><code>checkpoint_cut</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L755"><code>_checkpoint_steps</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L911"><code>flush</code></a>.</p>
+<p class="pclbl">New: the two pipeline threads and the writer actor (all new code)</p>
+<pre class="pc"><span class="who"># prepare thread, one per worker (owns every generator and lock)</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L325">_run</a>():</span>
+<span class="add">    loop:</span>
+<span class="add">        if a write finished: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L335">_complete</a>(jobs)</span><span class="cm">            # send keys -&gt; seal</span>
+<span class="add">        elif rows waited 10 ms: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L378">_writers.submit</a>(_write, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L377">_collect</a>())</span>
+<span class="add">        elif buffer has room: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L386">_advance</a>(next inventory)</span><span class="cm">  # run to next yield</span>
+
+<span class="who"># writer thread, one per worker (one write in flight)</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L224">_write</a>(jobs):</span><span class="cm">                                       # rows of several inventories</span>
+<span class="add">    try: keys = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L235">sink.stage_generation_prefix_batch</a>(all rows)</span>
+<span class="add">    except: keys = [job.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L252">fallback</a>() for job in jobs]</span><span class="cm">     # each inventory alone</span>
+
+<span class="who"># writer thread, inside the sink (writer actor on)</span>
+<span class="add">cols = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L840">encode_prefix_groups</a>(rows)</span><span class="cm">                       # one TensorDict</span>
+<span class="add">ref = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L319">ray.put</a>(PrefixPut(<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95">pack_columns</a>(cols)))</span><span class="cm">            # NumPy byte buffers</span>
+<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L325">ray.get</a>(writer_actor.put.remote(ref))</span><span class="cm">                   # blocks until TQ acks</span>
+
+<span class="who"># PrefixWriterActor process (CPU only, same node)</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L204">put</a>(batch):</span>
+<span class="add">    fields = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L130">unpack_columns</a>(batch.columns)</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L225">own_tq_client.put_samples</a>(keys, fields, tags)</span><span class="cm">       # the TQ write</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L325"><code>PrefixWritePipeline._run</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L224"><code>_write</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L300"><code>RayPrefixWriterClient.put_samples</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L204"><code>PrefixWriterService.put</code></a>.
+A call's lock is taken and released only on the prepare thread; the writer thread and the actor only move bytes. The generator can pause while it holds locks, which is why the pipeline caps how many prepared batches wait (the byte budget).</p>
 
 <h2>Where they join, and what still differs</h2>
 <table>

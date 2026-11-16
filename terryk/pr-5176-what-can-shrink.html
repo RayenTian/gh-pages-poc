@@ -63,6 +63,32 @@ p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
 .where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px;font-size:14px}
 .diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
 .diff .add{color:var(--green)}.diff .del{color:var(--red)}.diff .hunk{color:var(--accent)}
+
+svg .colh{fill:var(--text);font:bold 14px -apple-system,sans-serif}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .h{fill:var(--dim);font:bold 11.5px -apple-system,sans-serif}
+svg .box{fill:var(--surface);stroke:var(--border)}
+svg .panel{fill:none;stroke:var(--dim);stroke-dasharray:6 4}
+svg .panel2{fill:none;stroke:var(--orange);stroke-dasharray:6 4}
+svg .same{fill:var(--surface2);stroke:var(--border)}
+svg .new{fill:var(--surface2);stroke:var(--green);stroke-width:1.5}
+svg .cl{fill:var(--surface);stroke:var(--accent)}
+svg .tq{fill:var(--surface);stroke:var(--orange);stroke-width:1.5}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg .arw{stroke:var(--orange);stroke-width:1.6;fill:none}
+svg .dash{stroke:var(--accent);stroke-dasharray:4 3;fill:none}
+svg .ahf{fill:var(--dim)}
+svg .w{fill:var(--orange);font:bold 11px -apple-system,sans-serif}
+svg a text{fill:var(--accent);font:12px ui-monospace,Menlo,monospace;text-decoration:underline}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
   document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -94,10 +120,11 @@ The review is pending; its comment links work once it is published.</p>
 </div>
 
 <nav class="chain">
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-write-paths.html">1 · new path vs old path</a>
-  <span class="here">2 · what can shrink</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-who-calls-what.html">1 · who calls what</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-write-paths.html">2 · new path vs old path</a>
+  <span class="here">3 · what can shrink</span>
 </nav>
-<p class="chainnote">Two pages on this PR. This one: which lines can go, and why each cut is safe.</p>
+<p class="chainnote">Three pages on this PR. This one: which lines can go, and why each cut is safe.</p>
 
 <p>The biggest piece is the writer actor's transport. <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95-L170"><code>pack_columns</code> / <code>unpack_columns</code></a>
 turn each column into NumPy bytes for the trip to the actor, and
@@ -127,7 +154,7 @@ The PR body itself says the packing "did not improve total snapshot latency".</p
 <text x="190" y="131" class="lbl" text-anchor="end">direct_prefix_batch.py</text>
 <rect x="200" y="118" width="128" height="18" class="keep"/>
 <rect x="328" y="118" width="5" height="18" class="cut"/>
-<text x="339" y="131" class="num">+214 → −8  (C9)</text>
+<text x="339" y="131" class="num">+214 → −5  (C9)</text>
 <text x="190" y="157" class="lbl" text-anchor="end">recovery.py</text>
 <rect x="200" y="144" width="68" height="18" class="keep"/>
 <rect x="268" y="144" width="2" height="18" class="cut"/>
@@ -162,24 +189,30 @@ The PR body itself says the packing "did not improve total snapshot latency".</p
 <tr><td>C6</td><td><code>direct_column_encoding</code></td><td>The pipeline requires it and it was never measured alone; turn it on with the pipeline.</td><td>≈ 25</td></tr>
 <tr><td>C7</td><td>Two of the three copies of the same config check</td><td>One pydantic validator enforces it wherever the config is parsed.</td><td>≈ 35</td></tr>
 <tr><td>C8</td><td><code>_validate_keys</code> in the actor</td><td>Its only caller sends generation-cut keys for the same partition, so it never fires.</td><td>≈ 26</td></tr>
-<tr><td>C9</td><td>Copied dense-or-jagged tail in the encoder</td><td>One helper, same output.</td><td>≈ 8</td></tr>
+<tr><td>C9</td><td>Copied dense-or-jagged tail in the encoder</td><td>One helper, same output.</td><td>≈ 5</td></tr>
 </table>
 <p class="cref" id="crefs">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · prefix_writer_actor.py:95</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656734">C3 · prefix_writer_actor.py:86</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656737">C4 · vllm/config.py:119</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656743">C5 · prefix_pipeline.py:41</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656745">C6 · prefix_pipeline.py:36</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656749">C7 · prefix_pipeline.py:98</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656753">C8 · prefix_writer_actor.py:202</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656754">C9 · direct_prefix_batch.py:70</a></p>
 
-<h2>The biggest cut, as a diff (proposed, not in the PR)</h2>
-<p class="where"><b>Where it lands: RL only.</b> <code>prefix_writer_actor.py</code> loses the packing and the client class; <code>vllm_worker_async.py</code> keeps the actor handle and kills it at shutdown.</p>
-<pre class="diff"><span class="hunk">@@ prefix_writer_actor.py · PrefixWriterService (actor side)</span>
-<span class="del">-    def put(self, batch: PrefixPut) -> PrefixWriteReply:
--        ...
--        fields = unpack_columns(batch.columns, len(batch.sample_ids))</span>
-<span class="add">+    # Same keyword names as DataPlaneClient, so _call_dp can reach it via .remote
-+    def put_samples(self, *, sample_ids, partition_id, fields, tags) -> None:
-+        self._client.put_samples(
-+            sample_ids=sample_ids, partition_id=partition_id, fields=fields, tags=tags
-+        )</span>
-<span class="hunk">@@ vllm_worker_async.py · setup_token_capture</span>
-<span class="del">-                sink.set_prefix_writer(writer)   # RayPrefixWriterClient wrapping the actor</span>
-<span class="add">+                sink.set_prefix_writer(actor)    # _call_dp does ray.get(actor.put_samples.remote(...))</span></pre>
+<h2>The biggest cut, as pseudocode (proposed, not run)</h2>
+<p>Nothing below is implemented.</p>
+<p class="where"><b>Where it lands: RL only.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95"><code>prefix_writer_actor.py</code></a> loses the packing and the client class; <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L987"><code>vllm_worker_async.py</code></a> keeps the bare actor handle and kills it at shutdown. No TQ change.</p>
+<pre class="pc"><span class="who"># writer thread, inside the sink (proposed: no packing, no client class)</span>
+cols = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L840">encode_prefix_groups</a>(rows)<span class="cm">                         # one TensorDict</span>
+<span class="del">ref = ray.put(PrefixPut(pack_columns(cols)))</span>
+<span class="del">ray.get(RayPrefixWriterClient -&gt; actor.put.remote(ref))</span>
+<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L408">_call_dp</a>(writer_actor, &#x27;put_samples&#x27;, fields=cols, ...)</span><span class="cm">   # ray.get(actor.put_samples.remote(...))</span>
+
+<span class="who"># PrefixWriterActor process (CPU only, same node)</span>
+<span class="del">def put(batch):</span>
+<span class="del">    fields = unpack_columns(batch.columns)</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L204">put_samples</a>(sample_ids, partition_id, fields, tags):</span><span class="cm">  # TensorDict arrives as is</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L225">own_tq_client.put_samples</a>(sample_ids, fields, tags)
+
+<span class="who"># vLLM worker, setup and shutdown</span>
+<span class="del">sink.set_prefix_writer(RayPrefixWriterClient(actor))</span>
+<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L994">sink.set_prefix_writer</a>(actor)</span><span class="cm">                             # the bare actor handle</span>
+<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L3293">ray.kill</a>(actor, no_restart=True)</span><span class="cm">                          # on shutdown</span></pre>
+<p class="pcref">Real code today: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95"><code>pack_columns</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L130"><code>unpack_columns</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L280"><code>RayPrefixWriterClient</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L408"><code>_call_dp</code></a>.</p>
 
 <div class="hl"><b>So what.</b> The three speedups the PR measured all survive: the column encoder, the prepare/write overlap and the separate writer process.
 What goes is transport code Ray already provides, metrics nothing reads, and config that repeats existing knobs.

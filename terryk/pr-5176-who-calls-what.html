@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR #5176: who calls what</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--orange:#9a6700;--red:#cf222e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--orange)}
+.bg{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 14px;font-size:14px;margin:0 0 14px}
+.hl{border-left:3px solid var(--accent);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .t{fill:var(--text);font:12px -apple-system,sans-serif}
+svg .tb{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .m{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .d{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .prep{fill:var(--accent);opacity:.35}
+svg .put{fill:var(--orange);opacity:.55}
+svg .seal{fill:var(--green);opacity:.55}
+svg .lane{fill:var(--surface);stroke:var(--border)}
+svg .ax{stroke:var(--border)}
+svg .conv{stroke:var(--green);stroke-dasharray:5 4;fill:none}
+svg a text{text-decoration:underline}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12.5px ui-monospace,Menlo,monospace;margin:2px 4px 2px 0}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+
+svg .colh{fill:var(--text);font:bold 14px -apple-system,sans-serif}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .h{fill:var(--dim);font:bold 11.5px -apple-system,sans-serif}
+svg .box{fill:var(--surface);stroke:var(--border)}
+svg .panel{fill:none;stroke:var(--dim);stroke-dasharray:6 4}
+svg .panel2{fill:none;stroke:var(--orange);stroke-dasharray:6 4}
+svg .same{fill:var(--surface2);stroke:var(--border)}
+svg .new{fill:var(--surface2);stroke:var(--green);stroke-width:1.5}
+svg .cl{fill:var(--surface);stroke:var(--accent)}
+svg .tq{fill:var(--surface);stroke:var(--orange);stroke-width:1.5}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg .arw{stroke:var(--orange);stroke-width:1.6;fill:none}
+svg .dash{stroke:var(--accent);stroke-dasharray:4 3;fill:none}
+svg .ahf{fill:var(--dim)}
+svg .w{fill:var(--orange);font:bold 11px -apple-system,sans-serif}
+svg a text{fill:var(--accent);font:12px ui-monospace,Menlo,monospace;text-decoration:underline}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Who calls what in #5176: a new CPU actor next to each vLLM worker does the prefix TQ writes</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176">NVIDIA-NeMo/RL #5176</a>, part 11 of 11 in the partial-checkpointing stack.
+Own commit only: <code>788133a..981376a</code> (also on a <a href="https://github.com/terrykong/RL/pull/29">mirror PR</a> that shows just this diff).
+Permalinks pin <code>981376a</code>; "before" links pin <code>788133a</code>.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>The vLLM worker process cuts the calls, encodes the rows and writes them to TQ itself, with its own in-process TQ client, on one control thread.</dd>
+  <dt>This PR</dt>
+  <dd>Adds a prepare thread and a writer thread inside the worker, and an optional CPU-only Ray actor on the same node that does only the prefix writes.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">New, off by default. Review open:</span> the shape is sound; the review asks to drop the packing layer and the client wrapper around the actor (C2).</dd>
+</dl>
+</div>
+
+<nav class="chain">
+  <span class="here">1 · who calls what</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-write-paths.html">2 · new path vs old path</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-what-can-shrink.html">3 · what can shrink</a>
+</nav>
+<p class="chainnote">Three pages on this PR. This one: which process and which class does each step, and what crosses each boundary.</p>
+
+<div class="bg"><b>Background.</b> At a checkpoint, Gym sends each vLLM worker an <span class="tip" tabindex="0" data-tip="Gym's frozen list of model calls to cut at this checkpoint.">inventory</span>.
+The worker freezes each call, builds one row of tokens per call, writes the rows to
+<span class="tip" tabindex="0" data-tip="TransferQueue, the data plane. Its own Ray actors are a controller and several SimpleStorage units, spread over the nodes. Every process that uses it holds a client object in-process.">TQ</span>,
+and only after TQ confirms does it <span class="tip" tabindex="0" data-tip="Mark the row as part of the call's saved chain and build the acknowledgement Gym stores in the checkpoint.">seal</span> the rows and answer Gym.
+Dashed boxes are OS processes; solid boxes inside are the classes that run each numbered step. Dotted words have a short explanation: hover or tap them.</div>
+
+<h2>Processes and classes, before and after</h2>
+
+<svg viewBox="0 0 1060 760" role="img" aria-label="Before: the vLLM worker writes to TQ itself. After: a prepare thread and a writer thread in the worker, and a CPU writer actor on the same node does the TQ write">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahf" d="M0,0L10,5L0,10z"/></marker></defs>
+
+<!-- ===== LEFT: before ===== -->
+<text class="colh" x="16" y="24">Before (#4508)</text>
+<text class="n" x="16" y="40">one control thread does everything</text>
+<rect class="box" x="28" y="50" width="480" height="36" rx="6"/>
+<text class="t" x="36" y="66">Gym process</text>
+<text class="d" x="36" y="80">sends the inventory: 5 calls (example), POST generation cut</text>
+<path class="arr" d="M80,86 L80,126" marker-end="url(#ah)"/>
+
+<rect class="panel" x="16" y="100" width="504" height="352" rx="9"/>
+<text class="h" x="24" y="116">vLLM worker process (Ray actor, GPU) × N</text>
+
+<rect class="same" x="28" y="128" width="480" height="48" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L325"><text x="36" y="146">PrefixRecovery.run_cut</text></a>
+<text class="d" x="36" y="164">① hands the inventory to the single control thread</text>
+<path class="arr" d="M80,176 L80,190" marker-end="url(#ah)"/>
+
+<rect class="same" x="28" y="192" width="480" height="62" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/models/generation/prefix_recovery/recovery.py#L710"><text x="36" y="210">control thread: checkpoint_cut → _cut_batched</text></a>
+<text class="d" x="36" y="228">② freeze each call (holds its lock), build 5 rows</text>
+<text class="d" x="36" y="244">⑤ after the write: seal 5 rows, receipt back to Gym</text>
+<path class="arr" d="M80,254 L80,268" marker-end="url(#ah)"/>
+
+<rect class="same" x="28" y="270" width="480" height="62" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/788133a5545953dcdbd3a60af6b2a99d90482346/nemo_rl/data_plane/tq_token_sink.py#L795"><text x="36" y="288">TQTokenSink.stage_generation_prefix_batch</text></a>
+<text class="d" x="36" y="306">③ _encode_record per row → stack into one TensorDict</text>
+<text class="d" x="36" y="322">④ TQStagingStore.put_many → this process's TQ client</text>
+
+<rect class="same" x="28" y="346" width="480" height="48" rx="6"/>
+<text class="t" x="36" y="364">PrefixReadBatcher (restore reads) + terminal writes</text>
+<text class="d" x="36" y="382">same TQ client, same process</text>
+
+<rect class="cl" x="28" y="404" width="480" height="38" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L884"><text x="36" y="420">TQDataPlaneClient (in-process object, one per worker)</text></a>
+<text class="d" x="36" y="435">built by build_data_plane_client in setup_token_capture</text>
+
+<rect class="tq" x="28" y="660" width="480" height="70" rx="8"/>
+<text class="t" x="36" y="680">TQ: controller + SimpleStorage unit actors</text>
+<text class="d" x="36" y="698">units are spread over the nodes; clients reach them directly</text>
+<text class="d" x="36" y="716">W: prefix rows, terminal rows, both from the worker   R: restore</text>
+<path class="arw" d="M268,442 L268,658" marker-end="url(#ah)"/>
+<text class="w" x="276" y="560">R / W, all from the worker</text>
+
+<!-- ===== RIGHT: after ===== -->
+<text class="colh" x="540" y="24">This PR (pipeline + writer actor on)</text>
+<text class="n" x="540" y="40">prepare and write overlap; the TQ write leaves the worker</text>
+<rect class="box" x="552" y="50" width="480" height="36" rx="6"/>
+<text class="t" x="560" y="66">Gym process</text>
+<text class="d" x="560" y="80">same inventory, same 5 calls</text>
+<path class="arr" d="M604,86 L604,126" marker-end="url(#ah)"/>
+
+<rect class="panel" x="540" y="100" width="504" height="406" rx="9"/>
+<text class="h" x="548" y="116">vLLM worker process (Ray actor, GPU) × N</text>
+
+<rect class="same" x="552" y="128" width="480" height="48" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L358"><text x="560" y="146">PrefixRecovery.run_cut → PrefixWritePipeline.submit</text></a>
+<text class="d" x="560" y="164">① queue the inventory; a repeated inventory shares one result</text>
+<path class="arr" d="M604,176 L604,190" marker-end="url(#ah)"/>
+
+<rect class="new" x="552" y="192" width="480" height="62" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L190"><text x="560" y="210">prepare thread: _advance → _checkpoint_steps (generator)</text></a>
+<text class="d" x="560" y="228">② freeze calls, build 5 rows, pause at yield PrefixWrite</text>
+<text class="d" x="560" y="244">⑤ _complete: keys go back in, seal, receipt to Gym</text>
+<path class="arr" d="M604,254 L604,268" marker-end="url(#ah)"/>
+
+<rect class="new" x="552" y="270" width="480" height="78" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L224"><text x="560" y="288">writer thread: _write → TQTokenSink.stage_generation_prefix_batch</text></a>
+<text class="d" x="560" y="306">③ merge rows of several inventories; encode_prefix_groups</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L300"><text x="560" y="324">RayPrefixWriterClient.put_samples: pack_columns, ray.put</text></a>
+<text class="d" x="560" y="340">then ray.get: this thread waits for the actor's reply</text>
+
+<rect class="same" x="552" y="362" width="480" height="48" rx="6"/>
+<text class="t" x="560" y="380">PrefixReadBatcher (restore reads) + terminal writes</text>
+<text class="d" x="560" y="398">unchanged: still the worker's own TQ client</text>
+
+<rect class="cl" x="552" y="420" width="480" height="38" rx="6"/>
+<text class="t" x="560" y="436">TQDataPlaneClient (worker's own)</text>
+<text class="d" x="560" y="451">no longer used for prefix PUTs when the actor is on</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L987"><text x="560" y="486">setup_token_capture → create_prefix_writer: starts the actor once</text></a>
+<path class="dash" d="M560,492 L560,530" marker-end="url(#ah)"/>
+
+<rect class="panel2" x="540" y="532" width="504" height="108" rx="9"/>
+<text class="h" x="548" y="548">PrefixWriterActor process (Ray actor, 1 CPU, 0 GPU)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L390"><text x="548" y="564">pinned to the worker's node: NodeAffinity, soft=False</text></a>
+<rect class="new" x="552" y="572" width="480" height="58" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L204"><text x="560" y="590">PrefixWriterService.put → unpack_columns</text></a>
+<text class="d" x="560" y="606">④ its OWN TQDataPlaneClient.put_samples (a second client)</text>
+<text class="d" x="560" y="622">one call at a time (max_concurrency=1), no retries</text>
+
+<path class="arr" d="M1032,330 L1038,330 L1038,570 L1032,570" marker-end="url(#ah)"/>
+<text class="w" x="780" y="500" text-anchor="start">PrefixPut via Ray's object store:</text>
+<text class="d" x="780" y="514">keys, NumPy byte columns + offsets, tags</text>
+<text class="d" x="780" y="526">reply: PrefixWriteReply (keys + timings)</text>
+
+<rect class="tq" x="552" y="660" width="480" height="70" rx="8"/>
+<text class="t" x="560" y="680">TQ: controller + SimpleStorage unit actors</text>
+<text class="d" x="560" y="698">W: prefix rows (from the actor) + terminal rows (worker)</text>
+<text class="d" x="560" y="716">R: restore, still from the worker</text>
+<path class="arw" d="M700,630 L700,658" marker-end="url(#ah)"/>
+<text class="w" x="708" y="650">W prefix rows</text>
+
+<!-- legend -->
+<rect class="same" x="16" y="740" width="14" height="12"/><text class="d" x="36" y="750">existing class</text>
+<rect class="new" x="140" y="740" width="14" height="12"/><text class="d" x="160" y="750">new in this PR</text>
+<rect class="panel" x="270" y="740" width="14" height="12"/><text class="d" x="290" y="750">OS process</text>
+</svg>
+
+<h2>Your questions, answered from the code</h2>
+<table>
+<tr><th>Question</th><th>Answer</th></tr>
+<tr><td>Who starts the writer actor?</td><td>The vLLM worker itself, once, in
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L987-L998"><code>setup_token_capture</code></a>, and only on the worker that owns the model, when <code>prefix_writer_actor: true</code>. It is not a detached actor, so the worker that made it owns it; the worker kills it at <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L3291-L3294">shutdown</a>.</td></tr>
+<tr><td>Isn't there already a TQ client actor on every node?</td><td>No. TQ's own actors are the controller and the
+<span class="tip" tabindex="0" data-tip="SimpleStorage units: num_cpus=1 Ray actors that TQ places round-robin over every node that offers CPU.">storage units</span>. A TQ client is a plain object inside each process that uses TQ: the worker builds one with
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L884"><code>build_data_plane_client</code></a>. The writer actor builds a <em>second</em> client in its own process (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L272">L272</a>).</td></tr>
+<tr><td>What crosses the boundary?</td><td>A <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L70"><code>PrefixPut</code></a>: the row keys, the partition name, every column as a flat NumPy byte buffer (plus dtype, shape, and row offsets for ragged columns), and the per-row tags. For the 5-row example: <code>token_ids_delta</code> = all 5 rows' new token ids end to end, as int64 bytes, with 6 offsets marking where each row starts; route columns are <code>[tokens, layers, top-k]</code> int16. It goes through <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L319-L325"><code>ray.put</code> then <code>actor.put.remote</code></a>. The reply is the same keys plus timings.</td></tr>
+<tr><td>Can it land on another node?</td><td>No. It is created with <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L390"><code>NodeAffinitySchedulingStrategy(node_id, soft=False)</code></a>, so Ray only places it on the worker's node. If that node has no free CPU, it stays pending, and setup gives up after <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L395-L397">180 s</a> and fails loudly. A node check after start is a second guard.</td></tr>
+<tr><td>Does it do TQ reads?</td><td>No. Only prefix PUTs and the cleanup of a failed PUT. Restore reads (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/prefix_recovery/recovery.py#L168"><code>PrefixReadBatcher</code></a>) and the final write when a call finishes keep the worker's own client.</td></tr>
+<tr><td>Why a separate process at all?</td><td>Encoding and sending the bytes costs CPU and holds Python's lock. Moving the send out of the vLLM worker keeps it free to serve requests. Measured with the actor and the packing added: 31.7 s → 25.2 s for the first snapshot (one run).</td></tr>
+</table>
+
+<h2>The classes this PR adds</h2>
+<table>
+<tr><th>Class / function</th><th>Runs in</th><th>Made by</th><th>Job</th></tr>
+<tr><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L79"><code>PrefixWritePipeline</code></a></td><td>worker: 2 threads</td><td><code>PrefixRecovery.__init__</code></td><td>Prepare thread runs the cut generators; writer thread runs one merged write at a time.</td></tr>
+<tr><td><code>PrefixWrite</code>, <code>BatchReleased</code></td><td>worker</td><td>the cut generator</td><td>What the generator hands out: "write these rows", then "their locks are released".</td></tr>
+<tr><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/direct_prefix_batch.py#L73"><code>encode_prefix_groups</code></a></td><td>worker, writer thread</td><td>called by the sink</td><td>Builds whole columns at once, same bytes as <code>_encode_record</code>.</td></tr>
+<tr><td><code>RayPrefixWriterClient</code></td><td>worker</td><td><code>create_prefix_writer</code></td><td>Looks like a TQ client to the sink; packs columns and calls the actor. (C2: can go)</td></tr>
+<tr><td><code>PrefixWriterActor</code> ⊂ <code>PrefixWriterService</code></td><td>its own CPU process</td><td><code>create_prefix_writer</code></td><td>The actor only builds its TQ client; the service unpacks and calls <code>put_samples</code>, so it is testable without Ray.</td></tr>
+<tr><td><code>PrefixPut</code>, <code>PackedColumn</code>, <code>PrefixWriteReply</code></td><td>both sides</td><td>the client</td><td>What crosses the boundary. (C2/C3: can go; the TensorDict can cross as is)</td></tr>
+</table>
+<p class="cref">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · drop packing + client</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656734">C3 · timing-only fields</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656753">C8 · key check never fires</a></p>
+
+<div class="hl"><b>So what.</b> The writer actor is a second TQ client in a CPU process pinned to the worker's node; it only writes prefix rows, and the worker still does every read.
+The worker hands it ready-made columns and waits for TQ's confirmation before sealing anything, so nothing is acknowledged early.
+The packing into NumPy bytes and the client class around the actor are the parts the review asks to remove: Ray can carry the TensorDict, and the sink's <code>_call_dp</code> already calls actor handles.</div>
+
+</div>
+</body>
+</html>
