@@ -114,7 +114,7 @@ A design proposal from the review, not part of the PR. Permalinks pin <code>9813
   <dt>This PR</dt>
   <dd>Adds a third, <code>PrefixWriterActor</code>, with its own copy of that code and a different way of getting its data.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">Proposed — not implemented, and not in the review yet.</span> Yes, they can share one base. The net saving is small (≈ 80 lines); the gain is one pattern instead of three.</dd>
+  <dd><span class="verdict open">Proposed — not implemented, and not in the review yet.</span> Yes, they can share one base. The net saving is small (≈ 90 lines); the gain is one pattern instead of three.</dd>
 </dl>
 </div>
 
@@ -223,10 +223,36 @@ Dotted words have a short explanation: hover or tap them.</div>
 <tr><td>Placement and failure?</td><td><code>place</code> covers today's three: pinned to the caller's node (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L390">writer</a>), spread off the head node (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L80-L141">advantage</a>), default plus its own Python env (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L272-L283">reassembler</a>). All three already use <code>max_restarts=0</code>, and the controller already drops an advantage actor whose call failed (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L5129-L5143">L5129-L5143</a>); the pool does the same for every user.</td></tr>
 </table>
 
-<h2>The shared piece and each user, as pseudocode (proposed, not run)</h2>
+<h2>The two interfaces today, the shared one, and the migration (proposed, not run)</h2>
 <p>Nothing below is implemented.</p>
 <p class="where"><b>Where it lands: RL only.</b> A small refactor PR moves the two actors on main onto the base first; #5176 then uses it for its writer instead of adding a third copy. No TQ or Ray change.</p>
-<p class="pclbl">The shared piece</p>
+<p class="pclbl">Interface today: the prefix writer (#5176)</p>
+<pre class="pc"><span class="who"># vLLM worker process (caller side): what #5176 adds</span>
+writer = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L376">create_prefix_writer</a>(dp_cfg, partition_id=p)<span class="cm">               # -&gt; RayPrefixWriterClient; pinned to this node</span>
+writer.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L300">put_samples</a>(sample_ids=, partition_id=, fields=TensorDict, tags=)<span class="cm">  # pack -&gt; ray.put -&gt; ray.get(actor.put.remote)</span>
+writer.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L358">clear_samples</a>(sample_ids=, partition_id=)<span class="cm">                          # undo a failed write</span>
+writer.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L363">snapshot</a>(); writer.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L367">close</a>()<span class="cm">                                         # timings; ray.kill at shutdown</span>
+
+<span class="who"># PrefixWriterActor process (1 CPU, same node)</span>
+class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L263">PrefixWriterActor</a>(<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L187">PrefixWriterService</a>):
+    __init__(dp_config, partition_id)<span class="cm">                                     # builds its own TQ client</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L276">ready</a>() -&gt; {pid, node_id}<span class="cm">                                             # the caller checks the node</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L204">put</a>(batch: PrefixPut) -&gt; PrefixWriteReply<span class="cm">                             # rows arrive through Ray</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L256">clear</a>(partition_id, sample_ids)</pre>
+<p class="pclbl">Interface today: the advantage actor (on main)</p>
+<pre class="pc"><span class="who"># controller (caller side): on main today</span>
+actors = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L102">create_advantage_actors</a>(dp_cfg, stage_cfg, estimator, num_workers=n)<span class="cm">        # -&gt; list of actor handles</span>
+self._available_advantage_actors = asyncio.Queue(actors)<span class="cm">                             # hand-built pool</span>
+shards = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L232">split_meta_by_prompt_group</a>(meta, n)<span class="cm">                                         # whole prompt groups</span>
+outcomes = await gather(*<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L5125">_run_advantage_stage</a>(AdvantageRequest(s)) for s in shards)<span class="cm">  # take a free actor, await actor.run.remote, put it back</span>
+
+<span class="who"># AdvantageActor process (1 CPU, spread off the head node) x N</span>
+class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L41">AdvantageActor</a>:
+    __init__(dp_config, stage_cfg, estimator, shard_id)<span class="cm">                              # builds its own TQ client</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L59">mooncake_checkpoint</a>(body); <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L67">get_data_plane_snapshot</a>()<span class="cm">                             # checkpoint hooks</span>
+    async <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L72">run</a>(request: AdvantageRequest) -&gt; AdvantageOutcome<span class="cm">                         # metadata in; reads TQ, writes advantages</span></pre>
+<p class="pcref">Same shape: a CPU actor with its own TQ client, a start function, a caller that tracks which actor is free. Different: how many, where, and whether rows come through Ray or are read from TQ.</p>
+<p class="pclbl">Proposed: one shared interface</p>
 <pre class="pc"><span class="who"># new: nemo_rl/data_plane/actors.py (proposed, ≈ 110 lines)</span>
 <span class="add">class DataPlaneActor:</span><span class="cm">                                                         # a CPU Ray actor that owns a TQ client</span>
 <span class="add">    def __init__(self, dp_config, *, label, **client_opts):</span>
@@ -248,38 +274,51 @@ Dotted words have a short explanation: hover or tap them.</div>
 <span class="add">class DataPlaneActorPool:</span><span class="cm">                                                     # an asyncio.Queue of free actors</span>
 <span class="add">    async def call(self, method, request)</span><span class="cm">                                     # any free actor; a failed call drops that actor</span>
 <span class="add">    async def map(self, method, requests)</span><span class="cm">                                     # one request per actor, in parallel</span>
-<span class="add">    def send(self, method, *args) -&gt; Future</span><span class="cm">                                   # don&#x27;t wait: actor.method.remote(...).future()</span></pre>
+<span class="add">    def send(self, method, *args) -&gt; Future</span><span class="cm">                                   # don&#x27;t wait: actor.method.remote(...).future()</span>
+<span class="add">    size; def kill(self)</span><span class="cm">                                                      # number of actors; ray.kill all at shutdown</span></pre>
 <p class="pcref">Real code it replaces: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L41-L141"><code>advantage_actor.py</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L156-L291"><code>RolloutReassemblerActor</code> and its start function</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L187-L404"><code>PrefixWriterService</code> … <code>create_prefix_writer</code></a>, and the same two hooks in <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/worker_mixin.py#L431-L490"><code>TQWorkerMixin</code></a>.</p>
-<p class="pclbl">Each user, after</p>
-<pre class="pc"><span class="who"># controller: advantage stage (on main today)</span>
-<span class="del">def create_advantage_actors(...): ...</span><span class="cm">                                                 # placement, ready wait, cleanup: ≈ 55 lines</span>
-<span class="del">self._available_advantage_actors = asyncio.Queue()</span>
-<span class="add">pool = start_data_plane_actors(AdvantageActor, ..., n=num_workers, place=spread_off_head)</span>
-shards = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L232">split_meta_by_prompt_group</a>(meta, pool.size)<span class="cm">                                  # how to split stays here</span>
-<span class="add">outcomes = await pool.map(&#x27;run&#x27;, [AdvantageRequest(s) for s in shards])</span><span class="cm">               # each actor reads TQ itself</span>
+<p class="pclbl">Migration: the advantage actor</p>
+<pre class="pc"><span class="who"># AdvantageActor, after</span>
+<span class="del">class AdvantageActor:</span>
+<span class="add">class AdvantageActor(DataPlaneActor):</span>
+    def __init__(self, dp_config, stage_cfg, estimator, label):
+<span class="del">        self._dp_client = build_data_plane_client(dp_config, bootstrap=False)</span>
+<span class="add">        super().__init__(dp_config, label=label)</span><span class="cm">                                       # client, log name, hooks</span>
+        self.computer = AdvantageComputer(self.dp, stage_cfg, estimator)
+<span class="del">    def mooncake_checkpoint(...); def get_data_plane_snapshot(...)</span><span class="cm">                     # now inherited</span>
+    async def run(self, request): return await self.computer.run(request)<span class="cm">              # unchanged</span>
 
-<span class="who"># controller: finalizers (on main today)</span>
-<span class="del">self._available_finalizers = asyncio.Queue()</span>
-<span class="add">pool = start_data_plane_actors(RolloutReassemblerActor, ..., n=k, runtime_env=env)</span>
-<span class="add">group = await pool.call(&#x27;finalize&#x27;, request)</span>
-
-<span class="who"># vLLM worker: prefix writes (#5176)</span>
-<span class="add">class PrefixWriter(DataPlaneActor):</span><span class="cm">                                                   # the job; the rest is inherited</span>
-<span class="add">    def put_samples(self, keys, columns, tags): self.dp.put_samples(keys, self.from_bytes(columns), tags)</span>
+<span class="who"># controller, after</span>
+<span class="del">actors = create_advantage_actors(dp_cfg, stage_cfg, estimator, num_workers=n)</span><span class="cm">          # ≈ 60 lines go</span>
+<span class="del">self._available_advantage_actors = asyncio.Queue(actors)</span>
+<span class="add">pool = start_data_plane_actors(AdvantageActor, dp_cfg, stage_cfg, estimator, n=n, place=spread_off_head)</span>
+shards = split_meta_by_prompt_group(meta, pool.size)<span class="cm">                                   # how to split stays here</span>
+<span class="del">outcomes = await gather(*(_run_advantage_stage(AdvantageRequest(s)) for s in shards))</span><span class="cm">  # ≈ 20 lines go</span>
+<span class="add">outcomes = await pool.map(&#x27;run&#x27;, [AdvantageRequest(s) for s in shards])</span></pre>
+<p class="pclbl">Migration: the prefix writer</p>
+<pre class="pc"><span class="who"># PrefixWriter, after (actor process)</span>
+<span class="del">class PrefixWriterActor(PrefixWriterService): put(batch: PrefixPut); ready()</span>
+<span class="add">class PrefixWriter(DataPlaneActor):</span>
+<span class="add">    def put_samples(self, keys, columns, tags):</span>
+<span class="add">        self.dp.put_samples(keys, self.from_bytes(columns), tags)</span><span class="cm">  # rows read in place</span>
 <span class="add">    def clear_samples(self, keys): self.dp.clear(keys)</span>
-<span class="del">writer = await create_prefix_writer(dp_cfg, partition_id=p)</span><span class="cm">                           # ≈ 30 lines</span>
-<span class="add">writer = start_data_plane_actors(PrefixWriter, dp_cfg, n=1, place=this_node,</span>
-<span class="add">                                 max_concurrency=1, client_opts={&#x27;segment_size&#x27;: 0})</span><span class="cm">  # one write at a time, in order</span>
-<span class="add">future = writer.send(&#x27;put_samples&#x27;, keys, to_bytes(fields), tags)</span><span class="cm">                     # seal the rows when it resolves</span></pre>
+
+<span class="who"># vLLM worker, after (caller side)</span>
+<span class="del">writer = await create_prefix_writer(dp_cfg, partition_id=p)</span><span class="cm">        # ≈ 30 lines go</span>
+<span class="add">writer = start_data_plane_actors(PrefixWriter, dp_cfg, n=1, place=this_node, max_concurrency=1)</span>
+<span class="del">writer.put_samples(sample_ids=, partition_id=, fields=, tags=)</span><span class="cm">     # RayPrefixWriterClient, 94 lines, goes</span>
+<span class="add">future = writer.send(&#x27;put_samples&#x27;, keys, to_bytes(fields), tags)</span><span class="cm">  # seal the rows when it resolves</span>
+writer.kill()<span class="cm">                                                      # at shutdown</span></pre>
+<p class="pcref">The reassembler moves the same way as the advantage actor: <code>class RolloutReassemblerActor(DataPlaneActor)</code> keeps <code>finalize</code> and <code>check_dependencies</code>; the controller's queue of free finalizers becomes <code>pool.call('finalize', request)</code>.</p>
 
 <table>
 <tr><th>Change</th><th>Lines (estimate)</th></tr>
 <tr><td>New <code>data_plane/actors.py</code>: base, start function, pool</td><td>+110</td></tr>
 <tr><td><code>advantage_actor.py</code>: client, hooks, placement, ready wait, cleanup</td><td>−75</td></tr>
 <tr><td><code>rollout_reassembler_actor.py</code>: client, hooks, ready wait, cleanup</td><td>−40</td></tr>
-<tr><td><code>single_controller.py</code>: two hand-built queues of free actors</td><td>−25</td></tr>
+<tr><td><code>single_controller.py</code>: two hand-built queues of free actors and <code>_run_advantage_stage</code></td><td>−35</td></tr>
 <tr><td>#5176 <code>prefix_writer_actor.py</code>: start function, service/actor split (on top of C2)</td><td>−50</td></tr>
-<tr><td><b>Net</b></td><td><b>≈ −80</b></td></tr>
+<tr><td><b>Net</b></td><td><b>≈ −90</b></td></tr>
 </table>
 
 <div class="hl"><b>So what.</b> The three actors reconcile into one base class, one start function and one pool, about 110 lines, and nothing more: no generic <code>__call__</code>, no second read method, no sharding logic in the base.
