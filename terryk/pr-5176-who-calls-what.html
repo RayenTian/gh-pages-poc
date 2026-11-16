@@ -112,7 +112,7 @@ Permalinks pin <code>981376a</code>; "before" links pin <code>788133a</code>.</p
   <dt>This PR</dt>
   <dd>Adds a prepare thread and a writer thread inside the worker, and an optional CPU-only Ray actor on the same node that does only the prefix writes.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">New, off by default. Review open:</span> the shape is sound; the review asks to drop the packing layer and the client wrapper around the actor (C2).</dd>
+  <dd><span class="verdict open">New, off by default. Review open:</span> the shape is sound; the review asks to make it the default with no settings (C15) and to shrink the hop to the actor (C2).</dd>
 </dl>
 </div>
 
@@ -260,11 +260,11 @@ Dashed boxes are OS processes; solid boxes inside are the classes that run each 
 <tr><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L79"><code>PrefixWritePipeline</code></a></td><td>worker: 2 threads</td><td><code>PrefixRecovery.__init__</code></td><td>Prepare thread runs the cut generators; writer thread runs one merged write at a time.</td></tr>
 <tr><td><code>PrefixWrite</code>, <code>BatchReleased</code></td><td>worker</td><td>the cut generator</td><td>What the generator hands out: "write these rows", then "their locks are released".</td></tr>
 <tr><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/direct_prefix_batch.py#L73"><code>encode_prefix_groups</code></a></td><td>worker, writer thread</td><td>called by the sink</td><td>Builds whole columns at once, same bytes as <code>_encode_record</code>.</td></tr>
-<tr><td><code>RayPrefixWriterClient</code></td><td>worker</td><td><code>create_prefix_writer</code></td><td>Looks like a TQ client to the sink; packs columns and calls the actor. (C2: can go)</td></tr>
+<tr><td><code>RayPrefixWriterClient</code></td><td>worker</td><td><code>create_prefix_writer</code></td><td>Looks like a TQ client to the sink; packs columns and calls the actor. (C2: a 10-line wrapper is enough)</td></tr>
 <tr><td><code>PrefixWriterActor</code> ⊂ <code>PrefixWriterService</code></td><td>its own CPU process</td><td><code>create_prefix_writer</code></td><td>The actor only builds its TQ client; the service unpacks and calls <code>put_samples</code>, so it is testable without Ray.</td></tr>
-<tr><td><code>PrefixPut</code>, <code>PackedColumn</code>, <code>PrefixWriteReply</code></td><td>both sides</td><td>the client</td><td>What crosses the boundary. (C2/C3: can go; the TensorDict can cross as is)</td></tr>
+<tr><td><code>PrefixPut</code>, <code>PackedColumn</code>, <code>PrefixWriteReply</code></td><td>both sides</td><td>the client</td><td>What crosses the boundary. (C2: keep the NumPy byte views, they are what make the hop cheap; drop the rest)</td></tr>
 </table>
-<p class="cref">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · drop packing + client</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656734">C3 · timing-only fields</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656753">C8 · key check never fires</a></p>
+<p class="cref">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · shrink the hop</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4591760426">C15 · no settings</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656734">C3 · timing-only fields</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656753">C8 · key check never fires</a></p>
 
 <div class="hl"><b>So what.</b> The writer actor is a second TQ client in a CPU process pinned to the worker's node; it only writes prefix rows, and the worker still does every read.
 The worker hands it ready-made columns and waits for TQ's confirmation before sealing anything, so nothing is acknowledged early.

@@ -103,7 +103,7 @@ svg a text{fill:var(--accent);font:12px ui-monospace,Menlo,monospace;text-decora
   document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
 <div class="wrap">
 
-<h1>About 500 of #5176's 2,281 added lines can go without losing a measured speedup</h1>
+<h1>About 560 of #5176's 2,281 added lines can go without losing a measured speedup</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176">NVIDIA-NeMo/RL #5176</a>, part 11 of 11 in the partial-checkpointing stack.
 Counts are the PR's own commit <code>788133a..981376a</code> (+2,281 / −49). Permalinks pin <code>981376a</code>.
 The review is pending; its comment links work once it is published.</p>
@@ -113,7 +113,7 @@ The review is pending; its comment links work once it is published.</p>
   <dt>Before</dt>
   <dd>#4508 writes generation-prefix rows in batches from one thread, with the worker's own TransferQueue client.</dd>
   <dt>This PR</dt>
-  <dd>Adds a column encoder, a prepare/write pipeline and a writer actor: 1,390 source lines and 880 test lines.</dd>
+  <dd>Adds a column encoder, a prepare/write pipeline and a writer actor: 1,390 source lines and 880 test lines, behind three settings that are off by default.</dd>
   <dt>Status</dt>
   <dd><span class="verdict open">Proposed in the review, not done:</span> the cuts below. Each one keeps the behavior the benchmark measured.</dd>
 </dl>
@@ -126,13 +126,12 @@ The review is pending; its comment links work once it is published.</p>
 </nav>
 <p class="chainnote">Three pages on this PR. This one: which lines can go, and why each cut is safe.</p>
 
-<p>The biggest piece is the writer actor's transport. <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95-L170"><code>pack_columns</code> / <code>unpack_columns</code></a>
-turn each column into NumPy bytes for the trip to the actor, and
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L280-L373"><code>RayPrefixWriterClient</code></a> wraps the actor.
-But the sink already knows how to call an actor:
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L408-L414"><code>_call_dp</code></a> does <code>ray.get(method.remote(...))</code> when given an actor handle,
-and Ray pickles a TensorDict with jagged and bf16 columns exactly (checked on the pinned torch, tensordict and Ray versions, not through a live actor).
-The PR body itself says the packing "did not improve total snapshot latency".</p>
+<p>Two asks do most of the work. <b>C15</b> drops the PR's three settings (<code>prefix_writer_actor</code>, <code>prefix_write_pipeline.enabled</code>,
+<code>direct_column_encoding</code>), which today allow six ways to write a cut, and picks the new path whenever the run can use it: text-only capture on TransferQueue <code>simple</code>.
+The old path stays only for media capture and other TQ backends, which the new one does not support (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L851-L856">L851-L856</a>).
+<b>C2</b> keeps the NumPy byte views, because Ray 2.58 copies torch tensors (and so a <code>TensorDict</code>) through torch's own pickle but hands NumPy arrays to the actor in place
+(≈ 45 + 14 ms against ≈ 2 + 0 ms for a 128 MiB batch). It shrinks them to two helpers and replaces the 94-line
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L280-L373"><code>RayPrefixWriterClient</code></a> with a thin wrapper.</p>
 
 <svg viewBox="0 0 960 300" role="img" aria-label="Added lines per file, with the part the review asks to remove">
 <style>.lbl{fill:var(--text);font:11px ui-monospace,Menlo,monospace}.num{fill:var(--dim);font:11px ui-monospace,Menlo,monospace}
@@ -140,83 +139,87 @@ The PR body itself says the packing "did not improve total snapshot latency".</p
 <rect x="200" y="12" width="14" height="12" class="keep"/><text x="220" y="22" class="lg">stays</text>
 <rect x="280" y="12" width="14" height="12" class="cut"/><text x="300" y="22" class="lg">review asks to remove (comment IDs in brackets)</text>
 <text x="190" y="53" class="lbl" text-anchor="end">tests (3 files)</text>
-<rect x="200" y="40" width="466" height="18" class="keep"/>
-<rect x="666" y="40" width="81" height="18" class="cut"/>
-<text x="753" y="53" class="num">+882 → −130  (C2 C3 C7 C8)</text>
+<rect x="200" y="40" width="438" height="18" class="keep"/>
+<rect x="638" y="40" width="108" height="18" class="cut"/>
+<text x="753" y="53" class="num">+882 → −175  (C2 C3 C8 C15)</text>
 <text x="190" y="79" class="lbl" text-anchor="end">prefix_pipeline.py</text>
-<rect x="200" y="66" width="249" height="18" class="keep"/>
-<rect x="449" y="66" width="25" height="18" class="cut"/>
-<text x="479" y="79" class="num">+441 → −40  (C3 C5 C6 C7)</text>
+<rect x="200" y="66" width="255" height="18" class="keep"/>
+<rect x="455" y="66" width="19" height="18" class="cut"/>
+<text x="479" y="79" class="num">+441 → −30  (C3 C15)</text>
 <text x="190" y="105" class="lbl" text-anchor="end">prefix_writer_actor.py</text>
-<rect x="200" y="92" width="92" height="18" class="keep"/>
-<rect x="292" y="92" width="158" height="18" class="cut"/>
-<text x="456" y="105" class="num">+404 → −255  (C2 C3 C8)</text>
+<rect x="200" y="92" width="105" height="18" class="keep"/>
+<rect x="305" y="92" width="146" height="18" class="cut"/>
+<text x="456" y="105" class="num">+404 → −235  (C2 C3 C8)</text>
 <text x="190" y="131" class="lbl" text-anchor="end">direct_prefix_batch.py</text>
-<rect x="200" y="118" width="128" height="18" class="keep"/>
-<rect x="328" y="118" width="5" height="18" class="cut"/>
+<rect x="200" y="118" width="130" height="18" class="keep"/>
+<rect x="330" y="118" width="3" height="18" class="cut"/>
 <text x="339" y="131" class="num">+214 → −5  (C9)</text>
 <text x="190" y="157" class="lbl" text-anchor="end">recovery.py</text>
 <rect x="200" y="144" width="68" height="18" class="keep"/>
 <rect x="268" y="144" width="2" height="18" class="cut"/>
-<text x="275" y="157" class="num">+112 → −3  (C5)</text>
+<text x="275" y="157" class="num">+112 → −3  (C15)</text>
 <text x="190" y="183" class="lbl" text-anchor="end">tq_token_sink.py</text>
 <rect x="200" y="170" width="39" height="18" class="keep"/>
 <rect x="239" y="170" width="5" height="18" class="cut"/>
-<text x="250" y="183" class="num">+71 → −8  (C6)</text>
+<text x="250" y="183" class="num">+71 → −8  (C15)</text>
 <text x="190" y="209" class="lbl" text-anchor="end">vllm_worker_async.py</text>
-<rect x="200" y="196" width="24" height="18" class="keep"/>
-<rect x="224" y="196" width="17" height="18" class="cut"/>
-<text x="247" y="209" class="num">+66 → −28  (C2 C4 C6 C7)</text>
+<rect x="200" y="196" width="22" height="18" class="keep"/>
+<rect x="222" y="196" width="19" height="18" class="cut"/>
+<text x="247" y="209" class="num">+66 → −30  (C2 C15)</text>
 <text x="190" y="235" class="lbl" text-anchor="end">vllm/config.py</text>
-<rect x="200" y="222" width="12" height="18" class="keep"/>
-<rect x="212" y="222" width="10" height="18" class="cut"/>
-<text x="228" y="235" class="num">+36 → −16  (C4 (moves))</text>
+<rect x="200" y="222" width="1" height="18" class="keep"/>
+<rect x="201" y="222" width="21" height="18" class="cut"/>
+<text x="228" y="235" class="num">+36 → −34  (C15)</text>
 <text x="190" y="261" class="lbl" text-anchor="end">docs + 6 YAML</text>
-<rect x="200" y="248" width="17" height="18" class="keep"/>
-<rect x="217" y="248" width="15" height="18" class="cut"/>
-<text x="238" y="261" class="num">+52 → −24  (C4 C6)</text>
-
-<text x="200" y="290" class="lg">Total: about 510 of 2,281 → about +1,770. Source estimates; exact counts depend on how each ask is written.</text>
+<rect x="200" y="248" width="9" height="18" class="keep"/>
+<rect x="209" y="248" width="24" height="18" class="cut"/>
+<text x="238" y="261" class="num">+52 → −38  (C15)</text>
+<text x="200" y="290" class="lg">Total: about 558 of 2,281 → about +1,723. Estimates; exact counts depend on how each ask is written.</text>
 </svg>
 
 <h2>Each cut, and why the behavior stays</h2>
 <table>
 <tr><th>ID</th><th>What goes</th><th>Why nothing measured is lost</th><th>Lines</th></tr>
-<tr><td>C2</td><td>NumPy pack/unpack + <code>RayPrefixWriterClient</code>; pass the actor handle to <code>set_prefix_writer</code></td><td>Ray sends the TensorDict as is; the actor's <code>max_concurrency=1</code> and <code>max_restarts=0</code> keep writes ordered and failures loud. Costs one extra copy each way.</td><td>≈ 245</td></tr>
+<tr><td>C2</td><td><code>G_DTYPES</code>, <code>PackedColumn</code>, <code>PrefixPut</code>, the bf16 branch, <code>RayPrefixWriterClient</code></td><td>Two helpers do the same no-copy byte views for every dtype; the actor options already keep writes ordered and failures loud.</td><td>≈ 205</td></tr>
 <tr><td>C3</td><td>Timing fields, per-write INFO logs, <code>snapshot()</code>, <code>stats()</code></td><td>Only log lines and tests read them.</td><td>≈ 130</td></tr>
-<tr><td>C4</td><td>The knobs in <code>vllm_cfg</code>, the 6 YAML edits, a second validator</td><td>Their siblings already live in <code>rollout_recovery</code>; only single-controller setup reads them.</td><td>≈ 100 net</td></tr>
-<tr><td>C5</td><td><code>max_batch_rows</code>, <code>max_batch_tokens</code></td><td>Same defaults (256, 4,194,304) as the existing <code>generation_prefix_batch_*</code>; today the smaller one silently wins.</td><td>≈ 10</td></tr>
-<tr><td>C6</td><td><code>direct_column_encoding</code></td><td>The pipeline requires it and it was never measured alone; turn it on with the pipeline.</td><td>≈ 25</td></tr>
-<tr><td>C7</td><td>Two of the three copies of the same config check</td><td>One pydantic validator enforces it wherever the config is parsed.</td><td>≈ 35</td></tr>
 <tr><td>C8</td><td><code>_validate_keys</code> in the actor</td><td>Its only caller sends generation-cut keys for the same partition, so it never fires.</td><td>≈ 26</td></tr>
 <tr><td>C9</td><td>Copied dense-or-jagged tail in the encoder</td><td>One helper, same output.</td><td>≈ 5</td></tr>
+<tr><td>C15</td><td>The three settings, their checks in two places, 6 YAML blocks, the doc table, the config tests</td><td>The run already says which path can work; the new path won every measured row, and the old one stays where it is needed.</td><td>≈ 185</td></tr>
 </table>
-<p class="cref" id="crefs">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · prefix_writer_actor.py:95</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656734">C3 · prefix_writer_actor.py:86</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656737">C4 · vllm/config.py:119</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656743">C5 · prefix_pipeline.py:41</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656745">C6 · prefix_pipeline.py:36</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656749">C7 · prefix_pipeline.py:98</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656753">C8 · prefix_writer_actor.py:202</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656754">C9 · direct_prefix_batch.py:70</a></p>
+<p class="cref" id="crefs">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · prefix_writer_actor.py:95</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656734">C3 · prefix_writer_actor.py:86</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656753">C8 · prefix_writer_actor.py:202</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656754">C9 · direct_prefix_batch.py:70</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4591760426">C15 · vllm/config.py:119</a></p>
 
-<h2>The biggest cut, as pseudocode (proposed, not run)</h2>
+<h2>The two biggest cuts, as pseudocode (proposed, not run)</h2>
 <p>Nothing below is implemented.</p>
-<p class="where"><b>Where it lands: RL only.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95"><code>prefix_writer_actor.py</code></a> loses the packing and the client class; <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L987"><code>vllm_worker_async.py</code></a> keeps the bare actor handle and kills it at shutdown. No TQ change.</p>
-<pre class="pc"><span class="who"># writer thread, inside the sink (proposed: no packing, no client class)</span>
-cols = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L840">encode_prefix_groups</a>(rows)<span class="cm">                         # one TensorDict</span>
-<span class="del">ref = ray.put(PrefixPut(pack_columns(cols)))</span>
-<span class="del">ray.get(RayPrefixWriterClient -&gt; actor.put.remote(ref))</span>
-<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L408">_call_dp</a>(writer_actor, &#x27;put_samples&#x27;, fields=cols, ...)</span><span class="cm">   # ray.get(actor.put_samples.remote(...))</span>
+<p class="where"><b>Where it lands: RL only.</b> No TQ or Ray change.</p>
+<p class="pclbl">C2 · the hop to the writer actor</p>
+<pre class="pc"><span class="who"># writer thread in the vLLM worker (proposed: two small helpers, a thin wrapper)</span>
+cols = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L840">encode_prefix_groups</a>(rows)<span class="cm">                                                        # one TensorDict</span>
+<span class="del">ref = ray.put(PrefixPut(pack_columns(cols)))</span><span class="cm">                                             # ~100 lines: dtype table, bf16 branch, checks</span>
+<span class="del">RayPrefixWriterClient.put_samples(...)</span><span class="cm">                                                   # ~95 lines: locks, timings, reply checks</span>
+<span class="add">columns = {name: to_bytes(t) for name, t in cols.items()}</span><span class="cm">                                # NumPy uint8 views, no copy</span>
+<span class="add">ray.get(actor.put_samples.remote(columns=columns, ...))</span><span class="cm">                                  # Ray copies once into shared memory</span>
 
 <span class="who"># PrefixWriterActor process (CPU only, same node)</span>
-<span class="del">def put(batch):</span>
-<span class="del">    fields = unpack_columns(batch.columns)</span>
-<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L204">put_samples</a>(sample_ids, partition_id, fields, tags):</span><span class="cm">  # TensorDict arrives as is</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L225">own_tq_client.put_samples</a>(sample_ids, fields, tags)
+<span class="del">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L204">put</a>(batch): fields = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L130">unpack_columns</a>(batch.columns)</span>
+<span class="add">def put_samples(columns, ...): fields = {k: from_bytes(*v) for k, v in columns.items()}</span><span class="cm">  # reads shared memory in place</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L225">own_tq_client.put_samples</a>(sample_ids, fields, tags)</pre>
+<p class="pcref">Real code today: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95"><code>pack_columns</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L130"><code>unpack_columns</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L280"><code>RayPrefixWriterClient</code></a>.</p>
+<p class="pclbl">C15 · choosing the write path</p>
+<pre class="pc"><span class="who"># vLLM worker, setup_token_capture (proposed: no settings)</span>
+<span class="del">writer_on   = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L842">cfg.prefix_writer_actor</a></span><span class="cm">                                                       # 3 settings, 6 combinations</span>
+<span class="del">pipeline_on = cfg.prefix_write_pipeline.enabled</span>
+<span class="del">encoder_on  = cfg.prefix_write_pipeline.direct_column_encoding</span>
+<span class="add">fast = prefix_cuts and not capture_media and tq_backend == &#x27;simple&#x27;</span><span class="cm">                         # decided once, from what the run is</span>
+<span class="add">if fast:</span>
+<span class="add">    pipeline = PrefixWritePipeline(encoder=direct, limits=parts.generation_prefix_batch_*)</span><span class="cm">  # existing limits</span>
+<span class="add">    writer   = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L987">create_prefix_writer</a>()</span><span class="cm">                                                       # fails clearly if no free CPU</span>
+<span class="add">else:</span>
+<span class="add">    keep today&#x27;s path</span><span class="cm">                                                                       # media capture, other TQ backends</span></pre>
+<p class="pcref">Real code today: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L842-L874"><code>setup_token_capture</code> checks</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/config.py#L354-L383"><code>validate_vllm_async_actor_settings</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L32-L42"><code>PrefixWritePipelineConfig</code></a>.</p>
 
-<span class="who"># vLLM worker, setup and shutdown</span>
-<span class="del">sink.set_prefix_writer(RayPrefixWriterClient(actor))</span>
-<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L994">sink.set_prefix_writer</a>(actor)</span><span class="cm">                             # the bare actor handle</span>
-<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L3293">ray.kill</a>(actor, no_restart=True)</span><span class="cm">                          # on shutdown</span></pre>
-<p class="pcref">Real code today: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95"><code>pack_columns</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L130"><code>unpack_columns</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L280"><code>RayPrefixWriterClient</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L408"><code>_call_dp</code></a>.</p>
-
-<div class="hl"><b>So what.</b> The three speedups the PR measured all survive: the column encoder, the prepare/write overlap and the separate writer process.
-What goes is transport code Ray already provides, metrics nothing reads, and config that repeats existing knobs.
-The PR would then be about +1,770 lines. A further option is to split it: encoder + pipeline first (the bigger win), then the writer actor.</div>
+<div class="hl"><b>So what.</b> The three speedups the PR measured all survive: the column encoder, the prepare/write overlap and the separate writer process, and they become the default.
+What goes is a no-copy bridge written longer than it needs to be, metrics nothing reads, and settings that let a run pick a slower path for no reason.
+The PR would then be about +1,723 lines. A further option is to split it: encoder + pipeline first (the bigger win), then the writer actor.</div>
 
 </div>
 </body>

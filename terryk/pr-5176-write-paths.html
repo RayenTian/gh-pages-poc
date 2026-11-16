@@ -112,7 +112,7 @@ Permalinks pin the PR head <code>981376a</code>.</p>
   <dt>This PR</dt>
   <dd>Adds three opt-in pieces: a faster column encoder, a pipeline that prepares the next batch while the last one is written, and a separate CPU process that does the writes.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">New feature, off by default. Review open:</span> the design holds up; the review asks to shrink it by about 500 lines and to make CI actually run its tests.</dd>
+  <dd><span class="verdict open">New feature, off by default. Review open:</span> the design holds up; the review asks to make it the default with no settings, shrink it by about 560 lines, and make CI check that it runs.</dd>
 </dl>
 </div>
 
@@ -270,9 +270,9 @@ The measured gain (single runs, prefix cut + save): 52.4 s → 31.7 s with the e
 
 <div class="hl"><b>So what.</b> The design is sound: one generator serves both the old and the new path, and nothing is acknowledged before TQ confirms the write.
 The review's asks are about size and CI. The NumPy packing layer and its client wrapper can go, since Ray already sends a TensorDict and the author's own data says packing did not change total time.
-The new knobs duplicate two existing ones and are validated in three places. CI never runs the 78 new tests.
+The three new settings allow six write paths; the review asks to drop them and use the new path wherever it can run. CI never runs the 78 new tests.
 Page 2 lists each cut and why it is safe.</div>
-<p class="cref">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · drop packing</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656743">C5 · duplicate knobs</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656749">C7 · one validator</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656722">C1 · tests never run in CI</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656755">C10 · end-to-end run</a></p>
+<p class="cref">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · drop packing</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4591760426">C15 · no settings</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656722">C1 · tests never run in CI</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656755">C10 · end-to-end run</a></p>
 
 </div>
 </body>
