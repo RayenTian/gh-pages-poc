@@ -120,8 +120,9 @@ Permalinks pin the PR head <code>981376a</code>.</p>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-who-calls-what.html">1 · who calls what</a>
   <span class="here">2 · new path vs old path</span>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-what-can-shrink.html">3 · what can shrink</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-one-actor-pattern.html">4 · one actor pattern</a>
 </nav>
-<p class="chainnote">Three pages on this PR. This one: how the new write path runs next to the old one, as a timeline and as pseudocode.</p>
+<p class="chainnote">Four pages on this PR. This one: how the new write path runs next to the old one, as a timeline and as pseudocode.</p>
 
 <div class="bg"><b>Background.</b> During a long generation, a checkpoint can save each request's tokens so far (its "prefix") instead of throwing them away.
 Gym sends each generation worker an <span class="tip" tabindex="0" data-tip="Gym's frozen list of the model calls to cut at this checkpoint. A worker can get several of them per checkpoint; the PR's benchmark saw 39 per engine.">inventory</span>;

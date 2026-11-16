@@ -123,8 +123,9 @@ The review is pending; its comment links work once it is published.</p>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-who-calls-what.html">1 · who calls what</a>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-write-paths.html">2 · new path vs old path</a>
   <span class="here">3 · what can shrink</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-one-actor-pattern.html">4 · one actor pattern</a>
 </nav>
-<p class="chainnote">Three pages on this PR. This one: which lines can go, and why each cut is safe.</p>
+<p class="chainnote">Four pages on this PR. This one: which lines can go, and why each cut is safe.</p>
 
 <p>Two asks do most of the work. <b>C15</b> drops the PR's three settings (<code>prefix_writer_actor</code>, <code>prefix_write_pipeline.enabled</code>,
 <code>direct_column_encoding</code>), which today allow six ways to write a cut, and picks the new path whenever the run can use it: text-only capture on TransferQueue <code>simple</code>.
