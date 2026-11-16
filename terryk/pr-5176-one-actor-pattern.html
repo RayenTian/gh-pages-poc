@@ -103,18 +103,18 @@ svg .missb{fill:var(--surface2);stroke:var(--red);stroke-width:1.5;stroke-dashar
   document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
 <div class="wrap">
 
-<h1>Can the new prefix writer and the two CPU actors already on main share one data-plane delegate and pool?</h1>
+<h1>Which CPU data-plane actors should share code? The two the controller owns, not the prefix writer</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176">NVIDIA-NeMo/RL #5176</a>, part 11 of 11 in the partial-checkpointing stack.
-A design proposal from the review, not part of the PR. Permalinks pin <code>981376a</code>.</p>
+A design proposal from the review, not part of the PR. "Before" links pin <code>981376a</code>; "after" links pin the draft's <code>a73b857</code>.</p>
 
 <div class="status">
 <dl>
   <dt>Before</dt>
-  <dd>Two CPU Ray actors on main, <code>AdvantageActor</code> and <code>RolloutReassemblerActor</code>, each own a TQ client and repeat the same start-up, checkpoint and pool code.</dd>
+  <dd>Two CPU Ray actors on main, <code>AdvantageActor</code> and <code>RolloutReassemblerActor</code>, each build a TQ client and repeat the same start-up, cleanup and checkpoint hooks.</dd>
   <dt>This PR</dt>
-  <dd>Adds a third, <code>PrefixWriterActor</code>, with its own copy of that code and a different way of getting its data.</dd>
+  <dd>Adds a third, <code>PrefixWriterActor</code>. It looks similar but differs in owner, count, placement and how data reaches it.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">Proposed, as a draft PR: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5256">#5256</a>, stacked on #5176.</span> One base class for the client and one pool class, with one pool per user. The gain is one pattern instead of three, not fewer lines.</dd>
+  <dd><span class="verdict open">Proposed, as draft PR <a href="https://github.com/NVIDIA-NeMo/RL/pull/5256">#5256</a>, not blocking #5176.</span> The two controller-owned actors share one small base and one start helper; the prefix writer stays as it is.</dd>
 </dl>
 </div>
 
@@ -124,17 +124,16 @@ A design proposal from the review, not part of the PR. Permalinks pin <code>9813
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-what-can-shrink.html">3 · what can shrink</a>
   <span class="here">4 · one actor pattern</span>
 </nav>
-<p class="chainnote">Four pages on this PR. This one: whether the new writer and two existing CPU actors can share one data-plane delegate and pool.</p>
+<p class="chainnote">Four pages on this PR. This one: which of the three CPU data-plane actors should share code, before and after.</p>
 
-<div class="bg"><b>Background.</b> All three actors exist for the same reason: some work on
+<div class="bg"><b>Background.</b> All three actors exist because some work on
 <span class="tip" tabindex="0" data-tip="TransferQueue, the data plane. Processes put and get rows of tensors by key. Each process that uses it holds its own client object.">TQ</span>
 is too slow, or too big, to do in the process that needs it, so it moves to a CPU-only Ray actor with its own TQ client.
-They differ in only three ways: how many there are, where they run, and how their input arrives.
-Two read their input from TQ themselves and get only metadata over Ray; the prefix writer gets its rows over Ray.
+A shared base is worth it only where the base does most of the work and each actor adds a little; where the actors differ in what matters, a base just gets in the way.
 Dotted words have a short explanation: hover or tap them.</div>
 
-<h2>Three copies of one pattern, and the shared version</h2>
-<svg viewBox="0 0 960 636" role="img" aria-label="Three CPU actors that each repeat the same setup today, and the shared DataPlaneDelegate base and DelegatePool, with one pool per user."><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahf" d="M0,0L10,5L0,10z"/></marker></defs>
+<h2>What the three have in common, and what they don't</h2>
+<svg viewBox="0 0 960 604" role="img" aria-label="Three CPU actors that each repeat the same setup today, and the proposed DataPlaneDelegate base for the two controller-owned ones."><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahf" d="M0,0L10,5L0,10z"/></marker></defs>
 <text class="colh" x="14" y="22">Today: three CPU actors, each with its own TQ client and its own copy of the setup</text>
 <text class="n" x="14" y="46">vLLM worker → ray.get(put.remote(...))</text>
 <line class="arr" x1="164" y1="52" x2="164" y2="78" marker-end="url(#ah)"/>
@@ -185,223 +184,118 @@ Dotted words have a short explanation: hover or tap them.</div>
 <line class="arw" x1="480" y1="278" x2="480" y2="292" marker-end="url(#ah)"/>
 <line class="arw" x1="796" y1="278" x2="540" y2="292" marker-end="url(#ah)"/>
 <text class="n" x="14" y="342">Orange: the same plumbing written in each actor.  Red: missing here.  Green: the one part that differs (the job).  Dashed: one OS process.</text>
-<text class="colh" x="14" y="378">Proposed: one client base class, one pool class; every user makes its own pool</text>
+<text class="colh" x="14" y="378">Proposed (#5256): the two controller-owned actors share a small base; the writer stays</text>
 <rect class="cl" x="14" y="390" width="452" height="74" rx="6"/>
-<text class="h" x="24" y="410">DataPlaneDelegate  (base class, ≈ 45 lines)</text>
-<text class="t" x="24" y="430">own TQ client · __repr__ names it in Ray logs</text>
-<text class="t" x="24" y="450">you override process(request) · owns_storage opt-in</text>
+<text class="h" x="24" y="410">DataPlaneDelegate  (base class)</text>
+<text class="t" x="24" y="430">builds the client · __repr__ names it in Ray logs</text>
+<text class="t" x="24" y="450">mooncake_checkpoint · get_data_plane_snapshot</text>
 <rect class="cl" x="494" y="390" width="452" height="74" rx="6"/>
-<text class="h" x="504" y="410">DelegatePool  (≈ 45 lines)</text>
-<text class="t" x="504" y="430">DelegatePool.start(cls, n, place): wait ready, kill on fail</text>
-<text class="t" x="504" y="450">wait_ready() · acquire() / release() · kill()</text>
-<rect class="panel2" x="14" y="490" width="300" height="134" rx="8"/>
-<text class="h" x="24" y="508">pool: 1 per vLLM engine</text>
-<rect class="new" x="24" y="518" width="268" height="46" rx="6"/>
-<text class="t" x="34" y="536">PrefixWriter(DataPlaneDelegate)</text>
-<text class="n" x="34" y="554">process = put rows; clear_samples</text>
-<text class="n" x="24" y="594">place: engine&#x27;s node, hard</text>
-<text class="w" x="24" y="612">4 engines on a node → 4 such pools</text>
-<line class="arr" x1="164" y1="490" x2="164" y2="466" marker-end="url(#ah)"/>
-<rect class="panel2" x="330" y="490" width="300" height="134" rx="8"/>
-<text class="h" x="340" y="508">pool: N, made by the controller</text>
-<rect class="new" x="352" y="530" width="268" height="46" rx="6"/>
-<rect class="new" x="346" y="524" width="268" height="46" rx="6"/>
-<rect class="new" x="340" y="518" width="268" height="46" rx="6"/>
-<text class="t" x="350" y="536">AdvantageActor(DataPlaneDelegate)</text>
-<text class="n" x="350" y="554">process = run the stage</text>
-<text class="n" x="340" y="600">place: spread off head</text>
-<line class="arr" x1="480" y1="490" x2="480" y2="466" marker-end="url(#ah)"/>
-<rect class="panel2" x="646" y="490" width="300" height="134" rx="8"/>
-<text class="h" x="656" y="508">pool: K, made by the controller</text>
-<rect class="new" x="668" y="530" width="268" height="46" rx="6"/>
-<rect class="new" x="662" y="524" width="268" height="46" rx="6"/>
-<rect class="new" x="656" y="518" width="268" height="46" rx="6"/>
-<text class="t" x="666" y="536">RolloutReassemblerActor(…)</text>
-<text class="n" x="666" y="554">process = finalize</text>
-<text class="n" x="656" y="600">place: default, own env</text>
-<line class="arr" x1="796" y1="490" x2="796" y2="466" marker-end="url(#ah)"/>
+<text class="h" x="504" y="410">start_cpu_actors() · spread_off_head()</text>
+<text class="t" x="504" y="430">create N · wait until ready · kill all if one fails</text>
+<text class="t" x="504" y="450">CPU_ACTOR_OPTIONS written once</text>
+<rect class="panel" x="14" y="490" width="300" height="100" rx="8"/>
+<text class="h" x="24" y="510">PrefixWriterActor: unchanged</text>
+<text class="t" x="24" y="532">owned by a vLLM worker, 1 per engine,</text>
+<text class="n" x="24" y="552">pinned, rows through Ray, no storage</text>
+<rect class="panel2" x="330" y="490" width="300" height="100" rx="8"/>
+<text class="h" x="340" y="510">AdvantageActor(DataPlaneDelegate)</text>
+<text class="t" x="340" y="532">keeps run(request)</text>
+<text class="n" x="340" y="552">pool of N, spread off the head</text>
+<line class="arr" x1="480" y1="490" x2="240" y2="466" marker-end="url(#ah)"/>
+<rect class="panel2" x="646" y="490" width="300" height="100" rx="8"/>
+<text class="h" x="656" y="510">RolloutReassemblerActor(DataPlaneDelegate)</text>
+<text class="t" x="656" y="532">keeps finalize, check_dependencies</text>
+<text class="n" x="656" y="552">pool of K, own Python env</text>
+<line class="arr" x1="796" y1="490" x2="720" y2="466" marker-end="url(#ah)"/>
 </svg>
-
 <table>
-<tr><th>Question</th><th>Answer, from the code</th></tr>
-<tr><td>Two ways to get data?</td><td>No second read method needed. A request is either metadata, and the actor reads TQ itself (advantage, reassembler; both already enforce it with <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L74"><code>assert_metadata_only</code></a>), or byte columns sent through Ray (prefix writer), which the writer turns back into a <code>TensorDict</code> with C2's <code>from_bytes</code>. Neither needs anything from the base.</td></tr>
-<tr><td>One method to override, or read / compute / write?</td><td>One: <code>process(request)</code>. Splitting it into read, compute and write hooks fits only the advantage stage: the writer has nothing to read or compute, and the reassembler reads staging rows, writes finalized rows and clears staging in an order it controls. Extra methods (the writer's <code>clear_samples</code>, the reassembler's <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L204"><code>check_dependencies</code></a>) stay plain methods, called on an actor from <code>pool.acquire()</code>.</td></tr>
-<tr><td>Why does a client need checkpoint and metrics hooks?</td><td>On the <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/interfaces.py#L172">Mooncake</a> TQ backend each client process lends the store memory (64 GiB by default), and the rows it writes live there. A TQ checkpoint therefore asks every such process to save its rows: the controller lists the advantage actors and finalizers for exactly that (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L455-L464">L455-L464</a>). A client built with <code>segment_size=0</code> holds no rows and needs no hook; the prefix writer already does this. So the base holds no rows unless a subclass sets <code>owns_storage</code>. <code>get_data_plane_snapshot</code> returns only I/O counters (bytes, wall time per op), which the controller sums across processes; <code>get_data_plane_metrics</code> says that.</td></tr>
-<tr><td>Why these names?</td><td>"Data-plane actor" sounds like the TQ storage actors that hold the data. "Detached" already means something in Ray: <code>lifetime="detached"</code> is an actor that outlives the process that made it, and these die with their owner. <code>DataPlaneDelegate</code> says what it is: a TQ client the caller hands work to. <code>DelegatePool.start</code> is a class method, so there is one entry point.</td></tr>
-<tr><td>Telling actors apart in logs?</td><td><code>__repr__</code> on the actor class sets Ray's log prefix (<a href="https://docs.ray.io/en/latest/ray-observability/user-guides/configure-logging.html#customizing-prefixes-for-actor-logs">Ray docs</a>), so 4 writers on one node print as <code>PrefixWriter[0]</code> … <code>PrefixWriter[3]</code>.</td></tr>
+<tr><th></th><th><code>AdvantageActor</code> and <code>RolloutReassemblerActor</code></th><th><code>PrefixWriterActor</code> (#5176)</th></tr>
+<tr><td>Owner</td><td>The controller (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L459-L464">L459-L464</a>)</td><td>Each vLLM worker</td></tr>
+<tr><td>Count</td><td>A pool of N</td><td>Exactly 1 per engine</td></tr>
+<tr><td>Placement</td><td>Anywhere: spread off the head node, or its own Python env</td><td>Pinned to its engine's node, hard (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L390">L390</a>)</td></tr>
+<tr><td>Data in</td><td>Metadata only; it reads TQ itself (<code>assert_metadata_only</code> both ways)</td><td>Rows sent through Ray</td></tr>
+<tr><td>Storage</td><td>Lends Mooncake memory, so it has the checkpoint hooks</td><td>Holds no rows (<code>segment_size=0</code>)</td></tr>
+<tr><td>Calls</td><td>Many at once, from a queue of free actors</td><td>One at a time, in order (<code>max_concurrency=1</code>)</td></tr>
+<tr><td>Caller sees</td><td>The actor handle</td><td>A wrapper that looks like a TQ client (<code>put_samples</code>)</td></tr>
 </table>
+<p class="pcref">Same in the left column, different in the right: so the first two share a base, and the writer stays its own class.
+An earlier version of this page put all three behind one base and one pool; on real code that added a <code>process()</code> rename nobody called generically, a pool of one for the writer, and +128 lines.</p>
 
-<h2>Each actor before and after, as pseudocode (draft PR #5256, not merged)</h2>
-<p>Nothing below is merged. <a href="https://github.com/NVIDIA-NeMo/RL/pull/5256">#5256</a> is a draft stacked on #5176; it has the real diff and the tests. Red struck lines go, green lines arrive, plain lines stay. Each block says which process it runs in.</p>
-<table>
-<tr><th>Actor</th><th>Methods: before → after</th><th>Who creates it</th><th>How it is called: what changes</th></tr>
-<tr><td><code>AdvantageActor</code></td><td><code>run</code>, <code>mooncake_checkpoint</code>, <code>get_data_plane_snapshot</code> → <code>process</code> (hooks inherited)</td><td>Setup, through <code>create_advantage_actors</code>: same signature, same list of handles (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller_utils/setup.py#L2394">setup.py</a> untouched)</td><td><code>actor.run.remote</code> → <code>actor.process.remote</code>; the controller's <code>asyncio.Queue</code> → <code>pool.acquire</code> / <code>release</code>. Same waiting, same "drop the actor if its call failed".</td></tr>
-<tr><td><code>RolloutReassemblerActor</code></td><td><code>finalize</code>, <code>check_dependencies</code>, hooks → <code>process</code>, <code>check_dependencies</code></td><td>Setup, through <code>create_rollout_reassembler_actors</code>: same signature and return</td><td><code>actor.finalize.remote</code> → <code>actor.process.remote</code>; queue → pool. The checkpoint lock is still taken only after an actor is free.</td></tr>
-<tr><td><code>PrefixWriterActor</code></td><td><code>put</code> (from the service), <code>clear</code>, <code>ready</code> → <code>process</code>, <code>clear</code>, <code>ready</code></td><td>vLLM worker, through <code>create_prefix_writer</code>: same signature, still returns <code>RayPrefixWriterClient</code> (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L987">worker</a> untouched)</td><td>Nothing changes for the worker or the sink: they still call <code>put_samples</code> / <code>clear_samples</code>. Inside the client, <code>put.remote</code> → <code>process.remote</code> and <code>ray.kill</code> → <code>pool.kill()</code>.</td></tr>
-</table>
-<p class="pcref">So the callers outside these files do not change: setup and the vLLM worker call the same three start functions. The method each actor is called with is now always <code>process</code>, and the controller's two queues of free actors are one class.</p>
-<p class="pclbl">AdvantageActor — before (on main)</p>
-<pre class="pc"><span class="who"># driver, setup (unchanged by #5256)</span>
-actors = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L102">create_advantage_actors</a>(dp_cfg, stage_cfg, estimator, num_workers=n)<span class="cm">             # -&gt; list of actor handles</span>
-    nodes = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L80">_placement_node_ids</a>()<span class="cm">                                                         # non-head nodes, or none</span>
-    AdvantageActor.options(spread or pin round-robin, soft).remote(..., shard_id=str(i))<span class="cm">  # x n</span>
-    ray.get([a.__ray_ready__.remote() ...]); on RayError: ray.kill each, raise
-
-<span class="who"># controller event loop, per advantage call</span>
-free = asyncio.Queue(actors)<span class="cm">                                                              # built in __init__</span>
-actor = await free.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L5129">get</a>()<span class="cm">                                                                  # wait for a free actor</span>
-outcome = await actor.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L5131">run</a>.remote(request)<span class="cm">                                                 # if it raises: actor not put back</span>
-free.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L5143">put_nowait</a>(actor)
-
-<span class="who"># AdvantageActor process (1 CPU) x n</span>
-@ray.remote(num_cpus=1, num_gpus=0, max_restarts=0, max_task_retries=0)
-class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L41">AdvantageActor</a>:
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L44">__init__</a>: self._dp_client = build_data_plane_client(...)<span class="cm">                              # owns Mooncake memory</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L59">mooncake_checkpoint</a>(body)<span class="cm">                                                             # copied in each actor</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L67">get_data_plane_snapshot</a>()<span class="cm">                                                             # copied in each actor</span>
-    async <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L72">run</a>(request) -&gt; AdvantageOutcome<span class="cm">                                                # the job</span></pre>
-<p class="pclbl">AdvantageActor — after</p>
-<pre class="pc"><span class="who"># driver, setup: same call, same return value</span>
-actors = <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/advantage_actor.py#L65">create_advantage_actors</a>(dp_cfg, stage_cfg, estimator, num_workers=n)
-<span class="del">    nodes = _placement_node_ids(); options(...); ray.get(...); kill on error</span>
-<span class="add">    pool = <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/advantage_actor.py#L73">DelegatePool.start</a>(AdvantageActor, ..., n=n, placement=spread_off_head())</span>
-<span class="add">    pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/advantage_actor.py#L81">wait_ready</a>(); return pool.actors</span><span class="cm">                 # kills all if one fails</span>
-
-<span class="who"># controller event loop, per advantage call</span>
-<span class="del">free = asyncio.Queue(actors)</span>
-<span class="add">pool = <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/single_controller.py#L515">DelegatePool</a>(actors)</span>
-<span class="del">actor = await free.get()</span>
-<span class="add">actor = await pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/single_controller.py#L5126">acquire</a>()</span><span class="cm">                              # same wait</span>
-<span class="del">outcome = await actor.run.remote(request)</span>
-<span class="add">outcome = await actor.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/single_controller.py#L5128">process</a>.remote(request)</span><span class="cm">             # run -&gt; process; same body</span>
-<span class="del">free.put_nowait(actor)</span>
-<span class="add">pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/single_controller.py#L5139">release</a>(actor)</span><span class="cm">                                       # still not after a failed call</span>
-
-<span class="who"># AdvantageActor process (1 CPU) x n</span>
+<h2>The two shared actors, before and after (draft PR #5256, not merged)</h2>
+<p>Nothing below is merged. <a href="https://github.com/NVIDIA-NeMo/RL/pull/5256">#5256</a> has the real diff and the tests. Red struck lines go, green lines arrive, plain lines stay.
+<b>How they are called does not change:</b> setup calls the same two start functions and gets the same list of handles; the controller still calls <code>run</code> and <code>finalize</code> from its own queues of free actors.</p>
+<p class="pclbl">AdvantageActor</p>
+<pre class="pc"><span class="who"># AdvantageActor process (1 CPU) x n</span>
 <span class="del">@ray.remote(num_cpus=1, num_gpus=0, max_restarts=0, max_task_retries=0)</span>
-<span class="add">@ray.remote</span><span class="cm">                                               # options come from DelegatePool.start</span>
-<span class="add">class <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/advantage_actor.py#L34">AdvantageActor</a>(DataPlaneDelegate):</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/advantage_actor.py#L39">owns_storage</a> = True</span><span class="cm">                                   # keeps its Mooncake memory, as before</span>
-    __init__: super().__init__(dp_config, label=label)<span class="cm">    # client built by the base</span>
-<span class="del">    mooncake_checkpoint(body); get_data_plane_snapshot()</span><span class="cm">  # inherited now</span>
-<span class="add">    async <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/advantage_actor.py#L57">process</a>(request) -&gt; AdvantageOutcome</span><span class="cm">            # was run</span></pre>
-<p class="pclbl">RolloutReassemblerActor (the finalizers) — before (on main)</p>
-<pre class="pc"><span class="who"># driver, setup (unchanged by #5256)</span>
-actors = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L257">create_rollout_reassembler_actors</a>(dp_cfg, cfg, num_workers=k)<span class="cm">    # -&gt; list of actor handles</span>
-    RolloutReassemblerActor.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L276">options</a>(runtime_env=env).remote(dp_cfg, cfg)<span class="cm">  # x k, own Python env</span>
-    ray.get([a.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L282">check_dependencies</a>.remote() ...]); on RayError: ray.kill each, raise
+<span class="del">class AdvantageActor:</span>
+<span class="add">@ray.remote(**<a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/data_plane/delegate.py#L35">CPU_ACTOR_OPTIONS</a>)</span><span class="cm">                                               # same four options, written once</span>
+<span class="add">class <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/algorithms/advantage_actor.py#L39">AdvantageActor</a>(DataPlaneDelegate):</span>
+    def __init__(self, dp_config, config, estimator, *, label):
+<span class="del">        self._dp_client = build_data_plane_client(dp_config, bootstrap=False)</span>
+<span class="add">        <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/algorithms/advantage_actor.py#L50">super().__init__</a>(dp_config, label=label)</span><span class="cm">                               # client, log name, hooks</span>
+        self._computer = AdvantageComputer(self.dp_client, ..., shard_id=label)
+<span class="del">    def mooncake_checkpoint(self, body): ...</span><span class="cm">                                   # now in the base</span>
+<span class="del">    def get_data_plane_snapshot(self): ...</span><span class="cm">                                     # now in the base</span>
+    async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/algorithms/advantage_actor.py#L58">run</a>(self, request) -&gt; AdvantageOutcome<span class="cm">                           # unchanged; the job</span>
 
-<span class="who"># controller event loop, per prompt group</span>
-free = asyncio.Queue(actors)<span class="cm">                                              # built in __init__</span>
-actor = await free.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L1373">get</a>()<span class="cm">                                                  # wait for a free actor first</span>
-async with checkpoint_barrier.mutation(&#x27;group_commits&#x27;):<span class="cm">                  # lock taken only once one is free</span>
-    finalized = await actor.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L1400">finalize</a>.remote(request)
-free.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L1527">put_nowait</a>(actor)<span class="cm">                                                    # unless the call failed</span>
-
-<span class="who"># RolloutReassemblerActor process (1 CPU, own Python env) x k</span>
-@ray.remote(num_cpus=1, num_gpus=0, max_restarts=0, max_task_retries=0)
-class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L162">RolloutReassemblerActor</a>:
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L165">__init__</a>: self._dp_client = build_data_plane_client(...)<span class="cm">              # owns Mooncake memory</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L195">mooncake_checkpoint</a>(body); <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L199">get_data_plane_snapshot</a>()<span class="cm">                  # copied in each actor</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L204">check_dependencies</a>()<span class="cm">                                                  # start-up check of its env</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L216">finalize</a>(request) -&gt; FinalizedGroup<span class="cm">                                   # the job</span></pre>
-<p class="pclbl">RolloutReassemblerActor — after</p>
-<pre class="pc"><span class="who"># driver, setup: same call, same return value</span>
-actors = <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/experience/rollout_reassembler_actor.py#L248">create_rollout_reassembler_actors</a>(dp_cfg, cfg, num_workers=k)
-<span class="del">    options(runtime_env=env).remote(...); ray.get(check_dependencies); kill on error</span>
-<span class="add">    pool = <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/experience/rollout_reassembler_actor.py#L264">DelegatePool.start</a>(RolloutReassemblerActor, dp_cfg, cfg, n=k, runtime_env=env)</span>
-<span class="add">    pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/experience/rollout_reassembler_actor.py#L271">wait_ready</a>(&#x27;check_dependencies&#x27;); return pool.actors</span>
-
-<span class="who"># controller event loop, per prompt group</span>
-<span class="del">free = asyncio.Queue(actors)</span>
-<span class="add">pool = <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/single_controller.py#L565">DelegatePool</a>(actors)</span>
-<span class="del">actor = await free.get()</span>
-<span class="add">actor = await pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/single_controller.py#L1370">acquire</a>()</span><span class="cm">                              # same wait</span>
-async with checkpoint_barrier.mutation(&#x27;group_commits&#x27;):<span class="cm">  # unchanged: lock only once one is free</span>
-<span class="del">    finalized = await actor.finalize.remote(request)</span>
-<span class="add">    finalized = await actor.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/single_controller.py#L1397">process</a>.remote(request)</span><span class="cm">       # finalize -&gt; process</span>
-<span class="del">free.put_nowait(actor)</span>
-<span class="add">pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/algorithms/single_controller.py#L1524">release</a>(actor)</span><span class="cm">                                       # unless the call failed</span>
-
-<span class="who"># RolloutReassemblerActor process (1 CPU, own Python env) x k</span>
+<span class="who"># driver, setup: same call, same list of handles back</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/algorithms/advantage_actor.py#L66">create_advantage_actors</a>(dp_config, config, estimator, *, num_workers):
+<span class="del">    node_ids = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L80">_placement_node_ids</a>()</span><span class="cm">                                           # ≈ 20 lines</span>
+<span class="del">    actors = [AdvantageActor.options(spread or soft pin).remote(...) for i in range(n)]</span>
+<span class="del">    try: ray.get([a.__ray_ready__.remote() ...]) except: ray.kill each; raise</span><span class="cm">  # ≈ 15 lines</span>
+<span class="add">    placement = <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/algorithms/advantage_actor.py#L74">spread_off_head</a>()</span>
+<span class="add">    return <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/algorithms/advantage_actor.py#L75">start_cpu_actors</a>(</span>
+<span class="add">        lambda i: AdvantageActor.options(scheduling_strategy=placement(i))</span>
+<span class="add">                                .remote(dp_config, config, estimator, label=str(i)),</span>
+<span class="add">        n=num_workers)</span><span class="cm">                                                         # waits for each; kills all if one fails</span></pre>
+<p class="pclbl">RolloutReassemblerActor (the finalizers)</p>
+<pre class="pc"><span class="who"># RolloutReassemblerActor process (1 CPU, own Python env) x k</span>
 <span class="del">@ray.remote(num_cpus=1, num_gpus=0, max_restarts=0, max_task_retries=0)</span>
-<span class="add">@ray.remote</span>
-<span class="add">class <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/experience/rollout_reassembler_actor.py#L156">RolloutReassemblerActor</a>(DataPlaneDelegate):</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/experience/rollout_reassembler_actor.py#L161">owns_storage</a> = True</span><span class="cm">                                   # as before</span>
-<span class="del">    mooncake_checkpoint(body); get_data_plane_snapshot()</span><span class="cm">  # inherited now</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/experience/rollout_reassembler_actor.py#L195">check_dependencies</a>()<span class="cm">                                  # unchanged; now the ready check</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/experience/rollout_reassembler_actor.py#L207">process</a>(request) -&gt; FinalizedGroup</span><span class="cm">                    # was finalize</span></pre>
-<p class="pclbl">PrefixWriterActor — before (#5176)</p>
-<pre class="pc"><span class="who"># vLLM worker process, setup_token_capture (unchanged by #5256)</span>
-writer = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L376">create_prefix_writer</a>(dp_cfg, partition_id=p)<span class="cm">            # -&gt; RayPrefixWriterClient</span>
-    actor = ray.remote(PrefixWriterActor).<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L383">options</a>(num_cpus=1, ..., max_concurrency=1,
-        scheduling_strategy=NodeAffinity(this node, soft=False)).remote(dp_cfg, p)
-    ready = await asyncio.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L395">wait_for</a>(actor.ready.remote(), timeout=180)<span class="cm">  # check the node; kill on error</span>
-    return <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L404">RayPrefixWriterClient</a>(actor, writer_pid=ready[&#x27;pid&#x27;])
+<span class="del">class RolloutReassemblerActor:</span>
+<span class="add">@ray.remote(**CPU_ACTOR_OPTIONS)</span>
+<span class="add">class <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/experience/rollout_reassembler_actor.py#L160">RolloutReassemblerActor</a>(DataPlaneDelegate):</span>
+    def __init__(self, dp_config, config, *, label):
+<span class="del">        self._dp_client = build_data_plane_client(dp_config, bootstrap=False)</span>
+<span class="add">        <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/experience/rollout_reassembler_actor.py#L170">super().__init__</a>(dp_config, label=label)</span>
+        self._finalizer = RolloutReassembler(self.dp_client, ...)
+<span class="del">    def mooncake_checkpoint(self, body): ...</span><span class="cm">                                        # now in the base</span>
+<span class="del">    def get_data_plane_snapshot(self): ...</span><span class="cm">                                          # now in the base</span>
+    def <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/experience/rollout_reassembler_actor.py#L195">check_dependencies</a>(self)<span class="cm">                                                    # unchanged</span>
+    def <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/experience/rollout_reassembler_actor.py#L207">finalize</a>(self, request) -&gt; FinalizedGroup<span class="cm">                                   # unchanged; the job</span>
 
-<span class="who"># vLLM worker, writer thread: the sink calls the client</span>
-writer.put_samples(sample_ids=, partition_id=, fields=, tags=)
-    reply = ray.get(actor.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L325">put</a>.remote(ray.put(packed)))
-writer.close()  -&gt;  <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L372">ray.kill</a>(actor, no_restart=True)<span class="cm">                   # at shutdown</span>
-
-<span class="who"># PrefixWriterActor process (1 CPU, pinned to this node) x 1</span>
-class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L263">PrefixWriterActor</a>(PrefixWriterService):
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L266">__init__</a>: build_data_plane_client(..., segment_size=0)<span class="cm">             # holds no rows</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L204">put</a>(batch) -&gt; PrefixWriteReply<span class="cm">                                     # inherited from the service; the job</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L256">clear</a>(partition_id, sample_ids); <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L276">ready</a>()</pre>
-<p class="pclbl">PrefixWriterActor — after</p>
-<pre class="pc"><span class="who"># vLLM worker process, setup_token_capture: same call, same return type</span>
-writer = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/prefix_writer_actor.py#L381">create_prefix_writer</a>(dp_cfg, partition_id=p)
-<span class="del">    actor = ray.remote(PrefixWriterActor).options(...).remote(dp_cfg, p)</span>
-<span class="add">    pool = <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/prefix_writer_actor.py#L386">DelegatePool.start</a>(PrefixWriterActor, dp_cfg, p, n=1,</span>
-<span class="add">        placement=on_this_node(), max_concurrency=1)</span><span class="cm">                # same pin, same options</span>
-<span class="del">    ready = await asyncio.wait_for(actor.ready.remote(), timeout=180)</span>
-<span class="add">    (ready,) = await pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/prefix_writer_actor.py#L395">wait_ready_async</a>(&#x27;ready&#x27;, timeout_s=180)</span><span class="cm">  # node check kept</span>
-<span class="add">    return <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/prefix_writer_actor.py#L402">RayPrefixWriterClient</a>(pool, writer_pid=ready[&#x27;pid&#x27;])</span><span class="cm">     # holds the pool</span>
-
-<span class="who"># vLLM worker, writer thread: the sink&#x27;s calls do not change</span>
-writer.put_samples(sample_ids=, partition_id=, fields=, tags=)
-<span class="del">    reply = ray.get(actor.put.remote(ray.put(packed)))</span>
-<span class="add">    reply = ray.get(actor.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/prefix_writer_actor.py#L330">process</a>.remote(ray.put(packed)))</span><span class="cm">          # put -&gt; process</span>
-<span class="del">writer.close()  -&gt;  ray.kill(actor, no_restart=True)</span>
-<span class="add">writer.close()  -&gt;  pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/prefix_writer_actor.py#L377">kill</a>()</span>
-
-<span class="who"># PrefixWriterActor process (1 CPU, pinned to this node) x 1</span>
-<span class="del">class PrefixWriterActor(PrefixWriterService):</span>
-<span class="add">class <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/prefix_writer_actor.py#L262">PrefixWriterActor</a>(DataPlaneDelegate):</span><span class="cm">                         # owns_storage = False: segment_size=0, as before</span>
-<span class="add">    __init__: super().__init__(...); self._service = PrefixWriterService(self.dp_client, p)</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/prefix_writer_actor.py#L272">process</a>(batch) -&gt; PrefixWriteReply</span><span class="cm">                              # calls self._service.put</span>
-    clear(partition_id, sample_ids); <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/prefix_writer_actor.py#L278">ready</a>()<span class="cm">                        # unchanged</span></pre>
-<p class="pclbl">The shared piece they all use</p>
-<pre class="pc"><span class="who"># new in #5256: nemo_rl/data_plane/delegate.py</span>
-<span class="add">class <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L39">DataPlaneDelegate</a>:</span><span class="cm">                                              # base for each actor</span>
-<span class="add">    owns_storage = False</span><span class="cm">                                              # True: rows it writes live in its own Mooncake memory</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L51">__init__</a>(dp_config, *, label)</span><span class="cm">                                     # builds the client; segment_size=0 unless owns_storage</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L61">process</a>(request)</span><span class="cm">                                                  # the one method a subclass overrides</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L65">__repr__</a>()</span><span class="cm">                                                        # &#x27;AdvantageActor[2]&#x27; in Ray&#x27;s log prefix</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L69">mooncake_checkpoint</a>(body); <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L73">get_data_plane_snapshot</a>()</span><span class="cm">              # written once</span>
-
-<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L80">on_this_node</a>(); <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L86">spread_off_head</a>()</span><span class="cm">                                     # the two placements in use</span>
-
-<span class="add">class <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L109">DelegatePool</a>:</span><span class="cm">                                                   # one per user, never shared</span>
-<span class="add">    @classmethod <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L124">start</a>(cls, *args, n, placement=None, **ray_options)</span><span class="cm">  # num_cpus=1, max_restarts=0, ...; does not wait</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L162">wait_ready</a>(method, timeout_s=None); async <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L175">wait_ready_async</a>(...)</span><span class="cm">   # kill all if one fails</span>
-<span class="add">    async <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L198">acquire</a>(); <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L202">release</a>(actor)</span><span class="cm">                                   # the free-actor queue</span>
-<span class="add">    size; free; <a href="https://github.com/NVIDIA-NeMo/RL/blob/a4217b8e3c8094a7685725116c347c2500fa250d/nemo_rl/data_plane/delegate.py#L206">kill</a>()</span><span class="cm">                                                # free = idle actors (finalizer metric)</span></pre>
+<span class="who"># driver, setup: same call, same list of handles back</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/experience/rollout_reassembler_actor.py#L248">create_rollout_reassembler_actors</a>(dp_config, config, *, num_workers):
+    runtime_env = (the Gym env if it matches, else its own)<span class="cm">                         # unchanged</span>
+<span class="del">    actors = [RolloutReassemblerActor.options(runtime_env=env).remote(...) ...]</span>
+<span class="del">    try: ray.get([a.check_dependencies.remote() ...]) except: ray.kill each; raise</span><span class="cm">  # ≈ 15 lines</span>
+<span class="add">    return <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/experience/rollout_reassembler_actor.py#L264">start_cpu_actors</a>(</span>
+<span class="add">        lambda i: RolloutReassemblerActor.options(runtime_env=runtime_env)</span>
+<span class="add">                                         .remote(dp_config, config, label=str(i)),</span>
+<span class="add">        n=num_workers, <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/experience/rollout_reassembler_actor.py#L269">ready</a>=&#x27;check_dependencies&#x27;)</span></pre>
+<p class="pclbl">The shared piece</p>
+<pre class="pc"><span class="who"># new in #5256: nemo_rl/data_plane/delegate.py (119 lines)</span>
+<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/data_plane/delegate.py#L35">CPU_ACTOR_OPTIONS</a> = dict(num_cpus=1, num_gpus=0, max_restarts=0, max_task_retries=0)</span>
+<span class="add">class <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/data_plane/delegate.py#L43">DataPlaneDelegate</a>:</span><span class="cm">                                                       # base for the two controller-owned actors</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/data_plane/delegate.py#L50">__init__</a>(dp_config, *, label)</span><span class="cm">                                              # builds the client</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/data_plane/delegate.py#L56">__repr__</a>()</span><span class="cm">                                                                 # &#x27;AdvantageActor[2]&#x27; in Ray&#x27;s log prefix</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/data_plane/delegate.py#L60">mooncake_checkpoint</a>(body); <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/data_plane/delegate.py#L64">get_data_plane_snapshot</a>()</span><span class="cm">                       # the copies, written once</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/data_plane/delegate.py#L71">spread_off_head</a>() -&gt; placement(index)</span><span class="cm">                                      # moved from advantage_actor.py</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/a73b857dacafdbcc9e8b30d4600df590fa2769dd/nemo_rl/data_plane/delegate.py#L103">start_cpu_actors</a>(make_actor, *, n, ready=&#x27;__ray_ready__&#x27;, timeout_s=None)</span><span class="cm">  # create, wait, kill all on failure</span></pre>
+<p class="pclbl">PrefixWriterActor</p>
+<p class="pcref">No change: it stays as in #5176. Using <code>start_cpu_actors</code> would need an async twin (≈ 22 lines) to save ≈ 8 lines in the writer.</p>
 
 <table>
-<tr><th>Change in #5256</th><th>Lines</th></tr>
-<tr><td>New <code>data_plane/delegate.py</code>: client base class, pool, two placements</td><td>+212</td></tr>
-<tr><td><code>advantage_actor.py</code>: client, hooks, placement, ready wait, cleanup</td><td>−59</td></tr>
-<tr><td><code>rollout_reassembler_actor.py</code>: client, hooks, ready wait, cleanup</td><td>−19</td></tr>
-<tr><td><code>prefix_writer_actor.py</code> and <code>single_controller.py</code></td><td>−6</td></tr>
-<tr><td><b>Net, source only</b></td><td><b>+128</b></td></tr>
+<tr><th>Change in #5256 (source only)</th><th>Lines</th></tr>
+<tr><td>New <code>data_plane/delegate.py</code>: base, start helper, placement, options</td><td>+119</td></tr>
+<tr><td><code>advantage_actor.py</code>: client, hooks, placement, start, cleanup</td><td>−61</td></tr>
+<tr><td><code>rollout_reassembler_actor.py</code>: client, hooks, start, cleanup</td><td>−21</td></tr>
+<tr><td><b>Net</b></td><td><b>+37</b></td></tr>
 </table>
-<p class="pcref">Measured on the draft, not estimated. An earlier estimate here said ≈ −110; it assumed C2's removal of <code>RayPrefixWriterClient</code> (94 lines), which the draft leaves alone, and a shorter base. The payoff is per new actor: the next one is a subclass with one method instead of another ≈ 100 lines of plumbing.</p>
+<p class="pcref">Measured on the draft. Thirteen of the new lines are the license header; the rest roughly breaks even with what the two actors drop.</p>
 
-<div class="hl"><b>So what.</b> The three actors reconcile into one client base class with one method to override, and one pool class that each user starts its own copy of, and nothing more. No second read method, no read/compute/write hooks, no sharding logic in the base.
-Today it adds lines rather than removing them, but a fourth actor becomes a short subclass, and the prefix writer gets the checkpoint hooks it lacks today.
-The draft is <a href="https://github.com/NVIDIA-NeMo/RL/pull/5256">#5256</a>; it is not blocking #5176.</div>
+<div class="hl"><b>So what.</b> Sharing pays for the two actors the controller owns: they are the same thing with a different job, so the base does the plumbing and each keeps only its job and its placement.
+The prefix writer only looks similar; forcing it in added a rename, a pool of one and more lines than it removed.
+#5256 changes nothing in #5176's own code, so it is an FYI for this review, not a request.</div>
 
 </div>
 </body>
