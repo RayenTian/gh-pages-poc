@@ -195,22 +195,22 @@ Dotted words have a short explanation: hover or tap them.</div>
 <text class="t" x="504" y="430">place = this node | spread | default</text>
 <text class="t" x="504" y="450">wait until ready · kill all if one fails</text>
 <rect class="cl" x="14" y="478" width="932" height="52" rx="6"/>
-<text class="h" x="24" y="498">DataPlaneActorPool  (≈ 25)</text>
+<text class="h" x="24" y="498">DataPlaneActorPool  (≈ 25): one per use, never shared; each start call makes its own</text>
 <text class="t" x="24" y="518">call(): any free actor   ·   map(): one request per actor, in parallel   ·   send(): don&#x27;t wait, get a Future</text>
 <rect class="new" x="14" y="560" width="300" height="58" rx="6"/>
 <text class="h" x="24" y="580">PrefixWriter(DataPlaneActor)</text>
 <text class="t" x="24" y="600">put_samples, clear_samples</text>
-<text class="n" x="24" y="614">pool of 1 · send()</text>
+<text class="n" x="24" y="614">own pool of 1 per engine, this node · send()</text>
 <line class="arr" x1="164" y1="560" x2="164" y2="532" marker-end="url(#ah)"/>
 <rect class="new" x="330" y="560" width="300" height="58" rx="6"/>
 <text class="h" x="340" y="580">AdvantageActor(DataPlaneActor)</text>
 <text class="t" x="340" y="600">run(request)</text>
-<text class="n" x="340" y="614">pool of N · map()</text>
+<text class="n" x="340" y="614">own pool of N, spread off head · map()</text>
 <line class="arr" x1="480" y1="560" x2="480" y2="532" marker-end="url(#ah)"/>
 <rect class="new" x="646" y="560" width="300" height="58" rx="6"/>
 <text class="h" x="656" y="580">RolloutReassemblerActor(DataPlaneActor)</text>
 <text class="t" x="656" y="600">finalize(request)</text>
-<text class="n" x="656" y="614">pool of N · call()</text>
+<text class="n" x="656" y="614">own pool of K, own Python env · call()</text>
 <line class="arr" x1="796" y1="560" x2="796" y2="532" marker-end="url(#ah)"/>
 </svg>
 
@@ -271,12 +271,13 @@ class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879
 <span class="add">    ray.get([a.__ray_ready__.remote() for a in actors])</span><span class="cm">                       # on failure: kill all, raise</span>
 <span class="add">    return DataPlaneActorPool(actors)</span>
 
-<span class="add">class DataPlaneActorPool:</span><span class="cm">                                                     # an asyncio.Queue of free actors</span>
+<span class="add">class DataPlaneActorPool:</span><span class="cm">                                                     # one per start call; each user owns its own</span>
 <span class="add">    async def call(self, method, request)</span><span class="cm">                                     # any free actor; a failed call drops that actor</span>
 <span class="add">    async def map(self, method, requests)</span><span class="cm">                                     # one request per actor, in parallel</span>
 <span class="add">    def send(self, method, *args) -&gt; Future</span><span class="cm">                                   # don&#x27;t wait: actor.method.remote(...).future()</span>
 <span class="add">    size; def kill(self)</span><span class="cm">                                                      # number of actors; ray.kill all at shutdown</span></pre>
 <p class="pcref">Real code it replaces: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L41-L141"><code>advantage_actor.py</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L156-L291"><code>RolloutReassemblerActor</code> and its start function</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L187-L404"><code>PrefixWriterService</code> … <code>create_prefix_writer</code></a>, and the same two hooks in <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/worker_mixin.py#L431-L490"><code>TQWorkerMixin</code></a>.</p>
+<p class="pcref"><b>One pool per use, never shared.</b> Each <code>start_data_plane_actors</code> call returns its own pool with its own count and placement: 4 vLLM engines on a node make 4 pools of 1 writer, each pinned to that node; the controller makes one pool of N advantage actors placed anywhere off the head node, and one pool of K finalizers. What is shared is the code, not the actors.</p>
 <p class="pclbl">Migration: the advantage actor</p>
 <pre class="pc"><span class="who"># AdvantageActor, after</span>
 <span class="del">class AdvantageActor:</span>
