@@ -114,7 +114,7 @@ A design proposal from the review, not part of the PR. Permalinks pin <code>9813
   <dt>This PR</dt>
   <dd>Adds a third, <code>PrefixWriterActor</code>, with its own copy of that code and a different way of getting its data.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">Proposed — not implemented, and not in the review yet.</span> Yes: one base class for the client and one pool class, with one pool per user. The net saving is small (≈ 90 lines); the gain is one pattern instead of three.</dd>
+  <dd><span class="verdict open">Proposed — not implemented, and not in the review yet.</span> Yes: one base class for the client and one pool class, with one pool per user. The net saving is small (≈ 110 lines); the gain is one pattern instead of three.</dd>
 </dl>
 </div>
 
@@ -189,17 +189,17 @@ Dotted words have a short explanation: hover or tap them.</div>
 <rect class="cl" x="14" y="390" width="452" height="74" rx="6"/>
 <text class="h" x="24" y="410">OffloadClient  (base class, ≈ 45 lines)</text>
 <text class="t" x="24" y="430">own TQ client · __repr__ names it in Ray logs</text>
-<text class="t" x="24" y="450">you override process(request) · from_bytes()</text>
+<text class="t" x="24" y="450">you override process(request) · owns_storage opt-in</text>
 <rect class="cl" x="494" y="390" width="452" height="74" rx="6"/>
-<text class="h" x="504" y="410">OffloadPool  (≈ 65 lines)</text>
+<text class="h" x="504" y="410">OffloadPool  (≈ 45 lines)</text>
 <text class="t" x="504" y="430">OffloadPool.start(cls, n, place): wait ready, kill on fail</text>
-<text class="t" x="504" y="450">call() · map() · send()</text>
+<text class="t" x="504" y="450">submit(request) → Ray reference · kill()</text>
 <rect class="panel2" x="14" y="490" width="300" height="134" rx="8"/>
 <text class="h" x="24" y="508">pool: 1 per vLLM engine</text>
 <rect class="new" x="24" y="518" width="268" height="46" rx="6"/>
 <text class="t" x="34" y="536">PrefixWriter(OffloadClient)</text>
 <text class="n" x="34" y="554">process = put rows; clear_samples</text>
-<text class="n" x="24" y="594">place: engine&#x27;s node, hard · send()</text>
+<text class="n" x="24" y="594">place: engine&#x27;s node, hard</text>
 <text class="w" x="24" y="612">4 engines on a node → 4 such pools</text>
 <line class="arr" x1="164" y1="490" x2="164" y2="466" marker-end="url(#ah)"/>
 <rect class="panel2" x="330" y="490" width="300" height="134" rx="8"/>
@@ -209,7 +209,7 @@ Dotted words have a short explanation: hover or tap them.</div>
 <rect class="new" x="340" y="518" width="268" height="46" rx="6"/>
 <text class="t" x="350" y="536">AdvantageActor(OffloadClient)</text>
 <text class="n" x="350" y="554">process = run the stage</text>
-<text class="n" x="340" y="600">place: spread off head · map()</text>
+<text class="n" x="340" y="600">place: spread off head</text>
 <line class="arr" x1="480" y1="490" x2="480" y2="466" marker-end="url(#ah)"/>
 <rect class="panel2" x="646" y="490" width="300" height="134" rx="8"/>
 <text class="h" x="656" y="508">pool: K, made by the controller</text>
@@ -218,15 +218,16 @@ Dotted words have a short explanation: hover or tap them.</div>
 <rect class="new" x="656" y="518" width="268" height="46" rx="6"/>
 <text class="t" x="666" y="536">RolloutReassemblerActor(…)</text>
 <text class="n" x="666" y="554">process = finalize</text>
-<text class="n" x="656" y="600">place: default, own env · call()</text>
+<text class="n" x="656" y="600">place: default, own env</text>
 <line class="arr" x1="796" y1="490" x2="796" y2="466" marker-end="url(#ah)"/>
 </svg>
 
 <table>
 <tr><th>Question</th><th>Answer, from the code</th></tr>
-<tr><td>Two ways to get data?</td><td>No second read method needed. A request is either metadata, and the actor reads TQ itself (advantage, reassembler; both already enforce it with <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L74"><code>assert_metadata_only</code></a>), or byte columns sent through Ray (prefix writer), which the base turns back into a <code>TensorDict</code> with <code>from_bytes</code>.</td></tr>
-<tr><td>One caller, many actors?</td><td><code>pool.map</code> sends one request to each actor in parallel. How to split the work stays with the caller: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L232"><code>split_meta_by_prompt_group</code></a> knows prompt groups and which estimators allow a split; generic code cannot.</td></tr>
-<tr><td>One method to override, or read / compute / write?</td><td>One: <code>process(request)</code>. Splitting it into read, compute and write hooks fits only the advantage stage: the writer has nothing to read or compute, and the reassembler reads staging rows, writes finalized rows and clears staging in an order it controls. Extra methods (the writer's <code>clear_samples</code>, the reassembler's <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L204"><code>check_dependencies</code></a>) stay plain methods, called with <code>pool.call(request, method=...)</code>.</td></tr>
+<tr><td>Two ways to get data?</td><td>No second read method needed. A request is either metadata, and the actor reads TQ itself (advantage, reassembler; both already enforce it with <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L74"><code>assert_metadata_only</code></a>), or byte columns sent through Ray (prefix writer), which the writer turns back into a <code>TensorDict</code> with C2's <code>from_bytes</code>. Neither needs anything from the base.</td></tr>
+<tr><td>One caller, many actors?</td><td><code>asyncio.gather</code> over <code>pool.submit</code>, one request per shard; the pool sends each to its least-busy actor. How to split the work stays with the caller: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L232"><code>split_meta_by_prompt_group</code></a> knows prompt groups and which estimators allow a split; generic code cannot.</td></tr>
+<tr><td>One method to override, or read / compute / write?</td><td>One: <code>process(request)</code>. Splitting it into read, compute and write hooks fits only the advantage stage: the writer has nothing to read or compute, and the reassembler reads staging rows, writes finalized rows and clears staging in an order it controls. Extra methods (the writer's <code>clear_samples</code>, the reassembler's <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L204"><code>check_dependencies</code></a>) stay plain methods, called on an actor from <code>pool.acquire()</code>.</td></tr>
+<tr><td>Why does a client need checkpoint and metrics hooks?</td><td>On the <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/interfaces.py#L172">Mooncake</a> TQ backend each client process lends the store memory (64 GiB by default), and the rows it writes live there. A TQ checkpoint therefore asks every such process to save its rows: the controller lists the advantage actors and finalizers for exactly that (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L455-L464">L455-L464</a>). A client built with <code>segment_size=0</code> holds no rows and needs no hook; the prefix writer already does this. So the base holds no rows unless a subclass sets <code>owns_storage</code>. <code>get_data_plane_snapshot</code> returns only I/O counters (bytes, wall time per op), which the controller sums across processes; <code>get_data_plane_metrics</code> says that.</td></tr>
 <tr><td>Why these names?</td><td>"Data-plane actor" sounds like the TQ storage actors that hold the data. "Detached" already means something in Ray: <code>lifetime="detached"</code> is an actor that outlives the process that made it, and these die with their owner. <code>OffloadClient</code> says what it is: a TQ client the caller hands work to. <code>OffloadPool.start</code> is a class method, so there is one entry point.</td></tr>
 <tr><td>Telling actors apart in logs?</td><td><code>__repr__</code> on the actor class sets Ray's log prefix (<a href="https://docs.ray.io/en/latest/ray-observability/user-guides/configure-logging.html#customizing-prefixes-for-actor-logs">Ray docs</a>), so 4 writers on one node print as <code>PrefixWriter[0]</code> … <code>PrefixWriter[3]</code>.</td></tr>
 <tr><td>Placement and failure?</td><td><code>place</code> covers today's three: pinned to the caller's node (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L390">writer</a>), spread off the head node (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L80-L141">advantage</a>), default plus its own Python env (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L272-L283">reassembler</a>). All three already use <code>max_restarts=0</code>, and the controller already drops an advantage actor whose call failed (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L5129-L5143">L5129-L5143</a>); the pool does the same for every user.</td></tr>
@@ -260,38 +261,59 @@ class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879
     __init__(dp_config, stage_cfg, estimator, shard_id)<span class="cm">                              # builds its own TQ client</span>
     <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L59">mooncake_checkpoint</a>(body); <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L67">get_data_plane_snapshot</a>()<span class="cm">                             # checkpoint hooks</span>
     async <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L72">run</a>(request: AdvantageRequest) -&gt; AdvantageOutcome<span class="cm">                         # metadata in; reads TQ, writes advantages</span></pre>
+<p class="pclbl">Interface today: the rollout reassembler, which runs the finalizers (on main)</p>
+<pre class="pc"><span class="who"># controller (caller side): on main today</span>
+actors = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L257">create_rollout_reassembler_actors</a>(dp_cfg, cfg, num_workers=k)<span class="cm">  # own Python env; waits on check_dependencies</span>
+self._available_finalizers = asyncio.Queue(actors)<span class="cm">                      # hand-built pool</span>
+actor = await self._available_finalizers.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L1373">get</a>()<span class="cm">                          # wait for a free one (queue-wait metric)</span>
+async with checkpoint_barrier.mutation(&#x27;group_commits&#x27;):<span class="cm">                # taken only once an actor is free</span>
+    finalized = await actor.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L1400">finalize</a>.remote(request)<span class="cm">                    # if this fails, the actor is not put back</span>
+self._available_finalizers.<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/single_controller.py#L1527">put_nowait</a>(actor)
+
+<span class="who"># RolloutReassemblerActor process (1 CPU, own Python env) x K</span>
+class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L162">RolloutReassemblerActor</a>:
+    __init__(dp_config, cfg)<span class="cm">                                            # builds its own TQ client</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L195">mooncake_checkpoint</a>(body); <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L199">get_data_plane_snapshot</a>()<span class="cm">                # checkpoint hooks</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L204">check_dependencies</a>()<span class="cm">                                                # start-up check of its Python env</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L216">finalize</a>(request: ReassemblyRequest) -&gt; FinalizedGroup<span class="cm">              # metadata in; reads staging, writes rows</span></pre>
 <p class="pcref">Same shape: a CPU actor with its own TQ client, a start function, a caller that tracks which actor is free. Different: how many, where, and whether rows come through Ray or are read from TQ.</p>
 <p class="pclbl">Proposed: one shared interface</p>
-<pre class="pc"><span class="who"># new: nemo_rl/data_plane/offload.py (proposed, ≈ 110 lines)</span>
-<span class="add">class OffloadClient:</span><span class="cm">                                                                  # a CPU process with its own TQ client, doing one job</span>
-<span class="add">    def __init__(self, dp_config, *, label, **client_opts):</span>
-<span class="add">        self.dp = build_data_plane_client(dp_config, bootstrap=False, **client_opts)</span>
+<pre class="pc"><span class="who"># new: nemo_rl/data_plane/offload.py (proposed, ≈ 90 lines)</span>
+<span class="add">class OffloadClient:</span><span class="cm">                                                                      # a CPU process with its own TQ client, doing one job</span>
+<span class="add">    owns_storage = False</span><span class="cm">                                                                  # True: rows it writes live in its own memory (Mooncake)</span>
+<span class="add">    def __init__(self, dp_config, *, label):</span>
+<span class="add">        self.dp = build_data_plane_client(dp_config, bootstrap=False,</span>
+<span class="add">                                          segment_size=None if self.owns_storage else 0)</span><span class="cm">  # 0 = holds no rows</span>
 <span class="add">        self.label = label</span>
-<span class="add">    def process(self, request):</span><span class="cm">                                                       # the one method a subclass overrides</span>
-<span class="add">        raise NotImplementedError</span><span class="cm">                                                     # read, compute, write: its choice</span>
-<span class="add">    def from_bytes(self, columns) -&gt; TensorDict: ...</span><span class="cm">                                  # for rows sent through Ray, read in place</span>
-<span class="add">    def __repr__(self): return f&#x27;{type(self).__name__}[{self.label}]&#x27;</span><span class="cm">                 # Ray prints this in front of each log line</span>
-<span class="add">    def mooncake_checkpoint(self, body): ...; def get_data_plane_snapshot(self): ...</span><span class="cm">  # today copied in each class</span>
+<span class="add">    def process(self, request):</span><span class="cm">                                                           # the one method a subclass overrides</span>
+<span class="add">        raise NotImplementedError</span><span class="cm">                                                         # read, compute, write: its choice</span>
+<span class="add">    def __repr__(self): return f&#x27;{type(self).__name__}[{self.label}]&#x27;</span><span class="cm">                     # Ray prints this in front of each log line</span>
+<span class="add">    def get_data_plane_metrics(self): ...</span><span class="cm">                                                 # today get_data_plane_snapshot: I/O counters, no data</span>
+<span class="add">    def mooncake_checkpoint(self, body): ...</span><span class="cm">                                              # only used if owns_storage: save the rows it holds</span>
 
-<span class="add">def to_bytes(fields: TensorDict) -&gt; columns: ...</span><span class="cm">                                      # caller side; NumPy views, no copy (C2)</span>
-
-<span class="add">class OffloadPool:</span><span class="cm">                                                                    # one per user; never shared</span>
+<span class="add">class OffloadPool:</span><span class="cm">                                                                        # one per user; never shared</span>
 <span class="add">    @classmethod</span>
-<span class="add">    def start(cls, client_cls, *args, n, place, **ray_opts) -&gt; &#x27;OffloadPool&#x27;:</span>
-<span class="add">        actors = [ray.remote(client_cls).options(num_cpus=1, max_restarts=0,</span><span class="cm">          # the options all three use today</span>
+<span class="add">    def start(cls, client_cls, *args, n, place=None, ready=&#x27;__ray_ready__&#x27;, **ray_opts):</span>
+<span class="add">        actors = [ray.remote(client_cls).options(num_cpus=1, max_restarts=0,</span><span class="cm">              # the options all three use today</span>
 <span class="add">                  scheduling_strategy=place(i), **ray_opts).remote(*args, label=i) for i in range(n)]</span>
-<span class="add">        ray.get([a.__ray_ready__.remote() for a in actors])</span><span class="cm">                           # on failure: kill all, raise</span>
+<span class="add">        ray.get([getattr(a, ready).remote() for a in actors])</span><span class="cm">                             # on failure: kill all, raise</span>
 <span class="add">        return cls(actors)</span>
-<span class="add">    async def call(self, request, method=&#x27;process&#x27;)</span><span class="cm">                                   # any free actor; a failed call drops it</span>
-<span class="add">    async def map(self, requests)</span><span class="cm">                                                     # one request per actor, in parallel</span>
-<span class="add">    def send(self, request) -&gt; Future</span><span class="cm">                                                 # don&#x27;t wait: actor.process.remote(...).future()</span>
-<span class="add">    size; def kill(self)</span><span class="cm">                                                              # number of actors; ray.kill all at shutdown</span></pre>
+<span class="add">    def submit(self, request) -&gt; ObjectRef:</span><span class="cm">                                               # send to the least-busy actor now; never waits</span>
+<span class="add">        ...</span><span class="cm">                                                                               # await it (async code) or .future() (a thread)</span>
+<span class="add">    async def acquire(self) -&gt; ContextManager[actor]:</span><span class="cm">                                     # wait until an actor is free; give it back after</span>
+<span class="add">        ...</span><span class="cm">                                                                               # if the call inside failed, drop that actor</span>
+<span class="add">    size; free; def kill(self)</span><span class="cm">                                                            # free = idle actors (finalizer queue metric); kill at shutdown</span></pre>
+<p class="pcref"><b>How each user calls it.</b> <code>submit</code> sends now and returns a Ray reference; <code>acquire</code> waits for a free actor first, for a caller that must take a lock only once an actor is free.
+Finalizers: <code>async with pool.acquire() as actor</code> (see below).
+Advantage shards: <code>outcomes = await asyncio.gather(*(pool.submit(AdvantageRequest(s)) for s in shards))</code>.
+Prefix writer, from its prepare thread: <code>pool.submit(rows).future().add_done_callback(seal)</code>.</p>
 <p class="pcref">Real code it replaces: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/algorithms/advantage_actor.py#L41-L141"><code>advantage_actor.py</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/experience/rollout_reassembler_actor.py#L156-L291"><code>RolloutReassemblerActor</code> and its start function</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L187-L404"><code>PrefixWriterService</code> … <code>create_prefix_writer</code></a>, and the same two hooks in <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/worker_mixin.py#L431-L490"><code>TQWorkerMixin</code></a>.</p>
 <p class="pcref"><b>One pool per use, never shared.</b> Each <code>OffloadPool.start</code> call returns its own pool with its own count and placement: 4 vLLM engines on a node make 4 pools of 1 writer, each pinned to that node; the controller makes one pool of N advantage actors placed anywhere off the head node, and one pool of K finalizers. What is shared is the code, not the actors.</p>
 <p class="pclbl">Migration: the advantage actor</p>
 <pre class="pc"><span class="who"># AdvantageActor, after</span>
 <span class="del">class AdvantageActor:</span>
 <span class="add">class AdvantageActor(OffloadClient):</span>
+<span class="add">    owns_storage = True</span><span class="cm">                                                                # as today: its advantages rows live in it</span>
     def __init__(self, dp_config, stage_cfg, estimator, label):
 <span class="del">        self._dp_client = build_data_plane_client(dp_config, bootstrap=False)</span>
 <span class="add">        super().__init__(dp_config, label=label)</span><span class="cm">                                       # client, log name, hooks</span>
@@ -306,34 +328,53 @@ class <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879
 <span class="add">pool = OffloadPool.start(AdvantageActor, dp_cfg, stage_cfg, estimator, n=n, place=spread_off_head)</span>
 shards = split_meta_by_prompt_group(meta, pool.size)<span class="cm">                                   # how to split stays here</span>
 <span class="del">outcomes = await gather(*(_run_advantage_stage(AdvantageRequest(s)) for s in shards))</span><span class="cm">  # ≈ 20 lines go</span>
-<span class="add">outcomes = await pool.map([AdvantageRequest(s) for s in shards])</span></pre>
+<span class="add">outcomes = await asyncio.gather(*(pool.submit(AdvantageRequest(s)) for s in shards))</span></pre>
 <p class="pclbl">Migration: the prefix writer</p>
 <pre class="pc"><span class="who"># PrefixWriter, after (actor process)</span>
 <span class="del">class PrefixWriterActor(PrefixWriterService): put(batch: PrefixPut); ready()</span>
 <span class="add">class PrefixWriter(OffloadClient):</span>
-<span class="add">    def process(self, request):</span><span class="cm">                                                            # request = (keys, byte columns, tags)</span>
-<span class="add">        self.dp.put_samples(request.keys, self.from_bytes(request.columns), request.tags)</span><span class="cm">  # rows read in place</span>
+<span class="add">    def process(self, request):</span><span class="cm">                                                           # request = (keys, byte columns, tags)</span>
+<span class="add">        self.dp.put_samples(request.keys, from_bytes(request.columns), request.tags)</span><span class="cm">      # from_bytes: C2&#x27;s helper, next to the writer</span>
 <span class="add">    def clear_samples(self, keys): self.dp.clear(keys)</span>
 
 <span class="who"># vLLM worker, after (caller side)</span>
-<span class="del">writer = await create_prefix_writer(dp_cfg, partition_id=p)</span><span class="cm">                                # ≈ 30 lines go</span>
+<span class="del">writer = await create_prefix_writer(dp_cfg, partition_id=p)</span><span class="cm">                               # ≈ 30 lines go</span>
 <span class="add">writer = OffloadPool.start(PrefixWriter, dp_cfg, n=1, place=this_node, max_concurrency=1)</span>
-<span class="del">writer.put_samples(sample_ids=, partition_id=, fields=, tags=)</span><span class="cm">                             # RayPrefixWriterClient, 94 lines, goes</span>
-<span class="add">future = writer.send(PrefixRows(keys, to_bytes(fields), tags))</span><span class="cm">                             # seal the rows when it resolves</span>
-writer.kill()<span class="cm">                                                                              # at shutdown</span></pre>
-<p class="pcref">The reassembler moves the same way as the advantage actor: <code>class RolloutReassemblerActor(OffloadClient)</code> renames <code>finalize</code> to <code>process</code> and keeps <code>check_dependencies</code>; the controller's queue of free finalizers becomes <code>pool.call(request)</code>.</p>
+<span class="del">writer.put_samples(sample_ids=, partition_id=, fields=, tags=)</span><span class="cm">                            # RayPrefixWriterClient, 94 lines, goes</span>
+<span class="add">writer.submit(PrefixRows(keys, to_bytes(fields), tags)).future().add_done_callback(seal)</span><span class="cm">  # seal the rows when the write is confirmed</span>
+writer.kill()<span class="cm">                                                                             # at shutdown</span></pre>
+<p class="pclbl">Migration: the rollout reassembler</p>
+<pre class="pc"><span class="who"># RolloutReassemblerActor, after</span>
+<span class="del">class RolloutReassemblerActor:</span>
+<span class="add">class RolloutReassemblerActor(OffloadClient):</span>
+<span class="add">    owns_storage = True</span><span class="cm">                                                 # as today: the rows it writes live in it</span>
+<span class="del">    def mooncake_checkpoint(...); def get_data_plane_snapshot(...)</span><span class="cm">      # now inherited</span>
+<span class="del">    def finalize(self, request): ...</span>
+<span class="add">    def process(self, request): ...</span><span class="cm">                                     # same body, standard name</span>
+    def check_dependencies(self): ...<span class="cm">                                   # unchanged; start() uses it as the ready check</span>
+
+<span class="who"># controller, after</span>
+<span class="del">actors = create_rollout_reassembler_actors(dp_cfg, cfg, num_workers=k)</span><span class="cm">  # ≈ 35 lines go</span>
+<span class="del">self._available_finalizers = asyncio.Queue(actors)</span>
+<span class="add">pool = OffloadPool.start(RolloutReassemblerActor, dp_cfg, cfg, n=k,</span>
+<span class="add">                        runtime_env=env, ready=&#x27;check_dependencies&#x27;)</span>
+<span class="del">actor = await self._available_finalizers.get(); ...; put_nowait(actor)</span>
+<span class="add">async with pool.acquire() as actor:</span><span class="cm">                                     # waits for a free one; drops it if the call fails</span>
+    async with checkpoint_barrier.mutation(&#x27;group_commits&#x27;):<span class="cm">            # still taken only once an actor is free</span>
+        finalized = await actor.process.remote(request)</pre>
+<p class="pcref">The one real difference: the controller takes the checkpoint lock only after an actor is free, so the lock never covers time spent waiting in an actor's queue. <code>acquire()</code> keeps that; <code>submit()</code> alone would not.</p>
 
 <table>
 <tr><th>Change</th><th>Lines (estimate)</th></tr>
-<tr><td>New <code>data_plane/offload.py</code>: base, start function, pool</td><td>+110</td></tr>
+<tr><td>New <code>data_plane/offload.py</code>: client base class and pool</td><td>+90</td></tr>
 <tr><td><code>advantage_actor.py</code>: client, hooks, placement, ready wait, cleanup</td><td>−75</td></tr>
 <tr><td><code>rollout_reassembler_actor.py</code>: client, hooks, ready wait, cleanup</td><td>−40</td></tr>
 <tr><td><code>single_controller.py</code>: two hand-built queues of free actors and <code>_run_advantage_stage</code></td><td>−35</td></tr>
 <tr><td>#5176 <code>prefix_writer_actor.py</code>: start function, service/actor split (on top of C2)</td><td>−50</td></tr>
-<tr><td><b>Net</b></td><td><b>≈ −90</b></td></tr>
+<tr><td><b>Net</b></td><td><b>≈ −110</b></td></tr>
 </table>
 
-<div class="hl"><b>So what.</b> The three actors reconcile into one client base class with one method to override, and one pool class that each user starts its own copy of: about 110 lines, and nothing more. No second read method, no read/compute/write hooks, no sharding logic in the base.
+<div class="hl"><b>So what.</b> The three actors reconcile into one client base class with one method to override, and one pool class that each user starts its own copy of: about 90 lines, and nothing more. No second read method, no read/compute/write hooks, no sharding logic in the base.
 The line count drops only a little, but a fourth actor becomes a ten-line subclass, and the prefix writer gets the checkpoint hooks it lacks today.
 To keep #5176 from growing, the base lands first in its own small PR.</div>
 
