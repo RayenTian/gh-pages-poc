@@ -87,12 +87,12 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,M
 <div class="status"><dl>
   <dt>Before</dt><dd>There was one frontend per engine, so there was no pool and no control pipe. A failed metrics read only lost a metric.</dd>
   <dt>This PR</dt><dd>When any pool command fails, <code>command()</code> stops every child frontend <i>and</i> shuts down the shared engine. That includes the read-only <code>progress</code> and <code>snapshot</code> queries.</dd>
-  <dt>Status</dt><dd><span class="verdict open">Open, not fixed in this PR.</span> Raised as review comment C15 (pending until the review is published).</dd>
+  <dt>Status</dt><dd><span class="verdict open">Open, still in the merged code.</span> The PR merged on 2026-11-14 at <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L231-L236"><code>97a0d809</code></a> (vLLM 0.33.0). <code>command()</code> still closes the engine on any error. A new <code>_failure</code> flag makes later pool commands raise instead of returning <code>[]</code>, but the owner's frontend still takes Gym calls with no engine behind it. vLLM 0.33 still gives this client no engine monitor (<a href="https://github.com/vllm-project/vllm/blob/v0.33.0/vllm/v1/engine/core_client.py#L822-L827">core_client.py L822-L827</a>). The figure below uses the reviewed head, <code>908f05fa</code>. Review comment C15 was never published.</dd>
 </dl></div>
 
 <nav class="chain">
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5074-many-frontends.html">one Gym call, three setups</a>
-  <span class="here">a failed query stops the engine</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5074-many-frontends.html">three setups, one rollout</a>
+  <span class="here">a failed query</span>
 </nav>
 <p class="chainnote">Two pages on this PR, one question each. This one covers what happens when one frontend command fails.</p>
 
