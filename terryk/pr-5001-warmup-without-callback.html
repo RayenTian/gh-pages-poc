@@ -100,8 +100,8 @@ All permalinks pin the PR head <code>5223071</code>.</p>
 
 <div class="status"><dl>
 <dt>Before</dt><dd>No warm-up. Step 1 pays for compiling and tuning the trainer's kernels.</dd>
-<dt>This PR</dt><dd>Adds an opt-in warm-up: one fake step on the trainer while vLLM loads or the first rollouts run. In setup it is started by an 80-line class, <code>_EarlyTrainerWarmup</code>, hung on the trainer build as a done-callback.</dd>
-<dt>Status</dt><dd><span class="verdict prop">Proposed — not implemented.</span> The review asks to replace the class with ~12 plain lines in setup. Same start time in every case, so the same speedup. Not yet a staged review comment (would be C8).</dd>
+<dt>This PR</dt><dd>Adds an opt-in warm-up: one fake step on the trainer while vLLM loads or the first rollouts run. Setup starts it with an 80-line class, <code>_EarlyTrainerWarmup</code>, hung on the trainer build as a done-callback. Whether to warm up is decided twice, in setup and in the controller.</dd>
+<dt>Status</dt><dd><span class="verdict prop">Proposed — not implemented.</span> Review comment C8 asks for a plain wait in setup and a single decision handed to the controller. The warm-up starts at the same moment in every case, so the speedup is the same.</dd>
 </dl></div>
 
 <nav class="chain">
@@ -109,13 +109,13 @@ All permalinks pin the PR head <code>5223071</code>.</p>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5001-warmup-cuda-graph-crash.html">2 · warm-up crash with CUDA graphs</a>
   <span class="here">3 · warm-up without a callback</span>
 </nav>
-<p class="chainnote">Three pages on this PR. Page 1 explains all the switches; this one is only about how setup starts switch ④.</p>
+<p class="chainnote">Three pages on this PR. Page 1 explains all the switches; this one is only about how the warm-up (switch ④) is started.</p>
 
-<div class="bg"><b>Background.</b> The PR's warm-up (switch ④ on page 1) can start in two places.
+<div class="bg"><b>Background.</b> The warm-up can start in two places.
 If the trainer finishes building <i>before</i> vLLM has loaded, setup starts it, so it runs while vLLM loads.
 Otherwise the controller starts it beside the first rollouts, and step 1 waits for it.
-A flag, <code>trainer_warmup_ran</code>, tells the controller not to run it twice.
-Only the <b>setup</b> start changes on this page.</div>
+C8 changes only code that runs <b>after the dataset has loaded</b>. Switch ① still submits the trainer build
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller_utils/setup.py#L2036">before the vLLM reserve</a>, exactly as in the PR.</div>
 
 <h2>What C8 touches, switch by switch</h2>
 <table class="grid">
@@ -123,60 +123,81 @@ Only the <b>setup</b> start changes on this page.</div>
 <tr><td>① Build the trainer before reserving vLLM</td><td>No</td><td>Yes</td></tr>
 <tr><td>② Scan the dataset's Gym routes when the dataset loads</td><td>No</td><td>Yes</td></tr>
 <tr><td>③ Keep Triton autotune results and torch.compile shape profiles between jobs</td><td>No</td><td>Yes</td></tr>
-<tr><td>④ Warm-up, controller start (beside the first rollouts)</td><td>No</td><td>Yes</td></tr>
 <tr><td>④ Warm-up, setup start (while vLLM loads)</td><td><b>Yes</b>: the class becomes a wait in setup</td><td>Yes: same moment, below</td></tr>
+<tr><td>④ Warm-up, controller start (beside the first rollouts)</td><td><b>Yes</b>: it reads setup's decision instead of checking again</td><td>Yes: same moment</td></tr>
 </table>
 
-<svg viewBox="0 0 940 418" role="img" aria-label="When the warm-up starts in three orderings">
-<text class="hdr" x="14" y="22">When the warm-up starts: the PR and C8 pick the same moment in all three cases</text>
-<rect class="same" x="14" y="32" width="14" height="10" rx="2"/><text class="note" x="34" y="41">build / load</text>
-<rect class="stale" x="130.0" y="32" width="14" height="10" rx="2"/><text class="note" x="150.0" y="41">trainer thrown away</text>
-<rect class="warm" x="291.5" y="32" width="14" height="10" rx="2"/><text class="note" x="311.5" y="41">warm-up</text>
-<text class="note" x="375.0" y="41">bar lengths show order only, not measured times</text>
-<text class="lane" x="14" y="70" font-weight="bold">A · trainer ready first</text>
-<rect class="panel" x="8" y="54" width="924" height="96" rx="6"/>
-<text class="lane" x="24" y="92">trainer</text>
-<rect class="same" x="250" y="80" width="248" height="16" rx="3"/>
-<text class="bt" x="256" y="92">trainer build</text>
-<text class="lane" x="24" y="116">vLLM</text>
-<rect class="same" x="250" y="104" width="434" height="16" rx="3"/>
-<text class="bt" x="256" y="116">vLLM load</text>
-<text class="lane" x="24" y="140">trainer GPUs</text>
-<rect class="warm" x="498" y="128" width="161" height="16" rx="3"/>
-<text class="bt" x="504" y="140">warm-up (setup)</text>
-<line class="mark" x1="498" y1="74" x2="498" y2="146"/>
-<text class="note" x="14" y="160">Warm-up starts the moment the trainer is ready and runs while vLLM loads. Setup waits for it.</text>
-<text class="lane" x="14" y="192" font-weight="bold">B · vLLM ready first</text>
-<rect class="panel" x="8" y="176" width="924" height="96" rx="6"/>
-<text class="lane" x="24" y="214">trainer</text>
-<rect class="same" x="250" y="202" width="434" height="16" rx="3"/>
-<text class="bt" x="256" y="214">trainer build</text>
-<text class="lane" x="24" y="238">vLLM</text>
-<rect class="same" x="250" y="226" width="279" height="16" rx="3"/>
-<text class="bt" x="256" y="238">vLLM load</text>
-<text class="lane" x="24" y="262">trainer GPUs</text>
-<rect class="warm" x="696" y="250" width="161" height="16" rx="3"/>
-<text class="bt" x="702" y="262">warm-up (controller)</text>
-<line class="mark" x1="696" y1="196" x2="696" y2="268"/>
-<text class="note" x="14" y="282">Setup does nothing. The controller runs it beside the first rollouts; step 1 waits for it.</text>
-<text class="lane" x="14" y="314" font-weight="bold">C · dataset caps max_num_steps</text>
-<rect class="panel" x="8" y="298" width="924" height="96" rx="6"/>
-<text class="lane" x="24" y="336">trainer</text>
-<rect class="stale" x="250" y="324" width="186" height="16" rx="3"/>
-<text class="bt" x="256" y="336">1st build</text>
-<rect class="same" x="436" y="324" width="211" height="16" rx="3"/>
-<text class="bt" x="442" y="336">rebuild</text>
-<text class="lane" x="24" y="360">vLLM</text>
-<rect class="same" x="250" y="348" width="465" height="16" rx="3"/>
-<text class="bt" x="256" y="360">vLLM load</text>
-<text class="lane" x="24" y="384">trainer GPUs</text>
-<rect class="warm" x="647" y="372" width="161" height="16" rx="3"/>
-<text class="bt" x="653" y="384">warm-up (setup)</text>
-<line class="mark" x1="647" y1="318" x2="647" y2="390"/>
-<text class="note" x="14" y="404">The first trainer is thrown away. Only the rebuilt one is warmed up, in both versions.</text>
+<svg viewBox="0 0 940 544" role="img" aria-label="When the warm-up starts in three orderings">
+<text class="hdr" x="14" y="22">The PR and C8: same early trainer build, same warm-up start, in all three orders</text>
+<rect class="moved" x="14" y="32" width="14" height="10" rx="2"/><text class="note" x="34" y="41">① early build (C8 leaves it alone)</text>
+<rect class="stale" x="260.8" y="32" width="14" height="10" rx="2"/><text class="note" x="280.8" y="41">trainer thrown away</text>
+<rect class="warm" x="414.6" y="32" width="14" height="10" rx="2"/><text class="note" x="434.6" y="41">④ warm-up</text>
+<rect class="same" x="506.40000000000003" y="32" width="14" height="10" rx="2"/><text class="note" x="526.4000000000001" y="41">other work</text>
+<text class="note" x="926" y="41" text-anchor="end">order only, not timings</text>
+<rect class="panel" x="8" y="52" width="924" height="138" rx="6"/>
+<text class="lane" x="18" y="68" font-weight="bold">A · trainer ready before vLLM</text>
+<text class="lane" x="18" y="88">setup thread</text>
+<rect class="same" x="130" y="76" width="76" height="16" rx="3"/>
+<text class="bt" x="136" y="88">reserve</text>
+<text class="lane" x="18" y="110">dataset</text>
+<rect class="same" x="206" y="98" width="152" height="16" rx="3"/>
+<text class="bt" x="212" y="110">load dataset</text>
+<text class="lane" x="18" y="132">vLLM</text>
+<rect class="same" x="206" y="120" width="426" height="16" rx="3"/>
+<text class="bt" x="212" y="132">load weights, start servers</text>
+<text class="lane" x="18" y="154">trainer</text>
+<rect class="moved" x="130" y="142" width="319" height="16" rx="3"/>
+<text class="bt" x="136" y="154">① build trainer, before reserve</text>
+<text class="lane" x="18" y="176">trainer GPUs</text>
+<rect class="warm" x="449" y="164" width="198" height="16" rx="3"/>
+<text class="bt" x="455" y="176">④ warm-up (setup)</text>
+<line class="mark" x1="449" y1="72" x2="449" y2="186"/>
+<text class="note" x="14" y="204">Warm-up starts when the trainer is ready, while vLLM still loads. Setup then waits for both.</text>
+<rect class="panel" x="8" y="216" width="924" height="138" rx="6"/>
+<text class="lane" x="18" y="232" font-weight="bold">B · vLLM ready before the trainer</text>
+<text class="lane" x="18" y="252">setup thread</text>
+<rect class="same" x="130" y="240" width="76" height="16" rx="3"/>
+<text class="bt" x="136" y="252">reserve</text>
+<text class="lane" x="18" y="274">dataset</text>
+<rect class="same" x="206" y="262" width="152" height="16" rx="3"/>
+<text class="bt" x="212" y="274">load dataset</text>
+<text class="lane" x="18" y="296">vLLM</text>
+<rect class="same" x="206" y="284" width="304" height="16" rx="3"/>
+<text class="bt" x="212" y="296">load weights, start servers</text>
+<rect class="same" x="708" y="284" width="213" height="16" rx="3"/>
+<text class="bt" x="714" y="296">first rollouts</text>
+<text class="lane" x="18" y="318">trainer</text>
+<rect class="moved" x="130" y="306" width="562" height="16" rx="3"/>
+<text class="bt" x="136" y="318">① build trainer, before reserve</text>
+<text class="lane" x="18" y="340">trainer GPUs</text>
+<rect class="warm" x="708" y="328" width="182" height="16" rx="3"/>
+<text class="bt" x="714" y="340">④ warm-up (controller)</text>
+<line class="mark" x1="708" y1="236" x2="708" y2="350"/>
+<text class="note" x="14" y="368">Setup skips it. The controller runs it beside the first rollouts; step 1 waits for it.</text>
+<rect class="panel" x="8" y="380" width="924" height="138" rx="6"/>
+<text class="lane" x="18" y="396" font-weight="bold">C · dataset caps max_num_steps</text>
+<text class="lane" x="18" y="416">setup thread</text>
+<rect class="same" x="130" y="404" width="76" height="16" rx="3"/>
+<text class="bt" x="136" y="416">reserve</text>
+<text class="lane" x="18" y="438">dataset</text>
+<rect class="same" x="206" y="426" width="152" height="16" rx="3"/>
+<text class="bt" x="212" y="438">load dataset</text>
+<text class="lane" x="18" y="460">vLLM</text>
+<rect class="same" x="206" y="448" width="608" height="16" rx="3"/>
+<text class="bt" x="212" y="460">load weights, start servers</text>
+<text class="lane" x="18" y="482">trainer</text>
+<rect class="stale" x="130" y="470" width="274" height="16" rx="3"/>
+<text class="bt" x="136" y="482">① 1st build</text>
+<rect class="same" x="404" y="470" width="258" height="16" rx="3"/>
+<text class="bt" x="410" y="482">rebuild for the capped steps</text>
+<text class="lane" x="18" y="504">trainer GPUs</text>
+<rect class="warm" x="662" y="492" width="182" height="16" rx="3"/>
+<text class="bt" x="668" y="504">④ warm-up (setup)</text>
+<line class="mark" x1="662" y1="400" x2="662" y2="514"/>
+<text class="note" x="14" y="532">The first trainer is thrown away. Only the rebuilt one is warmed up, in both versions.</text>
 </svg>
 
-<h2>The setup start, as pseudocode</h2>
+<h2>The code, as pseudocode</h2>
 <p class="pclbl">PR head: setup thread</p>
 <pre class="pc"><span class="who"># setup thread, setup_single_controller (PR head)</span>
 ...dataset load, and the trainer rebuild if the dataset caps max_num_steps...
@@ -211,16 +232,22 @@ class <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d4
 <p>Three of the class's parts exist only because the start is a callback:
 the stored error (a callback's exceptions are only logged), the <code>threading.Event</code>
 (<code>result()</code> can return before the callback has run), and the class itself, which carries state between the two threads.
-Its skip check also returns <code>None</code> without saying why, while the <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1062">controller's copy</a> prints the reason.</p>
+Two things are also written twice: the skip check (<a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller_utils/setup.py#L1162">setup, silent</a>; <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1055-L1062">controller, printed</a>)
+and the step's field list (<a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L469-L475">controller</a>; <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L333-L338"><code>trainer_warmup_kwargs</code></a>).
+Both helpers live in the 5,275-line <code>single_controller.py</code>, and setup imports them back
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller_utils/setup.py#L1155-L1159">inside a function</a> to avoid an import loop.</p>
 
-<p class="pclbl">The fix, as pseudocode (proposed, not run)</p>
-<p class="where"><b>Where the fix lands: RL only, one file,</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller_utils/setup.py#L2219-L2241"><code>setup.py</code></a>. The class goes. Nothing in the controller or the Megatron worker changes.</p>
+<p class="pclbl">The fix, as pseudocode (proposed, not run): setup</p>
+<p class="where"><b>Where the fix lands: RL only, three files.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller_utils/setup.py#L2219-L2241"><code>setup.py</code></a> loses the class and decides once;
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1051-L1071"><code>single_controller.py</code></a> reads that decision;
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L104"><code>advantage_stage.py</code></a> holds the one field list.
+No Megatron worker change: its own <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2685">skip check</a> covers model settings the driver cannot see, so it stays.</p>
 <pre class="pc"><span class="who"># setup thread, setup_single_controller (proposed, not run)</span>
 ...dataset load, and the trainer rebuild if the dataset caps max_num_steps...
 <span class="del">early_warmup = _EarlyTrainerWarmup.maybe_create(cfg, loss_fn, ...)</span>
 <span class="del">if early_warmup:</span>
 <span class="del">    submitted[&#x27;trainer&#x27;].add_done_callback(early_warmup.start)</span>
-<span class="add">warmup_kwargs = <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L343">warmup_kwargs_or_none</a>(cfg)</span>                         <span class="cm"># one skip check; prints the reason</span>
+<span class="add">warmup_kwargs = _trainer_warmup_kwargs(cfg, stage_cfg, step)</span>       <span class="cm"># the only skip check; prints why</span>
 <span class="add">gen_f, trainer_f = submitted[&#x27;generation&#x27;], submitted[&#x27;trainer&#x27;]</span>
 <span class="add">refs = None</span>
 <span class="add">if warmup_kwargs is not None:</span>
@@ -233,32 +260,53 @@ trainer    = trainer_f.result()                                    <span class="
 <span class="del">    trainer_warmup_ran = early_warmup.finish()</span>
 <span class="add">if refs is not None:</span>
 <span class="add">    ray.get(refs)</span>                                                  <span class="cm"># warm-up errors raise here, normally</span>
-<span class="add">    trainer_warmup_ran = True</span>
-<span class="del">class _EarlyTrainerWarmup: ...</span>                                     <span class="cm"># whole class, ~80 lines, removed</span></pre>
+<span class="add">    warmup_kwargs = None</span>                                           <span class="cm"># done: nothing left for the controller</span>
+<span class="del">class _EarlyTrainerWarmup: ...</span>                                     <span class="cm"># whole class, ~80 lines, removed</span>
+SingleControllerActorArgs(...,
+<span class="del">    trainer_warmup_ran=trainer_warmup_ran)</span>
+<span class="add">    trainer_warmup_kwargs=warmup_kwargs)</span>                           <span class="cm"># None = off, skipped, or already run</span></pre>
+<p class="pclbl">The fix: helpers</p>
+<pre class="pc"><span class="who"># setup.py, new private helper (moved out of single_controller.py)</span>
+<span class="add">def _trainer_warmup_kwargs(cfg, stage_cfg, step):</span>
+<span class="add">    if not cfg.async_rl.trainer_warmup.enabled: return None</span>         <span class="cm"># C2&#x27;s config key</span>
+<span class="add">    if reason := <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L343">trainer_warmup_skip_reason</a>(cfg, stage_cfg, step):</span>  <span class="cm"># moved here, the one caller</span>
+<span class="add">        print(&#x27;trainer warm-up skipped:&#x27;, reason); return None</span>
+<span class="add">    return {&#x27;train_fields&#x27;: stage_cfg.train_fields(cfg),</span>            <span class="cm"># shared with the controller</span>
+<span class="add">            &#x27;run_logprobs&#x27;: stage_cfg.policy_logprobs_required}</span>
+<span class="who"></span>
+<span class="who"># advantage_stage.py: one place for the step&#x27;s fields</span>
+<span class="add">class AdvantageStageConfig:</span>
+<span class="add">    def train_fields(self, cfg):</span>
+<span class="add">        return <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L300">_train_fields_for_step</a>(...)</span>                          <span class="cm"># the expression both copies use today</span></pre>
 <p class="pcref">Real calls it uses: <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/models/policy/tq_policy.py#L887"><code>start_warmup_first_pass</code></a> (returns Ray futures, does not block),
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L343"><code>trainer_warmup_skip_reason</code></a>. <code>wait</code> and <code>FIRST_COMPLETED</code> are from Python's <code>concurrent.futures</code>; they work across the two thread pools.</p>
-
-<p class="pclbl">Controller start: same in the PR and in C8</p>
-<pre class="pc"><span class="who"># controller actor, event loop (same in the PR and in C8)</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1051">_maybe_start_trainer_warmup</a>():                                <span class="cm"># called before the pumps start</span>
-    if warm-up off or trainer_warmup_ran: return              <span class="cm"># setup already did it</span>
-    if reason := skip_reason(cfg): <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1062">print</a>(reason); return
-    task = <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1064">create_task</a>(to_thread(trainer.warmup_first_pass))  <span class="cm"># runs beside the first rollouts</span>
-<span class="who"># train pump, before step 1</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L2901">await _finish_trainer_warmup</a>()                            <span class="cm"># step 1 waits for it</span></pre>
+<p class="pclbl">The fix: controller</p>
+<pre class="pc"><span class="who"># controller actor, event loop (proposed, not run)</span>
+<span class="del">self._train_fields = <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L469">_train_fields_for_step</a>(...)</span>                        <span class="cm"># copy #1 of the expression</span>
+<span class="add">self._train_fields = stage_cfg.train_fields(cfg)</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1051">_maybe_start_trainer_warmup</a>():                                          <span class="cm"># called before the pumps start</span>
+<span class="del">    if warm-up off or trainer_warmup_ran: return</span>
+<span class="del">    if reason := skip_reason(cfg): <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1062">print</a>(reason); return</span>                <span class="cm"># skip check #2</span>
+<span class="add">    kwargs = self._trainer_warmup_kwargs</span>                                <span class="cm"># setup&#x27;s decision</span>
+<span class="add">    if kwargs is None: return</span>
+    task = <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1064">create_task</a>(to_thread(trainer.warmup_first_pass, **kwargs))  <span class="cm"># beside the first rollouts</span>
+<span class="who"># train pump, before step 1 (unchanged)</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L2901">await _finish_trainer_warmup</a>()                                      <span class="cm"># step 1 waits for it</span></pre>
 <p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L1051-L1071"><code>_maybe_start_trainer_warmup</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L924">called</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller.py#L2901">awaited before step 1</a>.</p>
 
 <h2>Why it is the same speed</h2>
 <ul>
-<li><b>A, trainer first.</b> The PR's callback fires when the trainer build ends. C8's <code>wait</code> returns at the same moment. Both start the warm-up then, and both make setup wait for it after vLLM is up.</li>
-<li><b>B, vLLM first.</b> Both skip the setup start. The controller runs it, unchanged.</li>
-<li><b>C, rebuild.</b> The PR attaches the callback <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller_utils/setup.py#L2198-L2217">after the rebuild</a>. C8's code sits in the same place, so it also warms only the final trainer.
+<li><b>① is untouched.</b> The trainer build is still submitted before the reserve. Every row of the figure starts it at time zero.</li>
+<li><b>A, trainer first.</b> The PR's callback is attached after the dataset load and fires when the trainer is ready. C8's <code>wait</code> sits in the same place and returns at the same moment.</li>
+<li><b>B, vLLM first.</b> Both skip the setup start, and the controller runs it beside the first rollouts.</li>
+<li><b>C, rebuild.</b> Both run after the <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/algorithms/single_controller_utils/setup.py#L2198-L2217">rebuild</a>, so only the final trainer is warmed up.
 (Starting it inside the build task would warm the thrown-away trainer. That is why C8 waits in setup instead.)</li>
 </ul>
 
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5001#discussion_r4604471007">review comment C8 — setup.py:1125</a></p>
 <div class="hl"><b>So what.</b> The same speedup, with no callback, no <code>Event</code>, no stored error and no class.
-Errors reach setup the normal way, and the skip reason is always printed.
-The two start places and the <code>trainer_warmup_ran</code> flag stay, because each start covers a different order.
+Whether to warm up is decided once and the reason is always printed; the field list is written once.
+Both start places stay, because each covers a different order.
 Nothing here has been run; the PR still has no timings for any switch (page 1).</div>
 </div>
 </body>
