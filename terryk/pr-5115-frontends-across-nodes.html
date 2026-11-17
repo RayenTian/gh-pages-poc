@@ -96,11 +96,16 @@ svg a text{text-decoration:underline;fill:var(--accent);font:10px ui-monospace,M
 <h1>Dynamo with several frontends: where each piece runs today, where it runs with this PR, and why it moves</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5115">#5115</a>, stacked on <a href="https://github.com/NVIDIA-NeMo/RL/pull/4979">#4979</a>. "Today" links are pinned to #4979's head <code>a29d55b</code>; "this PR" links to <code>9d420a14</code>. Dynamo <code>1.5.1</code> → <code>1.8.0.dev20261117</code>.</p>
 <nav class="chain">
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-one-chat-path.html">one chat path (#4905/#4979)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-dynamo-native-worker.html">what the PR replaces</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-request-paths.html">how requests reach vLLM</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-shared-or-copied.html">shared or copied</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-one-chat-path.html">one chat path</a>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-gym-through-dynamo.html">Gym through Dynamo (#4979)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-one-call-three-steps.html">one call, three steps</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-reasoning-ended.html">finished thinking? (C84)</a>
   <span class="here">frontends across nodes (#5115)</span>
 </nav>
-<p class="chainnote">Pages on this Dynamo stack, one question each. This one: what #5115 moves, and why.</p>
+<p class="chainnote">Eight pages on this stack (#4905, #4979 and #5115), one question each. This one: what #5115 moves to several frontends, and why.</p>
 <div class="status"><dl>
 <dt>Before</dt><dd>One Dynamo frontend runs as a child process of the v2 (single controller) driver, on the driver's node. It holds one router, one session table (at most 65,536 Gym sessions) and every chat render. A small launcher patches Dynamo's code to plug in our chat engine, and checkpoint cuts go to a second port.</dd>
 <dt>This PR</dt><dd><code>num_frontends</code> frontends run on the GPU nodes, each started by a small Ray actor. They use stock <code>dynamo.frontend</code> with two supported plug-ins (our chat engine and the cut route), so the launcher and the second port are gone. The session table holds 16,777,216. A watchdog stops every service if its starter is killed.</dd>
