@@ -95,8 +95,9 @@ and Transformer Engine 2.18 <code>27486e0</code>.</p>
 <nav class="chain">
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5001-startup-switches.html">1 · what the switches change</a>
   <span class="here">2 · warm-up crash with CUDA graphs</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5001-warmup-without-callback.html">3 · warm-up without a callback</a>
 </nav>
-<p class="chainnote">Two pages on this PR. Read page 1 first for what the warm-up is.</p>
+<p class="chainnote">Three pages on this PR. Read page 1 first for what the warm-up is. Page 3 proposes a simpler way for setup to start it.</p>
 
 <div class="bg"><b>Background.</b> Megatron keeps a few named random-number streams, one per kind of parallel group, in an <span class="tip" tabindex="0" data-tip="A small object that holds named random-number states and switches between them around dropout and similar draws.">RNG tracker</span>. There are two kinds of tracker. Megatron's own stores each state as a tensor. Transformer Engine's (TE's) stores each state as a <code>torch.Generator</code> object, so that <span class="tip" tabindex="0" data-tip="A recorded sequence of GPU kernels that is replayed as one unit. Random draws inside it must read from a generator the graph registered.">CUDA graphs</span> can read it. NeMo RL <a href="https://github.com/NVIDIA-NeMo/RL/blob/52230711dede84bf040212f2d43b1acd36a0d067/nemo_rl/models/megatron/setup.py#L2003-L2006">switches to TE's tracker</a> whenever <code>cuda_graph_impl</code> is not <code>"none"</code>. Dotted words have a short explanation: hover or tap them.</div>
 

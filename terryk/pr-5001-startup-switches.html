@@ -94,8 +94,9 @@ All permalinks pin the PR head <code>5223071</code>.</p>
 <nav class="chain">
   <span class="here">1 · what the switches change</span>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5001-warmup-cuda-graph-crash.html">2 · warm-up crash with CUDA graphs</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5001-warmup-without-callback.html">3 · warm-up without a callback</a>
 </nav>
-<p class="chainnote">Two pages on this PR. This one shows the feature. The next one shows the crash the review found in it.</p>
+<p class="chainnote">Three pages on this PR. This one shows the feature. Page 2 shows a crash the review found in it; page 3 proposes a simpler way for setup to start the warm-up.</p>
 
 <div class="bg"><b>Where this sits.</b> Only the <b>v2 single-controller</b> path reads these switches. The v1 driver loops (<code>grpo_train</code>, <code>async_grpo_train</code>, PPO, distillation) do not. The early trainer build and the early route scan need <span class="tip" tabindex="0" data-tip="The environment service that scores rollouts. Each dataset row names a route (an agent or environment server) that must exist in the running Gym stack.">NeMo-Gym</span> with vLLM on separate GPUs. The warm-up needs a Megatron trainer. Dotted words have a short explanation: hover or tap them.</div>
 
