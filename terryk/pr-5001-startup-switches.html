@@ -88,7 +88,7 @@ All permalinks pin the PR head <code>5223071</code>.</p>
   <dt>This PR</dt>
   <dd>Four switches, all off by default, set as environment variables: start the trainer earlier, scan routes earlier, keep compile results between jobs, and run a fake first step ahead of time.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">New and opt-in. The review is still pending.</span> It asks for the switches to become config keys (C2), and it found a crash in the warm-up switch when CUDA graphs are on (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5001-warmup-cuda-graph-crash.html">page 2</a>).</dd>
+  <dd><span class="verdict open">New and opt-in. The review is still pending.</span> It asks to turn two switches on for everyone with no flag, and to make the warm-up a config key (C2). It also it found a crash in the warm-up switch when CUDA graphs are on (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5001-warmup-cuda-graph-crash.html">page 2</a>).</dd>
 </dl></div>
 
 <nav class="chain">
@@ -102,7 +102,7 @@ All permalinks pin the PR head <code>5223071</code>.</p>
 <table class="grid">
 <tr><th></th><th>main</th><th>this PR</th><th>after the review's fixes (proposed)</th></tr>
 <tr><td>v1 (driver loops)</td><td>no switches</td><td>unchanged</td><td>unchanged</td></tr>
-<tr><td>v2 (single controller)</td><td>no switches</td><td>4 switches as <code>NRL_*</code> env vars, off by default</td><td>the 4 become <code>async_rl</code> config keys (C2). The warm-up skips CUDA-graph runs and restores RNG state in place (C1).</td></tr>
+<tr><td>v2 (single controller)</td><td>no switches</td><td>4 switches as <code>NRL_*</code> env vars, off by default</td><td>① and ② always on where they apply, no flag. ④ becomes an <code>async_rl</code> config key, off by default. ③ stays env vars (C2). The warm-up skips CUDA-graph runs and restores RNG state in place (C1).</td></tr>
 </table>
 
 <div class="mono"><span class="c"># how you turn them on in this PR: driver environment, passed to every Ray actor</span>
@@ -112,11 +112,12 @@ export NRL_MEGATRON_TRITON_CACHE_AUTOTUNING=1     <span class="c"># ③ keep Tri
 export NRL_MEGATRON_TORCH_COMPILE_JOB_ID=my-run   <span class="c"># ③ ... and torch.compile shape profiles</span>
 export NRL_TRAINER_WARMUP=1                       <span class="c"># ④ fake first step while setup or rollouts run</span>
 
-<span class="c"># proposed in review comment C2, not in the PR: the same switches as config</span>
+<span class="c"># proposed in review comment C2, not in the PR:</span>
+<span class="c"># ① and ② have no reason to be off, so they lose their flags and always run where they apply</span>
+<span class="c"># ③ stays env vars, next to the compile cache from #4715</span>
+<span class="c"># ④ becomes config, off by default until it has a test (C3) and works with CUDA graphs (C1)</span>
 async_rl:
-  early_trainer_submit: true
-  overlap_route_scan: true
-  trainer_warmup: {enabled: true, seqlens: null}</div>
+  trainer_warmup: {enabled: false, seqlens: null}</div>
 
 <h2>Startup, before and after</h2>
 
