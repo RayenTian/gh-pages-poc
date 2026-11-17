@@ -89,8 +89,9 @@ svg .cut{fill:var(--orange);font:bold 13px -apple-system,sans-serif}
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-gym-through-dynamo.html">Gym through Dynamo (#4979)</a>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-one-call-three-steps.html">one call, three steps</a>
   <span class="here">finished thinking? (C84)</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5115-frontends-across-nodes.html">frontends across nodes (#5115)</a>
 </nav>
-<p class="chainnote">Seven pages on this stack (#4905 and #4979), one question each. This one: which tokens decide whether the model is done thinking.</p>
+<p class="chainnote">Eight pages on this stack (#4905, #4979 and #5115), one question each. This one: which tokens decide whether the model is done thinking.</p>
 
 <div class="bg"><b>Background.</b> A thinking model writes <code>&lt;think&gt;…&lt;/think&gt;</code> and then its answer. Some calls force the answer into a shape: JSON for <span class="tip" tabindex="0" data-tip="A request field that says the reply must match a JSON schema.">response_format</span>, or a tool call for a <span class="tip" tabindex="0" data-tip="Some tool parsers (hermes, qwen3_engine, kimi_k2) ask vLLM to check the tool-call format, but only once the model starts a tool call. vLLM turns this on for every call that has tools and tool_choice: auto.">structural tag</span>. A grammar does that: at each step it blocks tokens that would break the shape. The thinking must not be blocked, so the grammar needs to know when thinking is over. Dotted words: hover or tap.</div>
 
