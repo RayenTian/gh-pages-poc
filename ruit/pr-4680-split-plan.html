@@ -1,21 +1,17 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PR #4680 · 两份拆分与合并方案</title><meta name="description" content="保留 CSD 全部有效能力，把 PR #4680 拆为 12 个可逐步合并的 PR：边界、依赖、接口变化和验收要求。"><style>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PR #4680 · 12 个 PR 的拆分与合并方案</title><meta name="description" content="保留 CSD 全部有效能力，把 PR #4680 拆为 12 个可逐步合并的 PR：边界、依赖、接口变化和验收要求。"><style>
 :root{color-scheme:dark;--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#9ba6b3;--accent:#79b8ff;--green:#56d384;--orange:#e3b341}
 :root[data-theme="light"]{color-scheme:light;--bg:#fff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#c8d0d9;--text:#1f2328;--dim:#59636e;--accent:#0969da;--green:#16743a;--orange:#875d00}
 *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:20px}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}.wrap{max-width:980px;margin:auto;padding:58px 22px 60px}h1{font-size:clamp(26px,4vw,36px);line-height:1.35;letter-spacing:-.02em;margin:0 0 12px}h2{font-size:22px;margin:36px 0 14px}h3{font-size:15px;margin:20px 0 8px}p{margin:9px 0}a{color:var(--accent);text-underline-offset:3px}button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:4px}code{font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--surface2);padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}.sub,.note,footer{color:var(--dim);font-size:13px}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--accent)}.status{border:1px solid var(--orange);border-left:4px solid var(--orange);border-radius:8px;padding:13px 16px;background:var(--surface);margin:18px 0}.status strong{color:var(--orange)}.chain{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0 7px}.chain a,.chain .here{border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:12px;text-decoration:none;background:var(--surface)}.chain .here{border-color:var(--accent);color:var(--accent);font-weight:700}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}.stat{padding:12px;border:1px solid var(--border);background:var(--surface);border-radius:8px}.stat strong{display:block;font:700 23px/1.4 ui-monospace,monospace}.stat span{font-size:12px;color:var(--dim)}.figure{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:12px;overflow:auto}.figure svg{display:block;width:100%;min-width:700px;height:auto}.figure text{fill:var(--text);font:13px sans-serif}.figure .dim{fill:var(--dim);font-size:11px}.figure .label{font-size:15px;font-weight:700}.figure rect{fill:var(--surface2);stroke:var(--border)}.figure .ready{stroke:var(--green);stroke-width:2}.figure .readytext{fill:var(--green)}.figure .arrow{stroke:var(--dim);stroke-width:1.5;fill:none;marker-end:url(#arrow)}.figure a text{text-decoration:underline;fill:var(--accent)}.figure .marker{fill:var(--dim)}.legend{font-size:12px;color:var(--dim);margin:8px 3px 0}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid var(--border);padding:10px 9px;vertical-align:top;text-align:left}th{color:var(--dim);font-weight:600}td:first-child{white-space:nowrap}tr.milestone td{background:var(--surface);font-weight:600}.controls{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.controls button,#theme-toggle{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:7px 12px}.controls button:hover{border-color:var(--accent)}#theme-toggle{position:fixed;top:12px;right:14px;z-index:10;font-size:12px;border-radius:20px}.card{border:1px solid var(--border);border-radius:10px;background:var(--surface);margin:12px 0;scroll-margin-top:20px}.card[open]{border-color:var(--accent)}summary{cursor:pointer;padding:16px 18px;list-style:none;display:grid;grid-template-columns:48px 1fr 20px;align-items:start;gap:10px}summary::-webkit-details-marker{display:none}summary::after{content:"＋";color:var(--dim)}details[open]>summary::after{content:"−"}.num{font:700 18px/1.5 ui-monospace,monospace;color:var(--accent)}.card-title{font-size:16px;font-weight:700;line-height:1.5}.card-meta{display:block;color:var(--dim);font-size:12px;margin-top:5px;font-weight:400}.body{padding:0 20px 20px 76px}.commit-title{font:12px/1.65 ui-monospace,monospace;overflow-wrap:anywhere;border-bottom:1px solid var(--border);padding-bottom:12px;color:var(--accent)}ul,ol{padding-left:22px;margin:8px 0}li{margin:5px 0}.refs{border-top:1px solid var(--border);margin-top:16px;padding-top:10px;font-size:12px}.refs a{display:block;overflow-wrap:anywhere;margin:4px 0}.callout{background:var(--surface);border-left:3px solid var(--accent);padding:12px 16px;margin:15px 0}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.panel{border:1px solid var(--border);border-radius:9px;padding:5px 16px 14px;background:var(--surface)}footer{border-top:1px solid var(--border);margin-top:30px;padding-top:14px}@media(max-width:650px){.wrap{padding:58px 16px 40px}.stats{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}summary{padding:14px 12px;grid-template-columns:34px 1fr 18px;gap:7px}.body{padding:0 16px 18px}.card-title{font-size:15px}.card-meta{font-size:11px}table{min-width:620px}}
-@media print{ :root,:root[data-theme="light"]{color-scheme:light;--bg:#fff;--surface:#fff;--surface2:#f1f1f1;--border:#aaa;--text:#111;--dim:#444;--accent:#064f90;--green:#126530;--orange:#765400}html{scroll-behavior:auto}.wrap{max-width:none;padding:0;font-size:11pt}#theme-toggle,.controls,.chain,.tabs{display:none}.stats{gap:6px}.figure svg{min-width:0}.figure,.scroll{overflow:visible}table{min-width:0;font-size:9pt}.two{display:block}.panel{margin:10px 0}.card{break-inside:auto}summary{break-after:avoid}.body{padding-left:20px}.card[open]{border-color:var(--border)}a{color:inherit}h2,h3{break-after:avoid} }
-.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--border);margin:24px 0 6px}.tabs button{border:0;border-bottom:3px solid transparent;background:none;color:var(--dim);padding:9px 14px;font-size:14px;margin-bottom:-1px}.tabs button:hover{color:var(--text)}.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}.tabpanel[hidden]{display:none}.figure .arr5{stroke:var(--dim);stroke-width:1.5;fill:none;marker-end:url(#arrow5)}.figure .opt{stroke-dasharray:5 4}.todo{list-style:none;padding-left:2px}.todo li::before{content:"☐ ";color:var(--orange)}
+@media print{ :root,:root[data-theme="light"]{color-scheme:light;--bg:#fff;--surface:#fff;--surface2:#f1f1f1;--border:#aaa;--text:#111;--dim:#444;--accent:#064f90;--green:#126530;--orange:#765400}html{scroll-behavior:auto}.wrap{max-width:none;padding:0;font-size:11pt}#theme-toggle,.controls,.chain{display:none}.stats{gap:6px}.figure svg{min-width:0}.figure,.scroll{overflow:visible}table{min-width:0;font-size:9pt}.two{display:block}.panel{margin:10px 0}.card{break-inside:auto}summary{break-after:avoid}.body{padding-left:20px}.card[open]{border-color:var(--border)}a{color:inherit}h2,h3{break-after:avoid} }
 </style><script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.dataset.theme='light';}catch(e){}})();</script></head><body>
 <button id="theme-toggle" type="button" aria-label="切换明暗主题">切换主题</button><main class="wrap">
-<p class="eyebrow">CSD · 拆分与合并方案</p><h1>如何把 PR #4680 拆成<br>可逐步合并的 PR：两份方案</h1>
+<p class="eyebrow">CSD · 拆分与合并方案</p><h1>如何把 PR #4680 拆成<br>12 个可逐步合并的 PR</h1>
 
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4680">NVIDIA-NeMo/RL #4680</a> · 分析基准 <a href="https://github.com/NVIDIA-NeMo/RL/commit/547d391af3652543403e3b30acf617510a1b80e7"><code>547d391a</code></a> · 2026-11-11</p>
-<nav class="chain" aria-label="PR 4680 相关页面"><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-csd-comparison.html">1 · CSD 与 X-Token</a><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-vocab-normalizer.html">2 · loss 归一化问题</a><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-packing-config.html">3 · 架构校验问题</a><span class="here" aria-current="page">4 · PR 拆分方案</span></nav>
-<p class="note">前三页是已有功能与审查说明；本页只讨论如何拆分，下面两个标签页各是一份方案。它们的审查结论不由本方案重新判定。</p>
-<div class="tabs" role="tablist" aria-label="两份拆分方案"><button type="button" role="tab" id="tab-plan-12" aria-controls="plan-12" aria-selected="true">12 个 PR 的方案</button><button type="button" role="tab" id="tab-plan-5" aria-controls="plan-5" aria-selected="false">5 个 PR 的方案（PR 作者）</button></div>
-<section class="tabpanel" id="plan-12" role="tabpanel" aria-labelledby="tab-plan-12">
 <div class="status"><strong>提案，尚未实施。</strong> 以下 01–12 是建议的拆分编号，不是已经创建的 GitHub PR。尚未生成分支、提取补丁或运行这些拆分版本；各项验收均为实施时的要求。</div>
-
+<nav class="chain" aria-label="PR 4680 相关页面"><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-csd-comparison.html">1 · CSD 与 X-Token</a><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-vocab-normalizer.html">2 · loss 归一化问题</a><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-packing-config.html">3 · 架构校验问题</a><span class="here" aria-current="page">4 · PR 拆分方案</span><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-author-split-plan.html">5 · 作者的拆分方案</a></nav>
+<p class="note">前三页是已有功能与审查说明；本页只讨论如何拆分；第五页是 PR 作者自己提出的另一份拆分方案。它们的审查结论不由本方案重新判定。</p>
 <p>目标是完整保留原 PR 的有效能力，先合入能独立验证的修复和工具，再交付最小可用 CSD，最后逐项增加后端与优化。每个 PR 自带测试、配置和必要文档；“独立”指其前置依赖合并后，不需要未来 PR 才能运行。</p>
 <div class="stats"><div class="stat"><strong>34,127</strong><span>原 PR 改动行：新增＋删除</span></div><div class="stat"><strong>14,598</strong><span>其中 tests/ 改动行</span></div><div class="stat"><strong>12</strong><span>建议的功能与修复单元</span></div><div class="stat"><strong>PR 06</strong><span>首个完整可用的 CSD</span></div></div>
 <h2>一、先看依赖与交付顺序</h2>
@@ -199,82 +195,7 @@
 <li>最终运行配置检查、相关单测和代表性组合检查，逐项核对原 diff 的归属清单。</li>
 <li>仍需在提取实际 patch 后确认各 PR 可以独立合并；本页面没有把待验证的方案写成已完成结果。</li>
 </ul>
-</section>
-<section class="tabpanel" id="plan-5" role="tabpanel" aria-labelledby="tab-plan-5">
-<div class="status"><strong>提案，尚未实施。</strong> 这是 PR 作者在 2026-11-16 提出的拆分方案，本页是它的中文转述，不含评审意见。目前没有移动或删减任何代码；作者希望团队先同意拆法和目录布局。PR 0–4 是方案编号，不是已经创建的 GitHub PR。</div>
-<p>把 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4680">PR #4680</a>（约 33,000 行新增）拆成 5 个依次合并的 PR；如果保留今天的目录布局，就不需要 PR 0，变成 4 个。每个 PR 单独通过 CI，每次合并后 X-Token 都照常可用。PR #4680 保持打开，作为参考分支，直到最后一块合入。</p>
-<div class="stats"><div class="stat"><strong>~33,000</strong><span>原 PR 新增行</span></div><div class="stat"><strong>5</strong><span>依次合并的 PR（不改目录则为 4）</span></div><div class="stat"><strong>PR 3</strong><span>CSD 首次可以运行</span></div><div class="stat"><strong>PR 4</strong><span>可选：lockstep packing</span></div></div>
-<h2>一、五个 PR：合并顺序与每步之后能用什么</h2>
-<div class="figure"><svg viewBox="0 0 900 446" role="img" aria-labelledby="d5-title d5-desc"><title id="d5-title">5 个 PR 的合并顺序</title><desc id="d5-desc">PR 0 到 PR 4 自上而下依次合并。X-Token 每一步都可用，CSD 在 PR 3 首次可以运行，PR 4 可选。</desc><defs><marker id="arrow5" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="marker" d="M0,0 L8,4 L0,8 Z"/></marker></defs>
-<text x="20" y="26" class="label">合并顺序（自上而下）</text><text x="372" y="26" class="label">合并之后能用什么</text>
-<rect x="20" y="44" width="320" height="56" rx="8"/><text x="34" y="68">PR 0 · 重命名与移动</text><text x="34" y="89" class="dim">2 个文件改名、21 个移动、约 20 个更新引用</text>
-<text x="372" y="68">X-Token 照常运行，没有逻辑改动</text><text x="372" y="89" class="dim">启动命令改用新的 runner 文件名</text>
-<path class="arr5" d="M180 100 V119"/>
-<rect x="20" y="120" width="320" height="56" rx="8"/><text x="34" y="144">PR 1 · Teacher-logit 管道</text><text x="34" y="165" class="dim">约 9,400 行</text>
-<text x="372" y="144">X-Token 可用，并带上两项 X-Token 修复</text><text x="372" y="165" class="dim">teacher 能发送 logits；还没有 CSD 算法代码</text>
-<path class="arr5" d="M180 176 V195"/>
-<rect x="20" y="196" width="320" height="56" rx="8"/><text x="34" y="220">PR 2 · CSD loss</text><text x="34" y="241" class="dim">约 9,800 行</text>
-<text x="372" y="220">X-Token 可用</text><text x="372" y="241" class="dim">CSD loss 和对照测试已在 main 上，CSD 还不能端到端运行</text>
-<path class="arr5" d="M180 252 V271"/>
-<rect class="ready" x="20" y="272" width="320" height="56" rx="8"/><text x="34" y="296">PR 3 · CSD 端到端</text><text x="34" y="317" class="dim">约 7,700 行</text>
-<text x="372" y="296" class="readytext">CSD 首次可以运行；X-Token 可用</text><text x="372" y="317" class="dim">通过共用 runner 加 --config examples/configs/csd.yaml 启动</text>
-<path class="arr5" d="M180 328 V347"/>
-<rect class="opt" x="20" y="348" width="320" height="56" rx="8"/><text x="34" y="372">PR 4 · Lockstep packing（可选）</text><text x="34" y="393" class="dim">约 6,200 行</text>
-<text x="372" y="372">多条序列打包进一行，用来提速</text><text x="372" y="393" class="dim">所有 recipe 里默认关闭</text>
-<text x="20" y="432" class="dim">绿框＝CSD 首次可运行；虚线框＝可选，可以留在参考分支上；箭头＝合并顺序。</text>
-</svg></div>
-<p class="note">原文档这里是一张图片，本图按原文文字重画。行数是新增行的估计值，包含测试。</p>
-<div class="scroll"><table><thead><tr><th>编号</th><th>包含什么</th><th>规模</th></tr></thead><tbody>
-<tr><td>PR 0 · 重命名与移动</td><td>共用的 trainer 和 runner 换成不带方法名的名字：<code>cross_tokenizer_distillation.py</code> 和 <code>run_cross_tokenizer_distillation.py</code>。X-Token 已有的文件移入 <code>cross_tokenizer</code> 目录，所有引用同步更新。没有逻辑改动。</td><td>2 个文件改名、21 个移动、约 20 个更新；1,234 行的 X-Token loss 移到独立文件</td></tr>
-<tr><td>PR 1 · Teacher-logit 管道</td><td>Megatron teacher 可以发送 logits（完整词表或 top-k），Automodel teacher 可以只发送 top-k。另含 student 侧的读取代码、大 teacher 用的后端选项，以及 X-Token 修复。没有 CSD 算法代码。</td><td>约 9,400 行</td></tr>
-<tr><td>PR 2 · CSD loss</td><td>CSD loss（<code>loss/cross_tokenizer/csd.py</code>），包括 owner-local 评估（每个 GPU 只给自己持有的分片打分）。另含它的输入准备、两个训练循环里的 CSD 接入点，以及对照测试。</td><td>约 9,800 行</td></tr>
-<tr class="milestone"><td>PR 3 · CSD 端到端</td><td>Sub-token 表工具、CSD collator、共用 trainer 里的 CSD 支持、配置、recipe、nightly 和使用指南。不新增单独的 CSD runner：CSD 通过共用 runner 加 <code>--config examples/configs/csd.yaml</code> 运行。</td><td>约 7,700 行</td></tr>
-<tr><td>PR 4 · Lockstep packing</td><td>把多条序列打包进一行来提速。所有 recipe 里默认关闭。</td><td>约 6,200 行</td></tr>
-</tbody></table></div>
-<h2>二、目录布局：今天与提议</h2>
-<div class="two"><section class="panel"><h3>今天（PR #4680 里）</h3><ul>
-<li>每个区域里，X-Token 和 CSD 各放在以方法命名的目录下。只有 <code>nemo_rl/data/cross_tokenizer/</code> 已经同时放两者。</li>
-<li>trainer 和 <code>x_token/</code> 下的辅助代码两种方法都在用，名字却带着 X-Token。</li>
-<li><code>run_csd.py</code> 只是带着 <code>csd.yaml</code> 调用 X-Token 的入口。</li>
-<li>PR 只改了一个文件的名字：使用指南，它现在同时讲两种方法。</li>
-</ul></section><section class="panel"><h3>提议：一个 runner、一个 trainer</h3><ul>
-<li>一个 runner 和一个 trainer 服务两种方法，名字不带方法名。</li>
-<li>每种方法保留自己的 loss 和工具，放在 <code>cross_tokenizer</code> 目录下。</li>
-<li>文件里的代码不变，只改名字、目录和指向它们的 import。</li>
-</ul></section></div>
-<div class="scroll"><table><thead><tr><th>什么</th><th>今天</th><th>提议</th></tr></thead><tbody>
-<tr><td>Runner</td><td><code>examples/run_xtoken_off_policy_distillation.py</code>；#4680 另有 <code>run_csd.py</code></td><td><code>examples/run_cross_tokenizer_distillation.py</code>，两种方法共用；不新增 <code>run_csd.py</code></td></tr>
-<tr><td>Trainer</td><td><code>nemo_rl/algorithms/xtoken_off_policy_distillation.py</code></td><td><code>cross_tokenizer_distillation.py</code></td></tr>
-<tr><td>X-Token 的辅助代码与工具</td><td>以 X-Token 命名的目录，例如 <code>nemo_rl/algorithms/x_token/</code>、<code>tools/x_token/</code></td><td>移入各区域的 <code>cross_tokenizer</code> 目录（共 21 个文件移动）</td></tr>
-<tr><td>X-Token loss</td><td>1,234 行，和其他代码在同一个文件里</td><td>移到独立文件，仍在 <code>nemo_rl/algorithms/loss/</code> 下</td></tr>
-<tr><td>CSD loss</td><td>只在 #4680 里，main 上没有</td><td>PR 2 直接建在 <code>loss/cross_tokenizer/csd.py</code></td></tr>
-<tr><td>Collator</td><td><code>nemo_rl/data/cross_tokenizer/</code></td><td>不变</td></tr>
-<tr><td>各方法的配置</td><td>例如 <code>xtoken_off_policy_distillation.yaml</code>、<code>csd.yaml</code></td><td>不变</td></tr>
-</tbody></table></div>
-<p class="note">原文档这里是两张布局图，本表按原文文字和 main 上现有的文件名整理。原文没有逐个列出 21 个文件移动后的完整路径。</p>
-<ul>
-<li>YAML 里的 <code>algorithm:</code> 键决定用哪种方法，不写这个键就运行 X-Token。runner 的默认配置仍是 <code>xtoken_off_policy_distillation.yaml</code>，所以 X-Token 的运行方式不变。</li>
-<li>CSD 的启动命令是 <code>uv run examples/run_cross_tokenizer_distillation.py --config examples/configs/csd.yaml</code>，所以 PR 3 不新增 <code>run_csd.py</code>。</li>
-<li>CSD 的文件都是新的，PR 2 到 4 直接把它们建在新目录里。X-Token 和共用的文件已经在 main 上，所以由 PR 0 先改名和移动。</li>
-<li>现有的 X-Token 启动命令要改用新的 runner 名字。main 在 <a href="https://github.com/NVIDIA-NeMo/RL/pull/1841">#1841</a> 合并 GRPO 和蒸馏的 runner 时也是这样做的，没有留下旧文件的副本。</li>
-<li>Loss 仍放在 <code>nemo_rl/algorithms/loss/</code> 下，和其他 loss 在一起，这是 main 的贡献规则要求的。</li>
-</ul>
-<h2>三、每个 PR 如何保持可以安全合并</h2>
-<p>每个 PR 都从当前的 main 切出，必须单独通过完整 CI 才能合并。</p>
-<ul>
-<li>任何 PR 都不调用还不在 main 上、也不在同一个 PR 里的代码，所以两次合并之间不会出问题。</li>
-<li>X-Token 在每一步都可用。改到 X-Token 代码的 PR 还要跑两个 X-Token nightly。</li>
-<li>PR 1 带来两项 X-Token bug 修复：使用 context parallelism（把一条序列切给多个 GPU）时的 teacher 打分，以及严格的 exact-map 规则。X-Token 的 nightly recipe 不受影响。</li>
-<li>新的 CSD recipe 按 main 现在的命名（<code>-automodel-</code>，不是 <code>-dtensor-</code>）。</li>
-<li>PR #4680 变成冻结的 draft，只作参考。最后一块合入后把它关闭，不合并。如果 packing 暂缓，它就继续开着，作为 packing 的参考。</li>
-</ul>
-<h3>需要团队决定</h3>
-<ul class="todo">
-<li>是否同意这个拆法；packing（PR 4）是现在合入，还是留在参考分支上。</li>
-<li>是否同意 PR 0 的布局：一个 runner 和一个 trainer，名字不带方法名；每种方法的 loss 和工具放在 <code>cross_tokenizer</code> 目录下。</li>
-</ul>
-</section>
-<footer>本页是 PR #4680 的两份拆分提案：12 个 PR 的方案里 01–12 是方案编号，5 个 PR 的方案里 PR 0–4 也是方案编号。12 个 PR 的方案中，代码事实和统计固定于 <code>547d391a</code>；不包含未执行验证的成功声明。页面正文为中文，PR 标题与代码标识符保留英文。</footer>
+<footer>本页是 PR #4680 的拆分提案，01–12 均为方案编号。代码事实和统计固定于 <code>547d391a</code>；不包含未执行验证的成功声明。页面正文为中文，PR 标题与代码标识符保留英文。</footer>
 </main><script>
 (function(){
 const cards=Array.from(document.querySelectorAll('details.card'));
@@ -287,10 +208,7 @@ let printState=null;
 window.addEventListener('beforeprint',()=>{if(printState===null)printState=cards.map(c=>c.open);cards.forEach(c=>c.open=true);});
 window.addEventListener('afterprint',()=>{if(printState){cards.forEach((c,i)=>c.open=printState[i]);printState=null;}});
 document.getElementById('print-plan').addEventListener('click',()=>window.print());
-const tabs=Array.from(document.querySelectorAll('.tabs [role="tab"]'));
-function showPlan(id,setHash){tabs.forEach(function(t){const on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on?'true':'false');document.getElementById(t.getAttribute('aria-controls')).hidden=!on;});if(setHash){try{history.replaceState(null,'','#'+id);}catch(e){}}}
-tabs.forEach(function(t){t.addEventListener('click',function(){showPlan(t.getAttribute('aria-controls'),true);});});
-function revealHash(){const target=location.hash.length>1?document.getElementById(location.hash.slice(1)):null;const panel=target?target.closest('.tabpanel'):null;showPlan(panel?panel.id:'plan-12',false);if(target&&target.matches('details.card')){target.open=true;requestAnimationFrame(()=>target.scrollIntoView({block:'start'}));}}
+function revealHash(){const target=document.getElementById(location.hash.slice(1));if(target&&target.matches('details.card')){target.open=true;requestAnimationFrame(()=>target.scrollIntoView({block:'start'}));}}
 window.addEventListener('hashchange',revealHash);revealHash();
 })();
 </script></body></html>
