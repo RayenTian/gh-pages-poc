@@ -1,170 +1,177 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PR #4680 · 12 个 PR 的拆分与合并方案</title><meta name="description" content="保留 CSD 全部有效能力，把 PR #4680 拆为 12 个可逐步合并的 PR：边界、依赖、接口变化和验收要求。"><style>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PR #4680 · 13 个 PR 的拆分与合并方案</title><meta name="description" content="把 PR #4680 拆为 13 个可逐步合并的 PR：先改名与修复，再交付最小可用 CSD，最后逐项增加后端与优化。"><style>
 :root{color-scheme:dark;--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#9ba6b3;--accent:#79b8ff;--green:#56d384;--orange:#e3b341}
 :root[data-theme="light"]{color-scheme:light;--bg:#fff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#c8d0d9;--text:#1f2328;--dim:#59636e;--accent:#0969da;--green:#16743a;--orange:#875d00}
 *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:20px}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}.wrap{max-width:980px;margin:auto;padding:58px 22px 60px}h1{font-size:clamp(26px,4vw,36px);line-height:1.35;letter-spacing:-.02em;margin:0 0 12px}h2{font-size:22px;margin:36px 0 14px}h3{font-size:15px;margin:20px 0 8px}p{margin:9px 0}a{color:var(--accent);text-underline-offset:3px}button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:4px}code{font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--surface2);padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}.sub,.note,footer{color:var(--dim);font-size:13px}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--accent)}.status{border:1px solid var(--orange);border-left:4px solid var(--orange);border-radius:8px;padding:13px 16px;background:var(--surface);margin:18px 0}.status strong{color:var(--orange)}.chain{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0 7px}.chain a,.chain .here{border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:12px;text-decoration:none;background:var(--surface)}.chain .here{border-color:var(--accent);color:var(--accent);font-weight:700}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}.stat{padding:12px;border:1px solid var(--border);background:var(--surface);border-radius:8px}.stat strong{display:block;font:700 23px/1.4 ui-monospace,monospace}.stat span{font-size:12px;color:var(--dim)}.figure{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:12px;overflow:auto}.figure svg{display:block;width:100%;min-width:700px;height:auto}.figure text{fill:var(--text);font:13px sans-serif}.figure .dim{fill:var(--dim);font-size:11px}.figure .label{font-size:15px;font-weight:700}.figure rect{fill:var(--surface2);stroke:var(--border)}.figure .ready{stroke:var(--green);stroke-width:2}.figure .readytext{fill:var(--green)}.figure .arrow{stroke:var(--dim);stroke-width:1.5;fill:none;marker-end:url(#arrow)}.figure a text{text-decoration:underline;fill:var(--accent)}.figure .marker{fill:var(--dim)}.legend{font-size:12px;color:var(--dim);margin:8px 3px 0}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid var(--border);padding:10px 9px;vertical-align:top;text-align:left}th{color:var(--dim);font-weight:600}td:first-child{white-space:nowrap}tr.milestone td{background:var(--surface);font-weight:600}.controls{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.controls button,#theme-toggle{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:7px 12px}.controls button:hover{border-color:var(--accent)}#theme-toggle{position:fixed;top:12px;right:14px;z-index:10;font-size:12px;border-radius:20px}.card{border:1px solid var(--border);border-radius:10px;background:var(--surface);margin:12px 0;scroll-margin-top:20px}.card[open]{border-color:var(--accent)}summary{cursor:pointer;padding:16px 18px;list-style:none;display:grid;grid-template-columns:48px 1fr 20px;align-items:start;gap:10px}summary::-webkit-details-marker{display:none}summary::after{content:"＋";color:var(--dim)}details[open]>summary::after{content:"−"}.num{font:700 18px/1.5 ui-monospace,monospace;color:var(--accent)}.card-title{font-size:16px;font-weight:700;line-height:1.5}.card-meta{display:block;color:var(--dim);font-size:12px;margin-top:5px;font-weight:400}.body{padding:0 20px 20px 76px}.commit-title{font:12px/1.65 ui-monospace,monospace;overflow-wrap:anywhere;border-bottom:1px solid var(--border);padding-bottom:12px;color:var(--accent)}ul,ol{padding-left:22px;margin:8px 0}li{margin:5px 0}.refs{border-top:1px solid var(--border);margin-top:16px;padding-top:10px;font-size:12px}.refs a{display:block;overflow-wrap:anywhere;margin:4px 0}.callout{background:var(--surface);border-left:3px solid var(--accent);padding:12px 16px;margin:15px 0}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.panel{border:1px solid var(--border);border-radius:9px;padding:5px 16px 14px;background:var(--surface)}footer{border-top:1px solid var(--border);margin-top:30px;padding-top:14px}@media(max-width:650px){.wrap{padding:58px 16px 40px}.stats{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}summary{padding:14px 12px;grid-template-columns:34px 1fr 18px;gap:7px}.body{padding:0 16px 18px}.card-title{font-size:15px}.card-meta{font-size:11px}table{min-width:620px}}
 @media print{ :root,:root[data-theme="light"]{color-scheme:light;--bg:#fff;--surface:#fff;--surface2:#f1f1f1;--border:#aaa;--text:#111;--dim:#444;--accent:#064f90;--green:#126530;--orange:#765400}html{scroll-behavior:auto}.wrap{max-width:none;padding:0;font-size:11pt}#theme-toggle,.controls,.chain{display:none}.stats{gap:6px}.figure svg{min-width:0}.figure,.scroll{overflow:visible}table{min-width:0;font-size:9pt}.two{display:block}.panel{margin:10px 0}.card{break-inside:auto}summary{break-after:avoid}.body{padding-left:20px}.card[open]{border-color:var(--border)}a{color:inherit}h2,h3{break-after:avoid} }
+.figure .opt{stroke-dasharray:5 4}
 </style><script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.dataset.theme='light';}catch(e){}})();</script></head><body>
 <button id="theme-toggle" type="button" aria-label="切换明暗主题">切换主题</button><main class="wrap">
-<p class="eyebrow">CSD · 拆分与合并方案</p><h1>如何把 PR #4680 拆成<br>12 个可逐步合并的 PR</h1>
+<p class="eyebrow">CSD · 拆分与合并方案</p><h1>如何把 PR #4680 拆成<br>13 个可逐步合并的 PR</h1>
 
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4680">NVIDIA-NeMo/RL #4680</a> · 分析基准 <a href="https://github.com/NVIDIA-NeMo/RL/commit/547d391af3652543403e3b30acf617510a1b80e7"><code>547d391a</code></a> · 2026-11-11</p>
-<div class="status"><strong>提案，尚未实施。</strong> 以下 01–12 是建议的拆分编号，不是已经创建的 GitHub PR。尚未生成分支、提取补丁或运行这些拆分版本；各项验收均为实施时的要求。</div>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4680">NVIDIA-NeMo/RL #4680</a> · 分析基准 <a href="https://github.com/NVIDIA-NeMo/RL/commit/83248b4789cc6361bc602abe9b13f509f5d7767f"><code>83248b47</code></a> · 2026-11-17 修订</p>
+<div class="status"><strong>提案，尚未实施。</strong> 以下 01–13 是建议的拆分编号，不是已经创建的 GitHub PR。尚未生成分支、提取补丁或运行这些拆分版本；各项验收均为实施时的要求，标注为“粗估”的行数没有实测。</div>
 <nav class="chain" aria-label="PR 4680 相关页面"><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-csd-comparison.html">1 · CSD 与 X-Token</a><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-vocab-normalizer.html">2 · loss 归一化问题</a><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-packing-config.html">3 · 架构校验问题</a><span class="here" aria-current="page">4 · PR 拆分方案</span><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-author-split-plan.html">5 · 作者的拆分方案</a></nav>
-<p class="note">前三页是已有功能与审查说明；本页只讨论如何拆分；第五页是 PR 作者自己提出的另一份拆分方案。它们的审查结论不由本方案重新判定。</p>
-<p>目标是完整保留原 PR 的有效能力，先合入能独立验证的修复和工具，再交付最小可用 CSD，最后逐项增加后端与优化。每个 PR 自带测试、配置和必要文档；“独立”指其前置依赖合并后，不需要未来 PR 才能运行。</p>
-<div class="stats"><div class="stat"><strong>34,127</strong><span>原 PR 改动行：新增＋删除</span></div><div class="stat"><strong>14,598</strong><span>其中 tests/ 改动行</span></div><div class="stat"><strong>12</strong><span>建议的功能与修复单元</span></div><div class="stat"><strong>PR 06</strong><span>首个完整可用的 CSD</span></div></div>
+<p class="note">前三页是已有功能与审查说明；本页只讨论如何拆分；第五页是 PR 作者自己提出的另一份拆分方案。前三页的审查结论不由本方案重新判定。</p>
+<p>目标是完整保留原 PR 的有效能力：先把已有文件改到合适的名字和目录，合入能独立验证的修复，再交付最小可用的 CSD，最后逐项增加后端与优化。有一条贯穿全部拆分的规则：<strong>每个 PR 合入时，它带来的代码都要有调用方</strong>，不先合一块等后面的 PR 来用。</p>
+<div class="stats"><div class="stat"><strong>33,836</strong><span>原 PR 改动行：新增 33,011、删除 825</span></div><div class="stat"><strong>13</strong><span>建议的功能与修复单元</span></div><div class="stat"><strong>PR 06</strong><span>首个完整可用的 CSD</span></div><div class="stat"><strong>2</strong><span>个与 CSD 无关、不阻塞主线的 PR</span></div></div>
+<div class="callout"><strong>和上一版（12 个 PR）相比改了什么</strong><ul>
+<li><a href="#pr-01">PR 01</a> 现在包含两部分：采纳作者方案里的“先改名与移动”，加上原来的修复。两部分在同一个 PR 里分成先后的提交。</li>
+<li>原来单独的“分片 loss 基础算子”不再存在：没有调用方的算子不单独合入，每个算子跟着第一个用它的 PR 走。</li>
+<li>原来的“基础 CSD”太大，拆成三步：<a href="#pr-05">PR 05</a> 抽出两种方法共用的部分，<a href="#pr-06">PR 06</a> 交付只含默认路径的最小 CSD，<a href="#pr-07">PR 07</a> 补上其余 loss 变体。</li>
+<li><a href="#pr-02">PR 02</a>、<a href="#pr-03">PR 03</a> 核实后确认与 X-Token 和 CSD 都无关，标为不阻塞主线。</li>
+<li>原 07–12 顺延为 08–13，内容不变。</li>
+</ul>有 <a href="#open">6 项尚未确定</a>，其中两项会影响 PR 05–07 的切法。</div>
 <h2>一、先看依赖与交付顺序</h2>
-<div class="figure"><svg viewBox="0 0 900 430" role="img" aria-labelledby="diagram-title diagram-desc"><title id="diagram-title">12 个 PR 的依赖关系</title><desc id="diagram-desc">01、04、05 汇入 06；06 到 10 按序扩展能力。11 依赖 06，12 依赖 07 到 11。02 和 03 独立，recipe 使用其选项时需要先合并。</desc><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="marker" d="M0,0 L8,4 L0,8 Z"/></marker></defs>
-<text x="20" y="26" class="label">公共准备 → 可用基线 → 增量能力</text>
-<rect x="20" y="44" width="260" height="62" rx="8"/><a href="#pr-01"><text x="34" y="68">01 · 已有蒸馏路径修复</text></a><text x="34" y="90" class="dim">scoring / mask / optimizer offload</text>
-<rect x="320" y="44" width="260" height="62" rx="8"/><a href="#pr-04"><text x="334" y="68">04 · Sub-token 表工具</text></a><text x="334" y="90" class="dim">CLI、产物格式、真实 tokenizer</text>
-<rect x="620" y="44" width="260" height="62" rx="8"/><a href="#pr-05"><text x="634" y="68">05 · 分片 loss 算子</text></a><text x="634" y="90" class="dim">数值与梯度对照</text>
-<path class="arrow" d="M150 106 V123 H450 V139"/><path class="arrow" d="M450 106 V139"/><path class="arrow" d="M750 106 V123 H450"/>
-<rect class="ready" x="320" y="140" width="260" height="56" rx="8"/><a href="#pr-06"><text x="334" y="164">06 · 基础 CSD / Automodel</text></a><text x="334" y="185" class="readytext">首个可用版本：单 teacher、dense</text>
-<path class="arrow" d="M580 168 H750 V220"/>
-<rect x="620" y="221" width="260" height="56" rx="8"/><a href="#pr-07"><text x="634" y="245">07 · Megatron dense</text></a><text x="634" y="266" class="dim">后端接入、router replay</text>
-<path class="arrow" d="M620 249 H580"/>
-<rect x="320" y="221" width="260" height="56" rx="8"/><a href="#pr-08"><text x="334" y="245">08 · Sparse teacher IPC</text></a><text x="334" y="266" class="dim">K=128 在本阶段引入</text>
-<path class="arrow" d="M320 249 H280"/>
-<rect x="20" y="221" width="260" height="56" rx="8"/><a href="#pr-09"><text x="34" y="245">09 · Owner-local 优化</text></a><text x="34" y="266" class="dim">与 replicated 参考对照</text>
-<path class="arrow" d="M150 277 V313"/>
-<rect x="20" y="314" width="260" height="56" rx="8"/><a href="#pr-10"><text x="34" y="338">10 · Multi-teacher</text></a><text x="34" y="359" class="dim">同 / 跨 tokenizer、聚合与权重</text>
-<path class="arrow" d="M320 168 H300 V299 H450 V313"/>
-<rect x="320" y="314" width="260" height="56" rx="8"/><a href="#pr-11"><text x="334" y="338">11 · 持久 sample ID</text></a><text x="334" y="359" class="dim">依赖 06，可与后续能力并行准备</text>
-<rect x="620" y="314" width="260" height="56" rx="8"/><a href="#pr-12"><text x="634" y="338">12 · Lockstep packing</text></a><text x="634" y="359" class="dim">要求 07–11 已合并</text>
-<path class="arrow" d="M280 342 H300 V391 H750 V370"/><path class="arrow" d="M580 342 H620"/>
-<text x="20" y="418" class="dim">02 · 加载精度与冻结、03 · Megatron-FSDP 独立准备；recipe 用到新增选项时先合并。绿框＝可用基线；箭头＝依赖。</text>
+<div class="figure"><svg viewBox="0 0 900 612" role="img" aria-labelledby="diagram-title diagram-desc"><title id="diagram-title">13 个 PR 的依赖关系</title><desc id="diagram-desc">01 之后是 05；04 和 05 汇入 06。06 之后是 07，以及按序扩展的 08 到 11。12 依赖 06，13 依赖 08 到 12。02 和 03 独立，不阻塞主线。</desc><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="marker" d="M0,0 L8,4 L0,8 Z"/></marker></defs>
+<text x="20" y="26" class="label">准备 → 可用基线 → 增量能力</text>
+<rect x="20" y="44" width="560" height="56" rx="8"/><a href="#pr-01"><text x="34" y="68">01 · 改名与移动，加已有蒸馏路径的修复</text></a><text x="34" y="89" class="dim">先是纯移动的提交（无逻辑改动），再是修复的提交（X-Token 修复、有效样本计数）</text>
+<rect x="620" y="44" width="260" height="56" rx="8"/><a href="#pr-04"><text x="634" y="68">04 · 子词表工具</text></a><text x="634" y="89" class="dim">建表与校验，可并行审</text>
+<path class="arrow" d="M450 100 V127"/>
+<rect x="320" y="128" width="260" height="56" rx="8"/><a href="#pr-05"><text x="334" y="152">05 · 共用部分重构</text></a><text x="334" y="173" class="dim">loss 基类、trainer 分发点</text>
+<path class="arrow" d="M450 184 V211"/><path class="arrow" d="M750 100 V228 H581"/>
+<rect class="ready" x="320" y="212" width="260" height="56" rx="8"/><a href="#pr-06"><text x="334" y="236">06 · 最小 CSD 端到端</text></a><text x="334" y="257" class="readytext">首个可用：Automodel、单 teacher</text>
+<path class="arrow" d="M320 240 H281"/>
+<rect x="20" y="212" width="260" height="56" rx="8"/><a href="#pr-07"><text x="34" y="236">07 · CSD loss 其余变体</text></a><text x="34" y="257" class="dim">KL、BCE、realized-only 等</text>
+<path class="arrow" d="M580 254 H700 V303"/>
+<rect x="620" y="304" width="260" height="56" rx="8"/><a href="#pr-08"><text x="634" y="328">08 · Megatron dense</text></a><text x="634" y="349" class="dim">后端接入、router replay</text>
+<path class="arrow" d="M620 332 H581"/>
+<rect x="320" y="304" width="260" height="56" rx="8"/><a href="#pr-09"><text x="334" y="328">09 · Sparse teacher IPC</text></a><text x="334" y="349" class="dim">K=128 在本阶段引入</text>
+<path class="arrow" d="M320 332 H281"/>
+<rect x="20" y="304" width="260" height="56" rx="8"/><a href="#pr-10"><text x="34" y="328">10 · Owner-local 优化</text></a><text x="34" y="349" class="dim">与 replicated 参考对照</text>
+<path class="arrow" d="M150 360 V395"/>
+<rect x="20" y="396" width="260" height="56" rx="8"/><a href="#pr-11"><text x="34" y="420">11 · Multi-teacher</text></a><text x="34" y="441" class="dim">同 / 跨 tokenizer、聚合与权重</text>
+<path class="arrow" d="M340 268 V284 H300 V380 H450 V395"/>
+<rect x="320" y="396" width="260" height="56" rx="8"/><a href="#pr-12"><text x="334" y="420">12 · 持久 sample ID</text></a><text x="334" y="441" class="dim">依赖 06，可提前准备</text>
+<rect x="620" y="396" width="260" height="56" rx="8"/><a href="#pr-13"><text x="634" y="420">13 · Lockstep packing</text></a><text x="634" y="441" class="dim">要求 08–12 已合并</text>
+<path class="arrow" d="M280 424 H300 V472 H750 V453"/><path class="arrow" d="M580 424 H619"/>
+<text x="20" y="508" class="label">与 CSD 无关，不阻塞主线</text>
+<rect class="opt" x="20" y="522" width="260" height="56" rx="8"/><a href="#pr-02"><text x="34" y="546">02 · 加载选项与参数冻结</text></a><text x="34" y="567" class="dim">所有算法通用</text>
+<rect class="opt" x="320" y="522" width="260" height="56" rx="8"/><a href="#pr-03"><text x="334" y="546">03 · Megatron-FSDP 接通</text></a><text x="334" y="567" class="dim">所有 Megatron 算法通用</text>
+<text x="20" y="602" class="dim">绿框＝可用基线；虚线框＝独立于 CSD，可随时并行；箭头＝依赖。</text>
 </svg></div>
-<p class="note">图展示主要依赖；完整依赖以总表和卡片为准。PR 11 可提前准备，PR 12 才开始接入 packing。dense 表示完整词表 logits；sparse 表示只传选定词项及其余概率质量；owner-local 表示在持有相应序列分片的 rank 上计算。</p>
-<div class="scroll"><table><thead><tr><th>编号</th><th>交付内容</th><th>前置依赖</th></tr></thead><tbody>
-<tr><td><a href="#pr-01">PR 01</a></td><td>已有蒸馏路径的正确性和资源切换</td><td>独立准备</td></tr>
-<tr><td><a href="#pr-02">PR 02</a></td><td>模型初始化选项和参数冻结</td><td>独立准备</td></tr>
-<tr><td><a href="#pr-03">PR 03</a></td><td>Megatron-FSDP 加载与初始化接线</td><td>独立准备</td></tr>
-<tr><td><a href="#pr-04">PR 04</a></td><td>Sub-token 表构建与校验</td><td>独立准备</td></tr>
-<tr><td><a href="#pr-05">PR 05</a></td><td>分片 loss 基础算子</td><td>独立准备</td></tr>
-<tr class="milestone"><td><a href="#pr-06">PR 06</a></td><td>基础 CSD：Automodel 单 teacher、dense、无 packing</td><td>PR 01、04、05</td></tr>
-<tr><td><a href="#pr-07">PR 07</a></td><td>Megatron dense CSD 与 router replay</td><td>PR 06；按 recipe 需要依赖 02/03</td></tr>
-<tr><td><a href="#pr-08">PR 08</a></td><td>Sparse teacher payload 与 IPC</td><td>PR 07</td></tr>
-<tr><td><a href="#pr-09">PR 09</a></td><td>Owner-local KD 优化</td><td>PR 08</td></tr>
-<tr><td><a href="#pr-10">PR 10</a></td><td>Multi-teacher 与同 tokenizer 快路径</td><td>PR 09</td></tr>
-<tr><td><a href="#pr-11">PR 11</a></td><td>持久数据身份</td><td>PR 06；同步后续训练能力分支</td></tr>
-<tr><td><a href="#pr-12">PR 12</a></td><td>Lockstep packing</td><td>PR 07–11</td></tr>
+<p class="note">图展示主要依赖；完整依赖以总表和卡片为准。dense 表示传完整词表的 logits；sparse 表示只传选定词项及其余概率质量；owner-local 表示每个 GPU 只在自己持有的序列分片上计算；replicated 表示每个 GPU 都拿到完整序列再计算。</p>
+<div class="scroll"><table><thead><tr><th>编号</th><th>交付内容</th><th>前置依赖</th><th>合入时谁在用</th></tr></thead><tbody>
+<tr><td><a href="#pr-01">PR 01</a></td><td>改名与移动（trainer、runner 用中性名字，X-Token 文件移入 <code>cross_tokenizer</code> 目录），加已有蒸馏路径的正确性和资源切换</td><td>独立</td><td>X-Token、普通蒸馏、value loss</td></tr>
+<tr><td><a href="#pr-02">PR 02</a></td><td>模型加载选项、参数冻结、配置类型声明</td><td>独立，不阻塞主线</td><td>需要自带一个用到非默认值的 recipe</td></tr>
+<tr><td><a href="#pr-03">PR 03</a></td><td>接通 Megatron-FSDP</td><td>独立，不阻塞主线</td><td>需要自带一个打开开关的 recipe</td></tr>
+<tr><td><a href="#pr-04">PR 04</a></td><td>子词表的建表与校验工具</td><td>PR 01 定下的目录方案</td><td>可直接运行的命令行工具</td></tr>
+<tr><td><a href="#pr-05">PR 05</a></td><td>两种方法共用的部分：loss 基类、trainer 分发点、共用算子</td><td>PR 01</td><td>X-Token</td></tr>
+<tr class="milestone"><td><a href="#pr-06">PR 06</a></td><td>最小 CSD：Automodel 单 teacher、dense、只含默认路径</td><td>PR 04、05</td><td>第一个 CSD recipe 和 nightly</td></tr>
+<tr><td><a href="#pr-07">PR 07</a></td><td>CSD loss 的其余变体</td><td>PR 06</td><td>通过配置选择</td></tr>
+<tr><td><a href="#pr-08">PR 08</a></td><td>Megatron dense CSD 与 router replay</td><td>PR 06；recipe 用到时依赖 02/03</td><td>Megatron CSD recipe</td></tr>
+<tr><td><a href="#pr-09">PR 09</a></td><td>Sparse teacher payload 与 IPC</td><td>PR 08</td><td>默认 K=128 的配置</td></tr>
+<tr><td><a href="#pr-10">PR 10</a></td><td>Owner-local KD 优化</td><td>PR 09</td><td>Megatron 学生</td></tr>
+<tr><td><a href="#pr-11">PR 11</a></td><td>Multi-teacher 与同 tokenizer 快路径</td><td>PR 10</td><td>多 teacher recipe</td></tr>
+<tr><td><a href="#pr-12">PR 12</a></td><td>持久数据身份</td><td>PR 06；同步后续训练能力分支</td><td>CSD collator</td></tr>
+<tr><td><a href="#pr-13">PR 13</a></td><td>Lockstep packing</td><td>PR 08–12</td><td>打开 packing 的配置</td></tr>
 </tbody></table></div>
-<div class="callout"><strong>不能按目录搬运。</strong> 同一文件会参与多个阶段。尤其 <code>csd.py</code>、<code>loss_utils.py</code> 和训练控制器，要按函数、分支和 producer/consumer 链路提取。不能先合完整文件，再让后续 PR 补上它依赖的代码。</div>
-<h2>二、12 个 PR 的范围与验收</h2><p class="note">点击标题展开。文件链接指向原始基准实现，帮助定位待提取代码，不代表拆分后必须保留相同文件布局。</p><div class="controls"><button type="button" id="expand-all">全部展开</button><button type="button" id="collapse-all">全部收起</button><button type="button" id="print-plan">打印 / 导出 PDF</button></div>
-<details class="card" id="pr-01"><summary><span class="num">01</span><span class="card-title">已有蒸馏路径的正确性和资源切换<span class="card-meta">已有行为修复 · 依赖：独立准备</span></span></summary><div class="body"><p class="commit-title">fix(distillation): correct teacher scoring and student state handling</p>
-<h3>纳入范围</h3><ul><li>X-Token teacher scoring 在 CP 边界正确获取 next-token label 和 mask；select_teacher 和动态 teacher weighting 使用各自 teacher 的 tokenization 与有效 token。</li><li>蒸馏 loss 和 value loss 的 <code>num_valid_samples</code> 遵守 <code>sample_mask</code>。</li><li>按 <code>offload_optimizer_for_logprob</code> 设置，在训练或验证结束后、下一次 teacher forward 前卸载 student optimizer。</li><li>修正 exact-token map 的判断，并增加针对性回归。</li></ul>
-<h3>本阶段不带入</h3><ul><li>CSD 注册、新后端、新 IPC 格式和 packing。</li></ul>
-<h3>验收要求</h3><ul><li>CP=1/2 的 teacher score 与单进程参考一致，覆盖窗口交界处 next-token。</li><li>padding 和 sample mask 不改变有效样本结果。</li><li>offload 开关分别验证实际调用与状态转换；保留 X-Token recipe 的显式覆盖。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/loss/loss_functions.py">nemo_rl/algorithms/loss/loss_functions.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/xtoken_off_policy_distillation.py">nemo_rl/algorithms/xtoken_off_policy_distillation.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/x_token/loss_utils.py">nemo_rl/algorithms/x_token/loss_utils.py</a>
+<div class="callout"><strong>不能按目录搬运，也不能按层次切。</strong> 同一文件会参与多个阶段，尤其 <code>csd.py</code>、<code>loss_utils.py</code> 和训练控制器，要按函数、分支和 producer/consumer 链路提取。按“算子 → loss → 接入训练”这种层次切，前几块合入时必然没有调用方，所以本方案改为按“已有代码的改造”“可独立运行的工具”“能跑起来的最小功能”“可选的变体”来切。</div>
+<h2>二、13 个 PR 的范围与验收</h2><p class="note">点击标题展开。文件链接指向原 PR 当前 head 的实现，帮助定位待提取代码，不代表拆分后保留相同的文件位置。</p><div class="controls"><button type="button" id="expand-all">全部展开</button><button type="button" id="collapse-all">全部收起</button><button type="button" id="print-plan">打印 / 导出 PDF</button></div>
+<details class="card" id="pr-01"><summary><span class="num">01</span><span class="card-title">改名与移动，加已有蒸馏路径的正确性和资源切换<span class="card-meta">纯移动的提交在前，修复的提交在后 · 依赖：独立</span></span></summary><div class="body"><p class="commit-title">fix(distillation): move cross-tokenizer files under neutral names and correct teacher scoring</p>
+<p>一个 PR，两部分，按提交分开。第一部分只移动文件、不改逻辑；第二部分在新位置上做修复。<strong>两部分不能混在同一个提交里</strong>：审的人靠逐个提交看 diff 来确认第一部分是原样搬过去的，一旦移动和修改出现在同一个提交里，这个确认就做不了了。因为第二部分改了行为，PR 标题用 <code>fix</code>。</p>
+<h3>第一部分：改名与移动</h3>
+<p>采纳<a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-author-split-plan.html">作者方案</a>里的 PR 0。只动 main 上已有的 X-Token 文件，不改任何逻辑，不带 CSD 代码。</p>
+<h3>移动的范围</h3><ul><li>trainer 改名：<code>nemo_rl/algorithms/xtoken_off_policy_distillation.py</code> → <code>cross_tokenizer_distillation.py</code>。</li><li>runner 改名：<code>examples/run_xtoken_off_policy_distillation.py</code> → <code>run_cross_tokenizer_distillation.py</code>。CSD 以后也用这个 runner，不新增 <code>run_csd.py</code>。</li><li><code>nemo_rl/algorithms/x_token/</code>（4 个文件）→ <code>nemo_rl/algorithms/cross_tokenizer/</code>；对应的 8 个测试文件移到 <code>tests/unit/algorithms/cross_tokenizer/</code>。这些代码两种方法都用。</li><li>X-Token loss 从 <code>loss/loss_functions.py</code> 抽到 <code>loss/cross_tokenizer/</code> 下的独立文件：3 个定义，约 1,240 行。这一段不依赖该文件里前面的任何名字，可以干净地切出来。</li><li>更新所有引用：源码和测试的 import、4 个启动脚本、6 个文档文件、<code>pyrefly.toml</code>、secrets baseline。</li></ul>
+<h3>移动部分明确不做</h3><ul><li>不改配置文件名、recipe 名、指南文件名；runner 的默认配置不变。</li><li>不加选择方法的配置键，那是 PR 06 的事。</li><li>不改 trainer 里的函数名；不留旧路径的兼容入口。</li></ul>
+<h3>提交顺序</h3><ol><li>移动 <code>algorithms/x_token/</code> 和它的测试。</li><li>抽出 X-Token loss，只做剪切粘贴加 import。</li><li>trainer 和 runner 改名，更新启动脚本、文档、测试文件名。</li><li>如果工具目录也要移动（<a href="#open">未定</a>），单独一个提交。</li><li>之后才是修复的提交，每项修复一个提交。</li></ol>
+<h3>移动部分的验收</h3><ul><li>只看前面几个移动的提交：<code>git diff -M</code> 里所有移动和改名都显示为 rename，相似度接近 100%；抽出的 loss 文件与删掉的行逐字一致。</li><li>在 PR head 上搜索旧的模块路径和文件名，结果为零（配置文件名除外）。</li><li>停在最后一个移动提交上，单测全过。</li></ul>
+<h3>第二部分：修复</h3><ul><li>X-Token 的 teacher scoring 在 CP 边界正确获取 next-token label 和 mask；select_teacher 和动态 teacher weighting 使用各自 teacher 的 tokenization 与有效 token。对齐结果里要新增 teacher 的 token ID 和 mask 两个字段，连同 trainer 里填充它们的代码一起带上。</li><li>蒸馏 loss 和 value loss 的 <code>num_valid_samples</code> 遵守 <code>sample_mask</code>。<strong>这两行改的是普通蒸馏和 value loss，不只影响 X-Token</strong>，PR 描述里要点明。</li><li>按 <code>offload_optimizer_for_logprob</code> 设置，在训练或验证结束后、下一次 teacher forward 前卸载 student optimizer。</li><li>修正 exact-token map 的判断，并增加针对性回归。</li><li>token 对齐：一侧全是 padding 的配对标记为无效。</li></ul>
+<h3>本阶段不带入</h3><ul><li>CSD 注册、新后端、新 IPC 格式和 packing。</li><li>节点内 IPC 检查里加上 pipeline parallelism：只有 Megatron 才有这个维度，留给 PR 08。</li><li><code>projection_matrix_path</code> 允许为空：是给不用投影矩阵的 CSD 准备的，留给 PR 06。</li></ul>
+<h3>修复部分的验收</h3><ul><li>CP=1/2 的 teacher score 与单进程参考一致，覆盖窗口交界处 next-token。</li><li>padding 和 sample mask 不改变有效样本结果。</li><li>offload 开关分别验证实际调用与状态转换；保留 X-Token recipe 的显式覆盖。</li><li>整个 PR 合入前：两个 X-Token functional 脚本和两个 X-Token nightly 跑通。</li></ul>
+<p class="note">已核实：<code>loss_functions.py</code> 在原 PR 里的全部改动（+75 / −39）都属于本 PR，没有一行 CSD 代码。exact-map 和 offload 两项在 trainer 与 <code>loss_utils.py</code> 的大 diff 里，尚未逐行核对它们与 CSD 改动是否纠缠。</p>
+<div class="refs"><strong>main 上的现有位置（移动的对象）</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/main/nemo_rl/algorithms/xtoken_off_policy_distillation.py">nemo_rl/algorithms/xtoken_off_policy_distillation.py</a><a href="https://github.com/NVIDIA-NeMo/RL/tree/main/nemo_rl/algorithms/x_token">nemo_rl/algorithms/x_token/</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/main/nemo_rl/algorithms/loss/loss_functions.py">nemo_rl/algorithms/loss/loss_functions.py</a><strong>原 PR 里修复的位置</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/loss_functions.py">nemo_rl/algorithms/loss/loss_functions.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/xtoken_off_policy_distillation.py">nemo_rl/algorithms/xtoken_off_policy_distillation.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/x_token/loss_utils.py">nemo_rl/algorithms/x_token/loss_utils.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/x_token/token_aligner.py">nemo_rl/algorithms/x_token/token_aligner.py</a>
 </div></div></details>
-<details class="card" id="pr-02"><summary><span class="num">02</span><span class="card-title">模型初始化选项和参数冻结<span class="card-meta">模型初始化 · 依赖：独立准备</span></span></summary><div class="body"><p class="commit-title">feat(policy): add explicit model loading and parameter freezing controls</p>
-<h3>纳入范围</h3><ul><li>Automodel 的 <code>load_precision</code>、<code>shard_before_load</code>。</li><li>两个训练后端的 <code>freeze_parameter_patterns</code>；policy 类型、配置传递和模型构造 hook。</li><li>修正 freeze hook 返回值，保持消费者预期的模型结构。</li></ul>
-<h3>接口约束</h3><ul><li>未设置新选项时保留原加载路径；文档明确 <code>shard_before_load</code> 实际生效的拓扑。</li></ul>
-<h3>验收要求</h3><ul><li>teacher/reference 低精度加载实际生效。</li><li>trainable worker 拒绝不符合现有 master-weight 要求的加载精度。</li><li>参数在 optimizer 构造前冻结；实际不更新，未冻结参数仍更新。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/models/automodel/setup.py">nemo_rl/models/automodel/setup.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/models/megatron/setup.py">nemo_rl/models/megatron/setup.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/models/policy/__init__.py">nemo_rl/models/policy/__init__.py</a>
+<details class="card" id="pr-02"><summary><span class="num">02</span><span class="card-title">模型加载选项、参数冻结、配置类型声明<span class="card-meta">模型初始化 · 与 CSD 无关，不阻塞主线</span></span></summary><div class="body"><p class="commit-title">feat(policy): add explicit model loading and parameter freezing controls</p>
+<h3>纳入范围</h3><ul><li>Automodel 的 <code>load_precision</code>、<code>shard_before_load</code>。</li><li>两个训练后端的 <code>freeze_parameter_patterns</code>；policy 类型、配置传递和模型构造 hook。</li><li>修正 freeze hook 返回值，保持消费者预期的模型结构。</li><li>配置类型声明补字段（约 25 行，只补类型不改行为）：<code>fuse_loss</code>、<code>sequence_length_round</code>、Megatron 优化器的几个 dtype 键、数据集的聊天适配字段、<code>DatumSpec.tools</code>。</li></ul>
+<h3>接口约束</h3><p>未设置新选项时保留原加载路径；文档明确 <code>shard_before_load</code> 实际生效的拓扑。</p>
+<h3>验收要求</h3><ul><li>teacher/reference 低精度加载实际生效。</li><li>trainable worker 拒绝不符合现有 master-weight 要求的加载精度。</li><li>参数在 optimizer 构造前冻结；实际不更新，未冻结参数仍更新。</li><li><strong>自带一个用到非默认值的 recipe 或 smoke。</strong> 原 PR 自带的 CSD 配置里这三个键写的都是默认值（<code>float32</code>、<code>false</code>、<code>null</code>），没有任何配置走到非默认路径。</li></ul>
+<p class="note">已核实：这些改动在两个后端的 <code>setup.py</code> 里，代码中不提 X-Token 或 CSD，对所有算法生效。</p>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/models/automodel/setup.py">nemo_rl/models/automodel/setup.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/models/megatron/setup.py">nemo_rl/models/megatron/setup.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/models/policy/__init__.py">nemo_rl/models/policy/__init__.py</a>
 </div></div></details>
-<details class="card" id="pr-03"><summary><span class="num">03</span><span class="card-title">Megatron-FSDP 加载与初始化接线<span class="card-meta">模型初始化 · 依赖：独立准备</span></span></summary><div class="body"><p class="commit-title">feat(megatron): support direct HF initialization with Megatron FSDP</p>
-<h3>纳入范围</h3><ul><li>把 <code>use_megatron_fsdp</code> 和已有兼容键传给 distributed config、DDP、模型构建。</li><li>从 HF snapshot 直接加载 FSDP shards，跳过中间 <code>torch_dist</code> 转换，并使用匹配的 <code>fsdp_dtensor</code> checkpoint 配置。</li><li>传递 <code>reduce_scatter_with_fp32_accumulation</code>。</li><li>两处 tokenizer 构造读取显式 tokenizer 配置，区分模型来源与 tokenizer 来源。</li></ul>
-<h3>依赖规则</h3><ul><li>PR 02/03 不阻塞基础 Automodel CSD；后续 recipe 使用这些新增选项时，才要求相应 PR 已合并。</li></ul>
-<h3>验收要求</h3><ul><li>完成 HF 初始化、optimizer update、checkpoint 保存和恢复。</li><li>普通 Megatron 加载路径保持可用；模型与 tokenizer 来源不同时实际加载指定 tokenizer。</li><li>核对项目固定版本的 Bridge/MCore API 实际行为。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/models/megatron/setup.py">nemo_rl/models/megatron/setup.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/models/policy/__init__.py">nemo_rl/models/policy/__init__.py</a>
+<details class="card" id="pr-03"><summary><span class="num">03</span><span class="card-title">接通 Megatron-FSDP<span class="card-meta">模型初始化 · 与 CSD 无关，不阻塞主线</span></span></summary><div class="body"><p class="commit-title">feat(megatron): enable Megatron FSDP with direct HF initialization</p>
+<p>Megatron-FSDP 是 Megatron-Core 自己的参数分片方式。上游的 Megatron-Core 和 Megatron-Bridge 早已实现并在自带的性能 recipe 里使用；但 NeMo-RL 自己组装配置和建模型的代码一直没有把开关传下去。main 上把这个键设为 <code>true</code> 不报错，也不生效。<strong>本 PR 是第一次接通，不是给已有功能加一个加载路径。</strong></p>
+<h3>纳入范围</h3><ul><li>把 <code>use_megatron_fsdp</code>（以及旧名字 <code>use_custom_fsdp</code>）传给 distributed config、DDP 配置和模型构建。</li><li>FSDP 时从 HF snapshot 直接加载进分片，跳过中间的 <code>torch_dist</code> 转换；checkpoint 用 <code>fsdp_dtensor</code> 格式。</li><li>透传 <code>reduce_scatter_with_fp32_accumulation</code>。</li><li>两处 tokenizer 构造改为读显式的 tokenizer 配置。<strong>这两行与 FSDP 无关，会改变“模型名和 tokenizer 名不同”的 Megatron 配置的行为</strong>，PR 描述里要点明并说明动机。</li></ul>
+<h3>提取时注意</h3><ul><li>同一个文件里的 <code>allow_unpacked_context_parallel</code> 是给跨 tokenizer 蒸馏用的，留给 PR 08，要按 hunk 分开。</li><li>打包路径上新增的 MoE 路由 padding mask 归属<a href="#open">未定</a>。</li></ul>
+<h3>验收要求</h3><ul><li>完成 HF 初始化、optimizer update、checkpoint 保存和恢复。</li><li>普通 Megatron 加载路径保持可用；模型与 tokenizer 来源不同时实际加载指定 tokenizer。</li><li>对照项目固定版本的 Bridge 和 Megatron-Core 接口核实实际行为，尤其是“HF 权重直接加载进 FSDP 分片”这一步。</li><li><strong>自带一个打开开关的 recipe 或 smoke。</strong> 原 PR 自带的配置里这个键都是 <code>false</code>。</li></ul>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/models/megatron/setup.py">nemo_rl/models/megatron/setup.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/models/policy/__init__.py">nemo_rl/models/policy/__init__.py</a>
 </div></div></details>
-<details class="card" id="pr-04"><summary><span class="num">04</span><span class="card-title">Sub-token 表构建与校验<span class="card-meta">独立工具 · 依赖：独立准备</span></span></summary><div class="body"><p class="commit-title">feat(csd): add bidirectional sub-token table tooling</p>
-<h3>纳入范围</h3><ul><li>tools/csd/ 的 builder、validator；表格式、fingerprint、特殊 token 映射说明。</li><li>完整 token chain、UTF-8 字节、不支持的 decoder、溢出不截断等测试。</li></ul>
-<h3>接口约束</h3><ul><li>保持现有 CLI 参数和产物格式。每次 builder 调用生成一个方向；validator 检查双向产物。</li></ul>
-<h3>验收要求</h3><ul><li>使用真实 Llama/Qwen tokenizer 生成、加载并验证双向表。</li><li>非法 ID、错误 fingerprint、不完整 chain 明确失败。</li></ul>
-<h3>规模说明</h3><ul><li>当前工具与对应测试合计约 710 行。这是原 diff 的统计，不是拆分后所有 PR 的行数估计。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/tools/csd/build_subtoks_table.py">tools/csd/build_subtoks_table.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/tools/csd/validate_subtoks_tables.py">tools/csd/validate_subtoks_tables.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/tests/unit/tools/csd/test_subtoks_tables.py">tests/unit/tools/csd/test_subtoks_tables.py</a>
+<details class="card" id="pr-04"><summary><span class="num">04</span><span class="card-title">子词表的建表与校验工具<span class="card-meta">独立工具 · 依赖：PR 01 定下的目录方案；代码上独立，可并行审</span></span></summary><div class="body"><p class="commit-title">feat(csd): add bidirectional sub-token table tooling</p>
+<p>CSD 训练前要跑的两个离线脚本。只用 tokenizer，不加载模型，在 CPU 上跑。</p>
+<h3>纳入范围</h3><ul><li>建表脚本（303 行）：对源 tokenizer 词表里的每个 token，找出目标 tokenizer 里拼出同样文字的 token 串。一次生成一个方向，所以学生到教师、教师到学生各跑一次。</li><li>校验脚本（144 行）：拿真实的两个 tokenizer 检查两张表：词表大小和 tokenizer 指纹是否匹配、张量结构是否合法、每一行是否真的拼出同样的文字。</li><li>表格式、指纹、特殊 token 按角色对应的说明；单测。</li></ul>
+<h3>接口约束</h3><ul><li>保持现有命令行参数和产物格式。</li><li>只支持 BPE 模型加 ByteLevel 解码器的 tokenizer，其他类型明确报错。</li><li>token 串长度上限默认 8，超过的记为没有对应，不截断。</li></ul>
+<h3>验收要求</h3><ul><li>使用真实 Llama/Qwen tokenizer 生成、加载并验证双向表。</li><li>非法 ID、错误指纹、不完整的 token 串明确失败。</li></ul>
+<h3>留给 PR 06 决定的一件事</h3><p>指纹只在校验脚本里检查。训练时 CSD loss 直接读表文件，不比对指纹。跳过校验脚本、拿错版本的表去训练不会被拦住。PR 06 要么在加载时也比对，要么在指南里把校验写成必须的步骤。</p>
+<p class="note">已核实：两个脚本只导入 <code>torch</code>、<code>tokenizers</code>、<code>transformers</code> 和彼此，不导入 <code>nemo_rl</code>；训练代码也不导入它们，两边只通过文件格式联系。脚本加测试约 700 行。</p>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/tools/csd/build_subtoks_table.py">tools/csd/build_subtoks_table.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/tools/csd/validate_subtoks_tables.py">tools/csd/validate_subtoks_tables.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/tests/unit/tools/csd/test_subtoks_tables.py">tests/unit/tools/csd/test_subtoks_tables.py</a>
 </div></div></details>
-<details class="card" id="pr-05"><summary><span class="num">05</span><span class="card-title">分片 loss 基础算子<span class="card-meta">数值基础 · 依赖：独立准备</span></span></summary><div class="body"><p class="commit-title">feat(distributed): add selected logprob and chunked normalization primitives</p>
-<h3>纳入范围</h3><ul><li>基础 CSD 必需的分布式 selected logprob、chunked vocab logsumexp、CP layout 转换、归约和梯度传播工具。</li></ul>
-<h3>明确后移</h3><ul><li>sparse top-k/logZ/forced-label 导出放 PR 08；仅 owner-local 使用的特殊归约放 PR 09；packing 专用操作放 PR 12。</li></ul>
-<h3>验收要求</h3><ul><li>小 TP/CP 拓扑与独立 dense 参考对照数值和梯度。</li><li>覆盖重复查询、越界 ID、chunk 边界和空有效区间。</li><li>确认没有 gather 完整 student vocabulary。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/distributed/model_utils.py">nemo_rl/distributed/model_utils.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/tests/unit/distributed/test_model_utils.py">tests/unit/distributed/test_model_utils.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/tests/unit/distributed/test_student_loss_primitives.py">tests/unit/distributed/test_student_loss_primitives.py</a>
+<details class="card" id="pr-05"><summary><span class="num">05</span><span class="card-title">两种方法共用的部分：loss 基类、trainer 分发点、共用算子<span class="card-meta">已有代码的改造 · 依赖：PR 01 · 方向已定，细节<a href="#open">待推敲</a></span></span></summary><div class="body"><p class="commit-title">refactor(xtoken): extract shared cross-tokenizer loss base and trainer dispatch</p>
+<p>原 PR 里有相当一部分不是新增 CSD，而是改造 X-Token 已有的 trainer 和 loss，让它能容纳第二种方法。这部分先做成一个只有 X-Token 的重构，合入时全部被 X-Token 使用。</p>
+<h3>为什么这样切</h3><p>X-Token loss 本身已经有两种比较方式（整体投影后算 KL，或先处理一一对应的 token 再处理其余部分），分叉点在一个方法里。原 PR 的 CSD loss 是从 X-Token loss 复制出来再改的：分叉点换成 CSD 的计算，其余骨架相同。两个类里同名的方法，4 个逐字相同或几乎相同，另外 5 个相似度在 0.7 到 0.85 之间，合计每个类约 360 行。所以 CSD 更接近“同一个框架里的第三种比较方式”，而不是一个并列的独立算法。</p>
+<h3>纳入范围</h3><ul><li>抽出共用的 loss 基类：多 teacher 聚合（<code>sum</code>、<code>averaged_logits</code>、<code>select_teacher</code>）、学生 CE、同 tokenizer 的 KL、动态权重、指标。X-Token loss 改成它的子类，只保留自己的两种比较方式。</li><li>trainer 里按方法选择 loss 和 collator 的分发点，本阶段只有 X-Token 一个分支。</li><li>两种方法都要用的基础算子（如 CP 布局转换），前提是 X-Token 的路径在本 PR 里改用它们。</li></ul>
+<h3>本阶段边界</h3><ul><li>不引入任何 CSD 代码或 CSD 配置键。</li><li>X-Token 用不到的算子不进本 PR，跟着第一个用它的 PR 走。</li></ul>
+<h3>风险</h3><p>基类要采用 CSD 那一版的实现（它是 X-Token 版的超集，例如跨进程求和用传入的进程组而不是全局组）。这会改变 X-Token 的代码路径，<strong>不是纯移动</strong>，要有前后对照。</p>
+<h3>验收要求</h3><ul><li>同一输入下，重构前后的 loss、梯度和指标逐项一致。</li><li>X-Token 单测全过；两个 X-Token nightly 做重构前后的对照。</li><li>多 teacher 聚合、学生 CE、同 tokenizer KL 在仓库里各只有一份实现。</li></ul>
+<p class="note">粗估 2,000 到 2,500 行（含测试），未实测。</p>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/loss_functions.py">nemo_rl/algorithms/loss/loss_functions.py（X-Token loss）</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L333">nemo_rl/algorithms/loss/csd.py:333（CSD loss，对照用）</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/xtoken_off_policy_distillation.py">nemo_rl/algorithms/xtoken_off_policy_distillation.py</a>
 </div></div></details>
-<details class="card" id="pr-06" open><summary><span class="num">06</span><span class="card-title">基础 CSD：Automodel 单 teacher、dense、无 packing<span class="card-meta">首个可用版本 · 依赖：PR 01、04、05</span></span></summary><div class="body"><p class="commit-title">feat(csd): add single-teacher dense distillation with Automodel</p>
-<h3>纳入范围</h3><ul><li><code>algorithm: csd</code>、入口、基础配置；一个跨 tokenizer teacher，Automodel student/teacher。</li><li>dense teacher logits（<code>teacher_topk_ipc_k=0</code>）、replicated loss 和基础 Automodel TP/CP 接入。</li><li>common support、REST bucket、各种 chunk 关系、CE/KD 组合与动态 KD/CE scaling。</li><li>保留现有 KL/JSD/BCE、realized-only/pure-ALM loss 变体及其有效组合限制。</li><li>复用现有 collator，保留 text/chat mask 和共同文本前缀截断。</li><li>训练、验证、保存恢复、异常资源释放、单 teacher recipe、smoke 脚本和最小使用说明。</li></ul>
-<h3>本阶段不支持</h3><ul><li>Megatron、sparse、owner-local、多 teacher、packing、router replay；在 setup 阶段拒绝不支持的组合，不保留不可达实现。</li></ul>
-<h3>接口与代码边界</h3><ul><li>表路径保持 <code>teachers[i].aligner</code>；本阶段只允许一个 teacher。</li><li>不要求 <code>sample_id</code>，其强制要求留到 PR 11。</li><li>dense IPC 重建若改变返回值，在同一个 PR 中更新所有现有调用者与测试。</li><li>不导入未来 sparse reader 或 owner-local 类型；不为仅存在于原 PR 历史、未发布的配置键增加迁移层。</li></ul>
-<h3>验收要求</h3><ul><li>1:1、1:many、many:1、many:many chunk 对照独立概率参考。</li><li>验证 mask、全 masked batch、CE/KD scaling、CP 边界的数值和梯度。</li><li>真实 tokenizer 的 text/chat 输入；小模型至少完成 10 次 optimizer update、validation 和保存恢复。</li><li>运行 X-Token 回归检查。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/loss/csd.py#L333">nemo_rl/algorithms/loss/csd.py:333</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/data/cross_tokenizer/csd_collate.py#L33">nemo_rl/data/cross_tokenizer/csd_collate.py:33</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/xtoken_off_policy_distillation.py">nemo_rl/algorithms/xtoken_off_policy_distillation.py</a>
+<details class="card" id="pr-06"><summary><span class="num">06</span><span class="card-title">最小 CSD：Automodel 单 teacher、dense、只含默认路径<span class="card-meta">首个可用版本 · 依赖：PR 04、05</span></span></summary><div class="body"><p class="commit-title">feat(csd): add single-teacher dense distillation with Automodel</p>
+<h3>纳入范围</h3><ul><li>CSD loss 作为 PR 05 基类的子类，只实现示例配置默认走的那一条路径：JSD 散度、从子词表取一一对应的 token、动态缩放。</li><li>选择方法的配置字段。必填，不设默认值，避免 CSD 配置漏写后悄悄跑成 X-Token；main 上现有的 X-Token 配置各补一行。字段的名字和位置<a href="#open">未定</a>。</li><li>一个跨 tokenizer teacher，Automodel student/teacher。</li><li>dense teacher logits（<code>teacher_topk_ipc_k=0</code>）、replicated loss 和基础 Automodel TP/CP 接入。</li><li>common support、REST bucket、各种 chunk 关系、CE 与 KD 的组合。</li><li>CSD collator；保留 text/chat mask 和共同文本前缀截断。</li><li>loss 需要的基础算子随本 PR 进入：取指定 token 的 log 概率、分块 logsumexp、带梯度的跨进程求和。</li><li><code>projection_matrix_path</code> 允许为空。</li><li>训练、验证、保存恢复、异常资源释放。</li><li>第一个 recipe 和 nightly：改造原 PR 里的 Automodel 单 teacher recipe。它在原 PR 里放在禁用列表中，要改成启用，并按 main 现在的命名把 <code>-dtensor-</code> 改成 <code>-automodel-</code>。</li><li>示例配置 <code>csd.yaml</code> 先写成 Automodel 版（原 PR 里它是 Megatron 版），到 PR 08 再改。</li><li>指南的基础部分。</li></ul>
+<h3>本阶段不支持</h3><p>Megatron、sparse、owner-local、多 teacher、packing、router replay，以及默认路径之外的 loss 变体。<strong>不支持的取值在配置校验时明确报错</strong>，不保留不可达的实现。</p>
+<h3>接口与代码边界</h3><ul><li>表路径保持 <code>teachers[i].aligner</code>；本阶段只允许一个 teacher。</li><li>不要求 <code>sample_id</code>，其强制要求留到 PR 12。</li><li>dense IPC 重建若改变返回值，在同一个 PR 中更新所有现有调用者与测试。</li><li>不导入未来的 sparse reader 或 owner-local 类型；不为仅存在于原 PR 历史、未发布的配置键增加迁移层。</li><li>决定子词表的指纹是否在加载时校验（见 <a href="#pr-04">PR 04</a>）。</li></ul>
+<h3>验收要求</h3><ul><li>1:1、1:many、many:1、many:many chunk 对照独立概率参考。</li><li>验证 mask、全 masked batch、CE/KD scaling、CP 边界的数值和梯度。</li><li>真实 tokenizer 的 text/chat 输入；小模型至少完成 10 次 optimizer update、validation 和保存恢复。</li><li>nightly 的通过条件要比“loss 是有限值”更严，例如若干步后 loss 低于起始值的某个比例。</li><li>运行 X-Token 回归检查。</li></ul>
+<p class="note">粗估 5,000 到 6,000 行（含测试），未实测，仍超过约 5,000 行的评审预算。这基本是下限：collator、配置、trainer 接入、loss 的核心计算和 recipe 必须同时出现才能跑起来。</p>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L2444">nemo_rl/algorithms/loss/csd.py:2444（CSD 的核心计算）</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/data/cross_tokenizer/csd_collate.py">nemo_rl/data/cross_tokenizer/csd_collate.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/examples/configs/csd.yaml">examples/configs/csd.yaml</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/examples/configs/recipes/llm/csd-qwen3-4b-to-llama3.2-1b-1n8g-dtensor-tp4cp2.yaml">csd-qwen3-4b-to-llama3.2-1b-1n8g-dtensor-tp4cp2.yaml（待改造的 recipe）</a>
 </div></div></details>
-<details class="card" id="pr-07"><summary><span class="num">07</span><span class="card-title">Megatron dense CSD 与 router replay<span class="card-meta">增加后端 · 依赖：PR 06；按 recipe 需要依赖 02/03</span></span></summary><div class="body"><p class="commit-title">feat(csd): support Megatron teachers and students</p>
-<h3>纳入范围</h3><ul><li>Megatron dense teacher export、student loss 接入和 unpacked CP。</li><li>Automodel/Megatron 师生混合后端 dispatch，正确处理 tokenizer/model vocab padding。</li><li>router replay 的 collator 元数据校验与训练转发。</li><li>Megatron recipe 和 smoke 脚本。</li></ul>
-<h3>本阶段边界</h3><ul><li>仍为 dense、replicated、无 packing。</li></ul>
+<details class="card" id="pr-07"><summary><span class="num">07</span><span class="card-title">CSD loss 的其余变体<span class="card-meta">可选的比较方式 · 依赖：PR 06 · 能否这样切<a href="#open">待核实</a></span></span></summary><div class="body"><p class="commit-title">feat(csd): add remaining loss variants</p>
+<h3>纳入范围</h3><ul><li>KL 和 BCE 两种散度。</li><li>realized-only 和 pure-ALM 两种变体，以及它们的有效组合限制。</li><li>从投影矩阵（而不是子词表）取一一对应的 token：<code>common_indices_from_subtoks=false</code>。这条路径要求先用 X-Token 的工具做出投影矩阵。</li><li>放开 PR 06 里对应的配置校验。</li></ul>
+<h3>要顺带决定的一件事</h3><p>原 PR 里 <code>common_indices_from_subtoks</code> 在代码中的默认值是 <code>false</code>，而自带的示例配置显式写了 <code>true</code>。也就是代码默认走的是一条自带配置都不用的路径。本 PR 要么把默认值改成和示例一致，要么去掉默认值、要求显式填写。</p>
+<h3>验收要求</h3><ul><li>每种变体对照独立的概率参考，数值和梯度一致。</li><li>默认路径的结果与 PR 06 合入时一致。</li><li>无效组合在配置校验时报错。</li></ul>
+<p class="note">粗估 2,000 到 3,000 行（含测试），未实测。省下的主要是测试：每种变体都有自己的数值对照。</p>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L151">nemo_rl/algorithms/loss/csd.py:151（CSD 的配置）</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L1540">nemo_rl/algorithms/loss/csd.py:1540（一一对应 token 的两种来源）</a>
+</div></div></details>
+<details class="card" id="pr-08"><summary><span class="num">08</span><span class="card-title">Megatron dense CSD 与 router replay<span class="card-meta">增加后端 · 依赖：PR 06；按 recipe 需要依赖 02/03</span></span></summary><div class="body"><p class="commit-title">feat(csd): support Megatron teachers and students</p>
+<p>main 上的 X-Token 只支持 Automodel。原 PR 第一次把跨 tokenizer 蒸馏接到 Megatron 上，而且 Megatron 是它的主路径：自带的示例配置和单 teacher nightly 都跑在 Megatron 上。</p>
+<h3>纳入范围</h3><ul><li>Megatron dense teacher export、student loss 接入和不打包时的 CP（<code>allow_unpacked_context_parallel</code>）。</li><li>Automodel/Megatron 师生混合后端 dispatch，正确处理 tokenizer/model vocab padding。</li><li>router replay 的 collator 元数据校验与训练转发。</li><li>节点内 IPC 检查里加上 pipeline parallelism。</li><li>Megatron recipe 和 smoke 脚本；示例配置 <code>csd.yaml</code> 改为 Megatron 版。</li></ul>
+<h3>本阶段边界</h3><p>仍为 dense、replicated、无 packing。</p>
 <h3>验收要求</h3><ul><li>TP2/CP2 与完整参考对照 loss、梯度和 CP scaling。</li><li>实际运行 Megatron student/teacher，以及两种混合后端组合。</li><li>微型 MoE 的 router replay 实际激活；拒绝与重新 tokenization 不匹配的 routes。</li><li>非 CSD 算法不因新开关意外放开不支持的 unpacked CP。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/models/megatron/train.py">nemo_rl/models/megatron/train.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/models/megatron/data.py">nemo_rl/models/megatron/data.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/models/policy/workers/megatron_policy_worker.py">nemo_rl/models/policy/workers/megatron_policy_worker.py</a>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/models/megatron/train.py">nemo_rl/models/megatron/train.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/models/megatron/data.py">nemo_rl/models/megatron/data.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/models/policy/workers/megatron_policy_worker.py">nemo_rl/models/policy/workers/megatron_policy_worker.py</a>
 </div></div></details>
-<details class="card" id="pr-08"><summary><span class="num">08</span><span class="card-title">Sparse teacher payload 与 IPC<span class="card-meta">改变 support · 依赖：PR 07</span></span></summary><div class="body"><p class="commit-title">feat(csd): add sparse teacher logits transport</p>
-<h3>整条链路一起落地</h3><ul><li>sparse top-k、精确 logZ、forced realized labels。</li><li>两个后端的 producer、policy 路由、payload reader 和 loss consumer。</li><li>CUDA IPC buffer 分配、复用、扩容、异常释放，以及身份和布局信息。</li><li>所有 sparse support 相关 loss 分支。</li></ul>
+<details class="card" id="pr-09"><summary><span class="num">09</span><span class="card-title">Sparse teacher payload 与 IPC<span class="card-meta">改变 support · 依赖：PR 08</span></span></summary><div class="body"><p class="commit-title">feat(csd): add sparse teacher logits transport</p>
+<h3>整条链路一起落地</h3><ul><li>sparse top-k、精确 logZ、forced realized labels，以及取 top-k 的分布式算子。</li><li>两个后端的 producer、policy 路由、payload reader 和 loss consumer。</li><li>CUDA IPC buffer 分配、复用、扩容、异常释放，以及身份和布局信息。</li><li>所有 sparse support 相关 loss 分支。</li></ul>
 <h3>接口与默认行为</h3><ul><li><code>K=0</code> 保留 dense；同 tokenizer direct-KL teacher 保持 dense。</li><li>本 PR 才引入当前 PR 的默认 <code>K=128</code>，配置、说明和测试同步更新。</li><li>有限 K 改变比较的 support 和训练目标，不能宣称它与 dense 等价。</li></ul>
 <h3>验收要求</h3><ul><li>support 覆盖完整词表时，与同设置 dense 路径比较。</li><li>有限 K 对照独立的 top-k＋REST 参考。</li><li>覆盖 forced labels、ties、重复查询、空 CP shard、vocab padding。</li><li>两个后端实际走 CUDA IPC，确认 payload 类型与 buffer 生命周期。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/x_token/loss_utils.py#L77">nemo_rl/algorithms/x_token/loss_utils.py:77</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/distributed/model_utils.py#L2655">nemo_rl/distributed/model_utils.py:2655</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/models/policy/utils.py">nemo_rl/models/policy/utils.py</a>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/x_token/loss_utils.py">nemo_rl/algorithms/x_token/loss_utils.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/distributed/model_utils.py">nemo_rl/distributed/model_utils.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/models/policy/utils.py">nemo_rl/models/policy/utils.py</a>
 </div></div></details>
-<details class="card" id="pr-09"><summary><span class="num">09</span><span class="card-title">Owner-local KD 优化<span class="card-meta">执行优化 · 依赖：PR 08</span></span></summary><div class="body"><p class="commit-title">perf(csd): evaluate KD on owner-local context shards</p>
+<details class="card" id="pr-10"><summary><span class="num">10</span><span class="card-title">Owner-local KD 优化<span class="card-meta">执行优化 · 依赖：PR 09</span></span></summary><div class="body"><p class="commit-title">perf(csd): evaluate KD on owner-local context shards</p>
 <h3>纳入范围</h3><ul><li>owner-local loss、本地按需读取 teacher rows、eligibility 判断、特殊梯度归约、CP-partial loss 的消费者处理。</li><li>支持 dense/sparse teacher transport；按当前支持范围自动选择执行路径。</li></ul>
-<h3>本阶段边界</h3><ul><li>单 teacher、无 packing；多 teacher 扩展留到 PR 10。</li></ul>
+<h3>本阶段边界</h3><p>单 teacher、无 packing；多 teacher 扩展留到 PR 11。只有 Megatron 学生才能用。</p>
 <h3>验收要求</h3><ul><li>与强制 replicated 参考逐项比较 loss、CE、KD、梯度和指标。</li><li>覆盖不同 TP/CP 拓扑和跨 CP chunk；确认不 gather 完整 student logits。</li><li>不符合条件时保持现有 replicated fallback 或明确拒绝规则。</li><li>临时日志证明路径实际执行，验证后移除 instrumentation。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/loss/csd.py#L3553">nemo_rl/algorithms/loss/csd.py:3553</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/loss/loss_input.py">nemo_rl/algorithms/loss/loss_input.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/tests/unit/algorithms/csd/test_csd_owner_local.py">tests/unit/algorithms/csd/test_csd_owner_local.py</a>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L3553">nemo_rl/algorithms/loss/csd.py:3553</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/loss_input.py">nemo_rl/algorithms/loss/loss_input.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/tests/unit/algorithms/csd/test_csd_owner_local.py">tests/unit/algorithms/csd/test_csd_owner_local.py</a>
 </div></div></details>
-<details class="card" id="pr-10"><summary><span class="num">10</span><span class="card-title">Multi-teacher 与同 tokenizer 快路径<span class="card-meta">扩展 teacher · 依赖：PR 09</span></span></summary><div class="body"><p class="commit-title">feat(csd): add multi-teacher aggregation</p>
-<h3>纳入范围</h3><ul><li>sum、averaged_logits、select_teacher；静态和动态 teacher 权重、vocab normalization。</li><li>同 tokenizer direct-KL、严格 tokenizer reuse 校验，混合同/跨 tokenizer teacher。</li><li>owner-local 在受支持静态 sum 组合下的多 teacher 扩展。</li><li>multi-teacher 配置、recipe 和测试。</li></ul>
+<details class="card" id="pr-11"><summary><span class="num">11</span><span class="card-title">Multi-teacher 与同 tokenizer 快路径<span class="card-meta">扩展 teacher · 依赖：PR 10</span></span></summary><div class="body"><p class="commit-title">feat(csd): add multi-teacher aggregation</p>
+<p>多 teacher 的聚合逻辑已经在 PR 05 的基类里，本 PR 主要是让 CSD 用上它，并补上 CSD 特有的部分，所以比上一版小。</p>
+<h3>纳入范围</h3><ul><li>CSD 接入基类的 <code>sum</code>、<code>averaged_logits</code>、<code>select_teacher</code>；静态和动态 teacher 权重、vocab normalization。</li><li>同 tokenizer direct-KL、严格 tokenizer reuse 校验，混合同/跨 tokenizer teacher。</li><li>owner-local 在受支持静态 sum 组合下的多 teacher 扩展。</li><li>multi-teacher 配置、recipe 和测试。</li></ul>
 <h3>验收要求</h3><ul><li>单 teacher 结果保持一致；两 teacher 聚合对照独立参考。</li><li>词表大小相同但映射、模板、特殊 token 或 backend 不同，不能误判可复用。</li><li>各 teacher 使用自己的 tokenization/mask 计算 score。</li><li>验证串行执行、模型状态恢复、失败后 IPC 释放，并完成双 teacher 真实训练 smoke。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/loss/csd.py#L903">nemo_rl/algorithms/loss/csd.py:903</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/xtoken_off_policy_distillation.py#L1389">nemo_rl/algorithms/xtoken_off_policy_distillation.py:1389</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/examples/configs/csd_multiteacher.yaml">examples/configs/csd_multiteacher.yaml</a>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L903">nemo_rl/algorithms/loss/csd.py:903</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/xtoken_off_policy_distillation.py">nemo_rl/algorithms/xtoken_off_policy_distillation.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/examples/configs/csd_multiteacher.yaml">examples/configs/csd_multiteacher.yaml</a>
 </div></div></details>
-<details class="card" id="pr-11"><summary><span class="num">11</span><span class="card-title">持久数据身份<span class="card-meta">packing 前置 · 依赖：PR 06；同步后续训练能力分支</span></span></summary><div class="body"><p class="commit-title">feat(data): preserve source sample identities for distillation</p>
+<details class="card" id="pr-12"><summary><span class="num">12</span><span class="card-title">持久数据身份<span class="card-meta">packing 前置 · 依赖：PR 06；同步后续训练能力分支</span></span></summary><div class="body"><p class="commit-title">feat(data): preserve source sample identities for distillation</p>
+<p>代码在通用的数据集里，所有用这些数据集的算法都会多出一列；目前的消费者只有 CSD 的 packing。</p>
 <h3>纳入范围</h3><ul><li>Arrow/OpenAI/ResponseDataset 使用统一 source-ID resolver。</li><li>优先保留已有 ID；缺失时使用 namespace＋原始 ordinal。</li><li>在 filter、formatting、split 之前确定 ID，并传入 collator。</li><li>更新 packed-cache schema version；CSD collator 开始要求有效 <code>sample_id</code>，fixtures 同步调整。</li></ul>
-<h3>验收要求</h3><ul><li>过滤和 validation split 前后 ID 稳定；path/subset/split 区分正确。</li><li>保留原始重复 ID，由 PR 12 的 occurrence ID 区分同 batch 中重复出现的样本。</li><li>旧 cache 重建、新 cache 重用；检查 CSD、X-Token 和普通数据消费路径。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/data/datasets/response_datasets/response_dataset.py">nemo_rl/data/datasets/response_datasets/response_dataset.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/data/datasets/response_datasets/arrow_text_dataset.py">nemo_rl/data/datasets/response_datasets/arrow_text_dataset.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/data/datasets/response_datasets/oai_format_dataset.py">nemo_rl/data/datasets/response_datasets/oai_format_dataset.py</a>
+<h3>验收要求</h3><ul><li>过滤和 validation split 前后 ID 稳定；path/subset/split 区分正确。</li><li>保留原始重复 ID，由 PR 13 的 occurrence ID 区分同 batch 中重复出现的样本。</li><li>旧 cache 重建、新 cache 重用；检查 CSD、X-Token 和普通数据消费路径。</li></ul>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/data/datasets/response_datasets/response_dataset.py">nemo_rl/data/datasets/response_datasets/response_dataset.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/data/datasets/response_datasets/arrow_text_dataset.py">nemo_rl/data/datasets/response_datasets/arrow_text_dataset.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/data/datasets/response_datasets/oai_format_dataset.py">nemo_rl/data/datasets/response_datasets/oai_format_dataset.py</a>
 </div></div></details>
-<details class="card" id="pr-12"><summary><span class="num">12</span><span class="card-title">Lockstep packing<span class="card-meta">最后落地 · 依赖：PR 07–11</span></span></summary><div class="body"><p class="commit-title">feat(csd): add lockstep sequence packing</p>
-<h3>整条链路一起落地</h3><ul><li>共享 bin plan、occurrence ID、DP 分配。</li><li>student/teacher 用各自 token 长度和 padding 几何 materialize 相同逻辑样本。</li><li>两个后端的 data、training wrapper、IPC packed 布局，csd_packing.py 和 global chunk normalization。</li><li>padding-only DP shard、metrics、checkpoint high-water mark、telemetry、设计文档和示例。</li></ul>
+<details class="card" id="pr-13"><summary><span class="num">13</span><span class="card-title">Lockstep packing<span class="card-meta">最后落地 · 依赖：PR 08–12</span></span></summary><div class="body"><p class="commit-title">feat(csd): add lockstep sequence packing</p>
+<h3>整条链路一起落地</h3><ul><li>共享 bin plan、occurrence ID、DP 分配。</li><li>student/teacher 用各自 token 长度和 padding 几何 materialize 相同逻辑样本。</li><li>两个后端的 data、training wrapper、IPC packed 布局，<code>csd_packing.py</code> 和 global chunk normalization。</li><li>padding-only DP shard、metrics、checkpoint high-water mark、telemetry、设计文档和示例。</li></ul>
 <h3>验收要求</h3><ul><li>packed/unpacked 的 loss、梯度、指标对照。</li><li>覆盖不同 teacher 长度、重复样本、uneven bins、CP head/tail；区分 raw lengths 与 padded offsets。</li><li>validation、恢复、旧 checkpoint 缺少 high-water mark。</li><li>dense/sparse、单/多 teacher 的当前支持组合实际训练 smoke。</li><li>setup 拒绝不支持的模型结构和组合；保留当前 owner-local 与 packing 的限制，不扩展支持范围。</li></ul>
-<h3>评审顺序</h3><ul><li>先看共享 plan 必须满足的条件，再看各后端 materialization，最后看 loss 和指标。这预计仍是最大的一个 PR。</li></ul>
-<div class="refs"><span class="note">原实现定位</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/data/packing/lockstep.py">nemo_rl/data/packing/lockstep.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/nemo_rl/algorithms/loss/csd_packing.py">nemo_rl/algorithms/loss/csd_packing.py</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/547d391af3652543403e3b30acf617510a1b80e7/docs/design-docs/csd-lockstep-sequence-packing.md">docs/design-docs/csd-lockstep-sequence-packing.md</a>
+<h3>评审顺序</h3><p>先看共享 plan 必须满足的条件，再看各后端 materialization，最后看 loss 和指标。这预计仍是最大的一个 PR。作者方案里也把它列为可选，可以留在参考分支上晚些再合。</p>
+<div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/data/packing/lockstep.py">nemo_rl/data/packing/lockstep.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd_packing.py">nemo_rl/algorithms/loss/csd_packing.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/docs/design-docs/csd-lockstep-sequence-packing.md">docs/design-docs/csd-lockstep-sequence-packing.md</a>
 </div></div></details>
 <h2>三、如何提取、验证并逐个合并</h2>
 <div class="two"><section class="panel"><h3>分支与补丁操作</h3><ol>
 <li>保留原 head 作为只读功能基准，不重写原作者分支。</li>
 <li>从最新实际目标分支建立拆分分支；按功能抽取 hunks，历史修复 commit 只作为定位线索。</li>
-<li>先准备 01、04、05、06，形成可用基线；02/03 独立评审。</li>
+<li>主线先准备 01、05、06，形成可用基线；04 与它们并行；02、03 独立评审，不占主线。</li>
 <li>后续使用 stacked branches。每次合并前确认前置依赖已合入目标分支，再更新 base，去掉重复 diff。</li>
 <li>建立逐项归属清单：每个行为、配置键、测试、文档和辅助修改都有归属，避免遗漏或重复。</li>
 <li>每次触发 CI 前重新获取 PR head 和实际目标分支；若落后，先 rebase、解决冲突、检查和 push，再对新的完整 SHA 触发 CI。</li>
@@ -183,19 +190,29 @@
 </tbody></table></div>
 <p>测试不在专用 review checkout 中启动训练。实际 GPU 验证使用独立工作 checkout，通过现有 <code>tools/launch</code> 提交，遵守现有资源与日志规则。临时 instrumentation 用于证明路径激活，验证后移除。</p>
 <h3>最终接口与行为</h3><ul>
-<li>最终恢复原 PR 有效配置能力和默认行为：PR 06 使用 dense <code>K=0</code>；PR 08 才引入默认 <code>K=128</code>，并一直保留 dense 参考模式。</li>
+<li>最终恢复原 PR 有效配置能力和默认行为：PR 06 使用 dense <code>K=0</code>；PR 09 才引入默认 <code>K=128</code>，并一直保留 dense 参考模式。</li>
 <li>有限 K 改变比较的 support，因此 dense/sparse 的一致性检查必须采用相同 support 设置。</li>
-<li>中间版本只公开已接通的能力，不提前塞入未来实现和 imports。</li>
-<li>README、guide 随对应阶段扩展；完整 packing 设计文档放 PR 12。</li>
+<li>中间版本只公开已接通的能力，不提前塞入未来实现和 imports；还没接通的取值在配置校验时报错。</li>
+<li>README、guide 随对应阶段扩展；完整 packing 设计文档放 PR 13。</li>
 <li>最终按功能与数值行为对照原 head，不要求文件逐字相同；已有审查中确认需修正的问题不因“保留功能”而被保留。</li>
 </ul>
 <h3>完成标准</h3><ul>
-<li>每个 PR 有清楚的行为边界、完整 producer/consumer 链路、针对性测试和明确限制。</li>
+<li>每个 PR 有清楚的行为边界、完整 producer/consumer 链路、针对性测试和明确限制；合入时它带来的代码都有调用方。</li>
 <li>超过约 5,000 行的拆分 PR 再次检查是否混入后续能力。这是评审预算，不是拆分后的实测行数。</li>
 <li>最终运行配置检查、相关单测和代表性组合检查，逐项核对原 diff 的归属清单。</li>
 <li>仍需在提取实际 patch 后确认各 PR 可以独立合并；本页面没有把待验证的方案写成已完成结果。</li>
 </ul>
-<footer>本页是 PR #4680 的拆分提案，01–12 均为方案编号。代码事实和统计固定于 <code>547d391a</code>；不包含未执行验证的成功声明。页面正文为中文，PR 标题与代码标识符保留英文。</footer>
+<h2 id="open">四、仍需确认</h2>
+<p>下面 6 项还没有定。前两项会改变 PR 05–07 的切法，需要先读代码核实；后四项需要和作者商量。</p>
+<div class="scroll"><table><thead><tr><th>事项</th><th>影响哪个 PR</th><th>现状与倾向</th></tr></thead><tbody>
+<tr><td>默认路径能否从 CSD 的核心计算里干净地分出来</td><td>06、07</td><td>未核实。核心计算是一个约 1,100 行的方法，各种变体如果交织得很深，“只含默认路径”的版本可能不比全部带上省多少。若分不出来，07 并回 06。</td></tr>
+<tr><td>抽基类会改变 X-Token 的哪些行为</td><td>05</td><td>方向已定，细节待推敲。两个类里同名方法已有差异（如求和用的进程组），统一时哪些是修复、哪些是行为变更，要逐个方法列出来。</td></tr>
+<tr><td>X-Token 这个名字要不要换</td><td>01、04、06</td><td>“X-Token”就是“cross-tokenizer”的缩写，和目录名 <code>cross_tokenizer</code> 字面同义，看不出它与 CSD 的区别。真正的区别是它用投影矩阵，倾向在新文件名和配置取值里改叫 <code>projection</code>。README 把该方法链接到一篇论文，要先向作者确认 X-Token 是不是论文里的正式名字。已有的配置文件名和 recipe 名不在 PR 01 里改。</td></tr>
+<tr><td>工具目录怎么放</td><td>01、04</td><td>三种放法：现有目录不动、新增平级目录；都收到 <code>tools/cross_tokenizer/</code> 下按方法分；都收到 <code>tools/cross_tokenizer/</code> 下按产出物分（投影矩阵、子词表）。CSD 在一种配置下也要用投影矩阵，所以按产出物命名更准确。代价是 X-Token 现有的命令路径都要改。</td></tr>
+<tr><td>选择方法的配置字段</td><td>06</td><td>原 PR 用顶层的 <code>algorithm:</code>，不写就默认 X-Token。倾向保留顶层字段但改成必填。如果 PR 05 的基类方案落定，也可以改成 loss 配置里的一个字段，同时取代现有的 <code>gold_loss</code>、<code>xtoken_loss</code> 两个开关。</td></tr>
+<tr><td>打包路径上的 MoE 路由 padding mask 归谁</td><td>03 或 08</td><td>未核实。从 diff 片段看它没有限定为 CSD，如果确实如此，它会改变所有用 Megatron 打包训练 MoE 模型的算法的行为，应并入 PR 03 并单独说明；否则留在 PR 08。</td></tr>
+</tbody></table></div>
+<footer>本页是 PR #4680 的拆分提案，01–13 均为方案编号。代码事实固定于 <code>83248b47</code>；标注为“粗估”的行数没有实测，标注为“未核实”的判断没有读完相关代码；不包含未执行验证的成功声明。页面正文为中文，PR 标题与代码标识符保留英文。</footer>
 </main><script>
 (function(){
 const cards=Array.from(document.querySelectorAll('details.card'));
