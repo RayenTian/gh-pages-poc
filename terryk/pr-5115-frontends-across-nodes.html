@@ -64,6 +64,8 @@ svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
 svg .cut{stroke:var(--purple);stroke-width:1.6;fill:none;stroke-dasharray:5 3;marker-end:url(#ahp)}
 svg .mk{stroke:var(--orange);stroke-width:1.3;fill:none;stroke-dasharray:2 3;marker-end:url(#aho)}
 svg .ahf{fill:var(--dim)}svg .ahpf{fill:var(--purple)}svg .ahof{fill:var(--orange)}
+svg .mesh{stroke:var(--accent);stroke-width:1;fill:none;opacity:.55}
+svg .lbl{fill:var(--bg);stroke:var(--border);stroke-width:1}
 svg .p{fill:var(--purple);font:bold 11px -apple-system,sans-serif}
 svg a text{text-decoration:underline;fill:var(--accent);font:10px ui-monospace,Menlo,monospace}
 .pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
@@ -195,62 +197,80 @@ svg a text{text-decoration:underline;fill:var(--accent);font:10px ui-monospace,M
 <rect class="box" x="556" y="54" width="476" height="44" rx="6"/>
 <text class="t" x="566" y="72">NeMo-Gym (Ray actors)</text>
 <text class="d" x="566" y="88">base_urls = [F0, F1, F2]   one session → one frontend</text>
-<path class="arr" d="M588,98 L588,322"/>
-<text class="n" x="596" y="114">① chat and ✂ cut, same URL</text>
+<path class="arr" d="M590,98 L590,144"/><text class="n" x="596" y="128">① ✂</text>
+<path class="arr" d="M746,98 L746,144"/><text class="n" x="752" y="128">① ✂</text>
+<path class="arr" d="M902,98 L902,144"/><text class="n" x="908" y="128">① ✂</text>
 
-<rect class="panel" x="544" y="124" width="500" height="80" rx="9"/>
-<text class="h" x="552" y="141">Driver's node</text>
-<rect class="box" x="612" y="150" width="176" height="44" rx="6"/>
-<text class="t" x="620" y="166">v2 driver process</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L569"><text x="620" y="184">_start_frontends · L569</text></a>
-<rect class="new" x="796" y="150" width="114" height="44" rx="6"/>
-<text class="t" x="804" y="168">etcd</text><text class="d" x="804" y="184">+ watchdog</text>
-<rect class="new" x="918" y="150" width="114" height="44" rx="6"/>
-<text class="t" x="926" y="168">NATS</text><text class="d" x="926" y="184">+ watchdog</text>
-<path class="mk" d="M700,194 L700,236"/>
-<text class="o" x="708" y="222">starts 3 actors, round-robin: node 0, 1, 0</text>
+<!-- row 1: frontends -->
+<text class="h" x="1036" y="128" text-anchor="end">3 frontends</text>
+<rect class="proc" x="556" y="146" width="150" height="150" rx="8"/>
+<text class="t" x="564" y="164">F0 · on node 0</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L365"><text x="564" y="180">FrontendHost, 0 CPU</text></a>
+<text class="d" x="564" y="196">stock dynamo.frontend</text>
+<text class="d" x="564" y="212">① one HTTP port</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L664"><text x="564" y="228">② chat engine plug-in</text></a>
+<text class="o" x="564" y="244">   + 8 render workers</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/vllm/generation_cut.py#L205"><text x="564" y="260">✂ cut route plug-in</text></a>
+<text class="d" x="564" y="276">③ its own KV router</text>
+<text class="g" x="564" y="290">16,777,216 sessions</text>
 
-<rect class="panel" x="544" y="216" width="500" height="372" rx="9"/>
-<text class="h" x="552" y="233">GPU node 0</text>
-<rect class="proc" x="556" y="240" width="476" height="246" rx="8"/>
-<text class="h" x="564" y="256">FrontendHost Ray actor (0 CPU, pinned) → F0</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L365"><text x="868" y="256">L365</text></a>
-<rect class="new" x="568" y="264" width="452" height="42" rx="6"/>
-<text class="t" x="576" y="281">Stock python -m dynamo.frontend, two plug-ins:</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L107-L112"><text x="576" y="298">--dyn-chat-processor · --frontend-route-extension</text></a>
-<rect class="box" x="568" y="324" width="220" height="48" rx="6"/>
-<text class="t" x="576" y="341">Rust HTTP server, one port</text>
-<text class="d" x="576" y="358">① chat · completions · ✂ cut</text>
-<path class="cut" d="M788,348 L798,348"/>
-<rect class="new" x="800" y="324" width="220" height="48" rx="6"/>
-<text class="t" x="808" y="341">CutRouteHandler</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/vllm/generation_cut.py#L185"><text x="808" y="358">✂ → EngineCutFanOut · L185</text></a>
-<path class="arr" d="M678,372 L678,384"/>
-<rect class="box" x="568" y="386" width="220" height="62" rx="6"/>
-<text class="t" x="576" y="403">Our chat engine</text>
-<text class="d" x="576" y="419">② render + splice TQ prefix</text>
-<text class="o" x="576" y="436">8 render workers per frontend</text>
-<path class="arr" d="M788,417 L798,417"/>
-<rect class="new" x="800" y="386" width="220" height="62" rx="6"/>
-<text class="t" x="808" y="403">KV router (one per frontend)</text>
-<text class="d" x="808" y="419">③ --router-replica-sync</text>
-<text class="g" x="808" y="436">16,777,216 sessions max</text>
-<text class="d" x="568" y="466">watchdog: stops this frontend if the actor is SIGKILLed</text>
-<text class="d" x="568" y="480">default (num_frontends: 1): F0 alone, still on GPU node 0</text>
-<rect class="box" x="556" y="498" width="150" height="76" rx="6"/>
-<text class="t" x="564" y="516">F2</text><text class="d" x="564" y="532">same as F0, its own</text><text class="d" x="564" y="546">router + 8 workers</text>
-<rect class="box" x="718" y="498" width="150" height="76" rx="6"/><text class="t" x="726" y="516">vLLM e0</text><text class="d" x="726" y="532">④ generate,</text><text class="d" x="726" y="546">TQ write ⑤</text>
-<rect class="box" x="880" y="498" width="152" height="76" rx="6"/><text class="t" x="888" y="516">vLLM e1</text><text class="d" x="888" y="532">same</text>
-<path class="arr" d="M910,448 L910,496"/>
-<text class="n" x="918" y="478">③ TCP</text>
+<rect class="proc" x="712" y="146" width="150" height="150" rx="8"/>
+<text class="t" x="720" y="164">F1 · on node 1</text>
+<text class="d" x="720" y="180">FrontendHost, 0 CPU</text>
+<text class="d" x="720" y="196">stock dynamo.frontend</text>
+<text class="d" x="720" y="212">① one HTTP port</text>
+<text class="d" x="720" y="228">② chat engine plug-in</text>
+<text class="o" x="720" y="244">   + 8 render workers</text>
+<text class="d" x="720" y="260">✂ cut route plug-in</text>
+<text class="d" x="720" y="276">③ its own KV router</text>
+<text class="g" x="720" y="290">16,777,216 sessions</text>
 
-<rect class="panel" x="544" y="600" width="500" height="96" rx="9"/>
-<text class="h" x="552" y="617">GPU node 1</text>
-<rect class="box" x="556" y="626" width="150" height="58" rx="6"/><text class="t" x="564" y="644">F1</text><text class="d" x="564" y="660">same as F0</text>
-<rect class="box" x="718" y="626" width="150" height="58" rx="6"/><text class="t" x="726" y="644">vLLM e2</text>
-<rect class="box" x="880" y="626" width="152" height="58" rx="6"/><text class="t" x="888" y="644">vLLM e3</text>
-<path class="arr" d="M1026,448 L1040,448 L1040,655 L1034,655"/>
-<text class="n" x="1036" y="596" text-anchor="end">③ any engine</text>
+<rect class="proc" x="868" y="146" width="164" height="150" rx="8"/>
+<text class="t" x="876" y="164">F2 · on node 0 again</text>
+<text class="d" x="876" y="180">FrontendHost, 0 CPU</text>
+<text class="d" x="876" y="196">stock dynamo.frontend</text>
+<text class="d" x="876" y="212">① one HTTP port</text>
+<text class="d" x="876" y="228">② chat engine plug-in</text>
+<text class="o" x="876" y="244">   + 8 render workers</text>
+<text class="d" x="876" y="260">✂ cut route plug-in</text>
+<text class="d" x="876" y="276">③ its own KV router</text>
+<text class="g" x="876" y="290">16,777,216 sessions</text>
+
+<!-- every router to every engine -->
+<path class="mesh" d="M631,296 L612,400"/><path class="mesh" d="M631,296 L733,400"/><path class="mesh" d="M631,296 L854,400"/><path class="mesh" d="M631,296 L975,400"/>
+<path class="mesh" d="M787,296 L612,400"/><path class="mesh" d="M787,296 L733,400"/><path class="mesh" d="M787,296 L854,400"/><path class="mesh" d="M787,296 L975,400"/>
+<path class="mesh" d="M950,296 L612,400"/><path class="mesh" d="M950,296 L733,400"/><path class="mesh" d="M950,296 L854,400"/><path class="mesh" d="M950,296 L975,400"/>
+<rect class="lbl" x="612" y="332" width="360" height="36" rx="4"/>
+<text class="t" x="792" y="347" text-anchor="middle">③ any router → any engine, either node</text>
+<text class="d" x="792" y="362" text-anchor="middle">TCP request plane · cache info from all engines via NATS</text>
+
+<!-- row 2: engines -->
+<text class="h" x="1036" y="398" text-anchor="end">4 engines</text>
+<rect class="box" x="556" y="402" width="113" height="62" rx="6"/><text class="t" x="564" y="420">vLLM e0</text><text class="d" x="564" y="436">on node 0</text><text class="d" x="564" y="452">④ generate ⑤</text>
+<rect class="box" x="677" y="402" width="113" height="62" rx="6"/><text class="t" x="685" y="420">vLLM e1</text><text class="d" x="685" y="436">on node 0</text><text class="d" x="685" y="452">④ generate ⑤</text>
+<rect class="box" x="798" y="402" width="113" height="62" rx="6"/><text class="t" x="806" y="420">vLLM e2</text><text class="d" x="806" y="436">on node 1</text><text class="d" x="806" y="452">④ generate ⑤</text>
+<rect class="box" x="919" y="402" width="113" height="62" rx="6"/><text class="t" x="927" y="420">vLLM e3</text><text class="d" x="927" y="436">on node 1</text><text class="d" x="927" y="452">④ generate ⑤</text>
+
+<!-- where the processes sit -->
+<text class="n" x="544" y="490">Where they run (frontend i → node i mod 2):</text>
+<rect class="panel" x="544" y="498" width="246" height="62" rx="9"/>
+<text class="h" x="552" y="516">GPU node 0</text>
+<text class="d" x="552" y="533">F0, F2, e0, e1</text>
+<text class="o" x="552" y="550">16 render workers on its CPUs</text>
+<rect class="panel" x="798" y="498" width="246" height="62" rx="9"/>
+<text class="h" x="806" y="516">GPU node 1</text>
+<text class="d" x="806" y="533">F1, e2, e3</text>
+<text class="o" x="806" y="550">8 render workers on its CPUs</text>
+
+<rect class="panel" x="544" y="572" width="500" height="80" rx="9"/>
+<text class="h" x="552" y="589">Driver's node</text>
+<rect class="box" x="556" y="598" width="226" height="44" rx="6"/>
+<text class="t" x="564" y="614">v2 driver process</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L569"><text x="564" y="632">starts the 3 actors · L569</text></a>
+<rect class="new" x="796" y="598" width="114" height="44" rx="6"/>
+<text class="t" x="804" y="616">etcd</text><text class="d" x="804" y="632">+ watchdog</text>
+<rect class="new" x="918" y="598" width="114" height="44" rx="6"/>
+<text class="t" x="926" y="616">NATS</text><text class="d" x="926" y="632">+ watchdog</text>
 
 <!-- legend -->
 <rect class="bad" x="16" y="716" width="18" height="12" rx="3"/><text class="n" x="40" y="726">removed or limited by this PR</text>
@@ -259,15 +279,15 @@ svg a text{text-decoration:underline;fill:var(--accent);font:10px ui-monospace,M
 <rect class="proc" x="560" y="716" width="18" height="12" rx="3"/><text class="n" x="584" y="726">one OS process</text>
 <path class="cut" d="M700,722 L740,722"/><text class="n" x="746" y="726">checkpoint cut</text>
 <path class="mk" d="M850,722 L890,722"/><text class="n" x="896" y="726">starts</text>
-<text class="n" x="16" y="756">Right column: F0 and F2 both land on node 0 because frontend i goes to node i mod 2. Every router learns every engine's cache over NATS,</text>
-<text class="n" x="16" y="772">so a call routed by F1 on node 1 can still run on e0 on node 0. v2 rollouts pick a frontend at random; Gym keeps each session on one.</text>
+<text class="n" x="16" y="756">Right column: frontends do not own engines. Each router can send a call to any of the 4 engines, and num_frontends is set on its own,</text>
+<text class="n" x="16" y="772">apart from the engine and node counts. Node placement only decides whose CPUs and memory a frontend uses. v2 rollouts pick a frontend at random.</text>
 </svg></div>
 
 <p><b>What happens to one Gym call, step by step.</b></p>
 <ol>
 <li>① Gym sends the chat call to its session's frontend. Today there is one URL; with this PR, Gym holds one URL per frontend (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/vllm/vllm_generation.py#L792-L801"><code>client_base_urls</code></a>) and keeps each session on one of them.</li>
 <li>② Our chat engine renders it with the checkpoint's template and splices the earlier turns from TQ. Today it is plugged in by patching Dynamo's <code>main()</code> (<a href="https://github.com/NVIDIA-NeMo/RL/blob/a29d55b66a4fe9fdc3673a8097984a92808de3e3/nemo_rl/models/generation/dynamo/vllm/frontend.py#L34-L72"><code>frontend.py</code></a>, deleted). With this PR, Dynamo loads it through its supported <code>--dyn-chat-processor</code> flag (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L664"><code>provider</code></a>), and its settings arrive as one typed <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L68-L80"><code>ChatProcessorOptions</code></a> instead of four env vars.</li>
-<li>③ That frontend's router picks one of the 4 engines. With several frontends, <code>--router-replica-sync</code> shares in-flight requests between the routers (in <code>kv</code> mode).</li>
+<li>③ That frontend's router picks one of the 4 engines, on either node: no frontend is tied to the engines on its own node. With several frontends, <code>--router-replica-sync</code> shares in-flight requests between the routers (in <code>kv</code> mode).</li>
 <li>④ The engine generates and writes the call to TQ, the same in both columns.</li>
 <li>⑤ The reply goes back through the same frontend to Gym.</li>
 <li>✂ At a checkpoint, Gym posts its in-flight calls. Today that goes to a second port (a uvicorn thread), because Dynamo 1.5.1 routes could not take a POST, so RL had to pass Gym a second URL list. With this PR, the cut uses the frontend's own port as a <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/vllm/generation_cut.py#L205"><code>routes()</code></a> extension. The native and Dynamo routes now share one check-and-answer helper, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/vllm/generation_cut_route.py#L44-L70"><code>answer_generation_cut</code></a>.</li>
