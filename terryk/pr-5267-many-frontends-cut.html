@@ -227,7 +227,12 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3
 
 <h2>What the review asks</h2>
 <div class="hl">The design holds up: the merge is a small pure function, and Gym accepts the merged receipt as is. The open asks are about proof. No CI run turns on prefix cuts with more than one frontend. Two new paths (a stalled peer, and peers set at startup) can break without any test failing. The settings sent to child frontends are a hand-written copy of a function's arguments. That copy already went stale once in the PR below, and this PR fixes it.</div>
-<p class="cref"><!--CREFS--></p>
+<p class="cref">
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528626">C1 — capture kwargs test · vllm_worker_async.py:1098</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528642">C2 — fast CI run, 2 frontends · nemo-gym-integration.md:81</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528651">C3 — stalled-peer test · generation_cut_route.py:173</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528667">C4 — startup peers test · vllm_worker_async.py:838</a>
+</p>
 
 </div>
 </body>
