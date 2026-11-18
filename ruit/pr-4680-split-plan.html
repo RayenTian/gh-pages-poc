@@ -166,34 +166,7 @@
 <h3>评审顺序</h3><p>先看共享 plan 必须满足的条件，再看各后端 materialization，最后看 loss 和指标。这预计仍是最大的一个 PR。作者方案里也把它列为可选，可以留在参考分支上晚些再合。</p>
 <div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/data/packing/lockstep.py">nemo_rl/data/packing/lockstep.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd_packing.py">nemo_rl/algorithms/loss/csd_packing.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/docs/design-docs/csd-lockstep-sequence-packing.md">docs/design-docs/csd-lockstep-sequence-packing.md</a>
 </div></div></details>
-<h2>三、如何提取、验证并逐个合并</h2>
-<div class="two"><section class="panel"><h3>分支与补丁操作</h3><ol>
-<li>保留原 head 作为只读功能基准，不重写原作者分支。</li>
-<li>从最新实际目标分支建立拆分分支；按功能抽取 hunks，历史修复 commit 只作为定位线索。</li>
-<li>主线先准备 01、05、06，形成可用基线；04 与它们并行；02、03 独立评审，不占主线。</li>
-<li>后续使用 stacked branches。每次合并前确认前置依赖已合入目标分支，再更新 base，去掉重复 diff。</li>
-<li>建立逐项归属清单：每个行为、配置键、测试、文档和辅助修改都有归属，避免遗漏或重复。</li>
-<li>每次触发 CI 前重新获取 PR head 和实际目标分支；若落后，先 rebase、解决冲突、检查和 push，再对新的完整 SHA 触发 CI。</li>
-</ol></section><section class="panel"><h3>测试代码先复用搭建过程</h3><ul>
-<li>共享 TP/CP 建组、进程启动与清理、小张量、表与 alignment fixture、基础 config builder。</li>
-<li>共享禁止 rank-3 gather 的 patch/context manager，以及 IPC 记录构造和生命周期检查。</li>
-<li>helper 随首个消费者落地，放在测试工具模块；避免从其他 test_*.py 导入纯 helper。</li>
-<li>相同执行逻辑的输入组合参数化，但保留各后端真实接入检查。</li>
-<li>删除只检查 Pydantic 默认值、类型约束、值原样返回的测试；复用 shipped-config sweep，不测试 recipe 字面参数值。</li>
-<li><strong>参考计算保持独立。</strong> loss、mask、梯度不能与被测实现共享同一套计算后互相证明。</li>
-</ul></section></div>
-<h3>三个验证层级</h3><div class="scroll"><table><thead><tr><th>层级</th><th>做什么</th><th>能证明什么</th></tr></thead><tbody>
-<tr><td>CPU / Gloo toy</td><td>独立参考、loss/梯度、mask、chunk、TP/CP 边界</td><td>小输入上的算法与分片正确性</td></tr>
-<tr><td>单节点 GPU smoke</td><td>小模型、短序列，实际 optimizer update 与 validation；涉及状态的阶段保存恢复</td><td>目标代码路径与实际后端接通；不等于收敛</td></tr>
-<tr><td>Recipe qualification</td><td>按正式 recipe 跑完，确定时间预算和 recipe 对应阈值，再登记 nightly</td><td>该 recipe 的执行结果；不能只凭 finite loss 宣称收敛</td></tr>
-</tbody></table></div>
-<p>测试不在专用 review checkout 中启动训练。实际 GPU 验证使用独立工作 checkout，通过现有 <code>tools/launch</code> 提交，遵守现有资源与日志规则。临时 instrumentation 用于证明路径激活，验证后移除。</p>
-<h3>哪些 PR 带 recipe</h3><div class="scroll"><table><thead><tr><th>做法</th><th>PR</th><th>说明</th></tr></thead><tbody>
-<tr><td>新增 recipe 和 nightly</td><td>03、06、08、11、13</td><td>各自让一种新的端到端配置能跑起来：新的参数分片方式、第一个 CSD、Megatron 后端、多 teacher、packing。</td></tr>
-<tr><td>不新增，但动现有的</td><td>02、09、10</td><td>02 加一个 functional 级别的 smoke；09 给 Megatron recipe 加版本后缀；10 给 nightly 加一项“owner-local 确实执行了”的检查。</td></tr>
-<tr><td>不需要</td><td>01、04、05、07、12</td><td>靠单测，或靠现有的两个 X-Token nightly。</td></tr>
-</tbody></table></div>
-<p class="note">判断标准：一个 PR 如果让一种新的端到端配置能跑起来，就要有一个 recipe 走到它；只改内部实现或只加工具的，靠单测和现有 nightly。具体要求写在每张卡片的验收里，以“Recipe：”开头。</p>
+<h2>三、最终接口与完成标准</h2>
 <h3>最终接口与行为</h3><ul>
 <li>最终恢复原 PR 有效配置能力和默认行为：PR 06 使用 dense <code>K=0</code>；PR 09 才引入默认 <code>K=128</code>，并一直保留 dense 参考模式。</li>
 <li>有限 K 改变比较的 support，因此 dense/sparse 的一致性检查必须采用相同 support 设置。</li>
