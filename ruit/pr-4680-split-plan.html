@@ -23,32 +23,31 @@
 <li>原 07–12 顺延为 08–13，内容不变。</li>
 </ul>有 <a href="#open">6 项尚未确定</a>，其中两项会影响 PR 05–07 的切法。</div>
 <h2>一、先看依赖与交付顺序</h2>
-<div class="figure"><svg viewBox="0 0 900 612" role="img" aria-labelledby="diagram-title diagram-desc"><title id="diagram-title">13 个 PR 的依赖关系</title><desc id="diagram-desc">01 之后是 05；04 和 05 汇入 06。06 之后是 07，以及按序扩展的 08 到 11。12 依赖 06，13 依赖 08 到 12。02 和 03 独立，不阻塞主线。</desc><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="marker" d="M0,0 L8,4 L0,8 Z"/></marker></defs>
-<text x="20" y="26" class="label">准备 → 可用基线 → 增量能力</text>
-<rect x="20" y="44" width="560" height="56" rx="8"/><a href="#pr-01"><text x="34" y="68">01 · 改名与移动，加已有蒸馏路径的修复</text></a><text x="34" y="89" class="dim">先是纯移动的提交（无逻辑改动），再是修复的提交（X-Token 修复、有效样本计数）</text>
-<rect x="620" y="44" width="260" height="56" rx="8"/><a href="#pr-04"><text x="634" y="68">04 · 子词表工具</text></a><text x="634" y="89" class="dim">建表与校验，可并行审</text>
-<path class="arrow" d="M450 100 V127"/>
-<rect x="320" y="128" width="260" height="56" rx="8"/><a href="#pr-05"><text x="334" y="152">05 · 共用部分重构</text></a><text x="334" y="173" class="dim">loss 基类、trainer 分发点</text>
-<path class="arrow" d="M450 184 V211"/><path class="arrow" d="M750 100 V228 H581"/>
-<rect class="ready" x="320" y="212" width="260" height="56" rx="8"/><a href="#pr-06"><text x="334" y="236">06 · 最小 CSD 端到端</text></a><text x="334" y="257" class="readytext">首个可用：Automodel、单 teacher</text>
-<path class="arrow" d="M320 240 H281"/>
-<rect x="20" y="212" width="260" height="56" rx="8"/><a href="#pr-07"><text x="34" y="236">07 · CSD loss 其余变体</text></a><text x="34" y="257" class="dim">KL、BCE、realized-only 等</text>
-<path class="arrow" d="M580 254 H700 V303"/>
-<rect x="620" y="304" width="260" height="56" rx="8"/><a href="#pr-08"><text x="634" y="328">08 · Megatron dense</text></a><text x="634" y="349" class="dim">后端接入、router replay</text>
-<path class="arrow" d="M620 332 H581"/>
-<rect x="320" y="304" width="260" height="56" rx="8"/><a href="#pr-09"><text x="334" y="328">09 · Sparse teacher IPC</text></a><text x="334" y="349" class="dim">K=128 在本阶段引入</text>
-<path class="arrow" d="M320 332 H281"/>
-<rect x="20" y="304" width="260" height="56" rx="8"/><a href="#pr-10"><text x="34" y="328">10 · Owner-local 优化</text></a><text x="34" y="349" class="dim">与 replicated 参考对照</text>
-<path class="arrow" d="M150 360 V395"/>
-<rect x="20" y="396" width="260" height="56" rx="8"/><a href="#pr-11"><text x="34" y="420">11 · Multi-teacher</text></a><text x="34" y="441" class="dim">同 / 跨 tokenizer、聚合与权重</text>
-<path class="arrow" d="M340 268 V284 H300 V380 H450 V395"/>
-<rect x="320" y="396" width="260" height="56" rx="8"/><a href="#pr-12"><text x="334" y="420">12 · 持久 sample ID</text></a><text x="334" y="441" class="dim">依赖 06，可提前准备</text>
-<rect x="620" y="396" width="260" height="56" rx="8"/><a href="#pr-13"><text x="634" y="420">13 · Lockstep packing</text></a><text x="634" y="441" class="dim">要求 08–12 已合并</text>
-<path class="arrow" d="M280 424 H300 V472 H750 V453"/><path class="arrow" d="M580 424 H619"/>
-<text x="20" y="508" class="label">与 CSD 无关，不阻塞主线</text>
-<rect class="opt" x="20" y="522" width="260" height="56" rx="8"/><a href="#pr-02"><text x="34" y="546">02 · 加载选项与参数冻结</text></a><text x="34" y="567" class="dim">所有算法通用</text>
-<rect class="opt" x="320" y="522" width="260" height="56" rx="8"/><a href="#pr-03"><text x="334" y="546">03 · Megatron-FSDP 接通</text></a><text x="334" y="567" class="dim">所有 Megatron 算法通用</text>
-<text x="20" y="602" class="dim">绿框＝可用基线；虚线框＝独立于 CSD，可随时并行；箭头＝依赖。</text>
+<div class="figure"><svg viewBox="0 0 900 800" role="img" aria-labelledby="diagram-title diagram-desc"><title id="diagram-title">13 个 PR 的依赖关系</title><desc id="diagram-desc">一棵自上而下的树。01 下面是 05，05 和 04 汇入 06。06 下面分三支：07、08、12。08 下面依次是 09、10、11、13；12 也汇入 13。02 和 03 独立，不阻塞主线。</desc><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="marker" d="M0,0 L8,4 L0,8 Z"/></marker></defs>
+<text x="20" y="26" class="label">主线：自上而下，箭头从前置 PR 指向依赖它的 PR</text>
+<rect x="320" y="44" width="260" height="52" rx="8"/><a href="#pr-01"><text x="334" y="66">01 · 改名与移动，加修复</text></a><text x="334" y="85" class="dim">先纯移动的提交，再修复的提交</text>
+<path class="arrow" d="M450 96 V123"/>
+<rect x="320" y="124" width="260" height="52" rx="8"/><a href="#pr-05"><text x="334" y="146">05 · 共用部分重构</text></a><text x="334" y="165" class="dim">loss 基类、trainer 分发点</text>
+<rect x="620" y="124" width="260" height="52" rx="8"/><a href="#pr-04"><text x="634" y="146">04 · 子词表工具</text></a><text x="634" y="165" class="dim">建表与校验，可与 01、05 并行审</text>
+<path class="arrow" d="M450 176 V203"/><path class="arrow" d="M750 176 V230 H581"/>
+<rect class="ready" x="320" y="204" width="260" height="52" rx="8"/><a href="#pr-06"><text x="334" y="226">06 · 最小 CSD 端到端</text></a><text x="334" y="245" class="readytext">首个可用：Automodel、单 teacher</text>
+<path class="arrow" d="M450 256 V283"/><path class="arrow" d="M450 270 H150 V283"/><path class="arrow" d="M450 270 H750 V283"/>
+<rect x="20" y="284" width="260" height="52" rx="8"/><a href="#pr-07"><text x="34" y="306">07 · CSD loss 其余变体</text></a><text x="34" y="325" class="dim">KL、BCE、realized-only 等</text>
+<rect x="320" y="284" width="260" height="52" rx="8"/><a href="#pr-08"><text x="334" y="306">08 · Megatron dense</text></a><text x="334" y="325" class="dim">后端接入、router replay</text>
+<rect x="620" y="284" width="260" height="52" rx="8"/><a href="#pr-12"><text x="634" y="306">12 · 持久 sample ID</text></a><text x="634" y="325" class="dim">只依赖 06，可提前准备</text>
+<text x="20" y="362" class="dim">07 这一支到此为止，</text><text x="20" y="378" class="dim">不挡任何后续 PR。</text>
+<path class="arrow" d="M450 336 V363"/>
+<rect x="320" y="364" width="260" height="52" rx="8"/><a href="#pr-09"><text x="334" y="386">09 · Sparse teacher IPC</text></a><text x="334" y="405" class="dim">K=128 在本阶段引入</text>
+<path class="arrow" d="M450 416 V443"/>
+<rect x="320" y="444" width="260" height="52" rx="8"/><a href="#pr-10"><text x="334" y="466">10 · Owner-local 优化</text></a><text x="334" y="485" class="dim">与 replicated 参考对照</text>
+<path class="arrow" d="M450 496 V523"/>
+<rect x="320" y="524" width="260" height="52" rx="8"/><a href="#pr-11"><text x="334" y="546">11 · Multi-teacher</text></a><text x="334" y="565" class="dim">同 / 跨 tokenizer、聚合与权重</text>
+<path class="arrow" d="M450 576 V603"/><path class="arrow" d="M750 336 V630 H581"/>
+<rect x="320" y="604" width="260" height="52" rx="8"/><a href="#pr-13"><text x="334" y="626">13 · Lockstep packing</text></a><text x="334" y="645" class="dim">要求 08–12 都已合并</text>
+<text x="20" y="696" class="label">与 CSD 无关，不阻塞主线</text>
+<rect class="opt" x="20" y="710" width="260" height="52" rx="8"/><a href="#pr-02"><text x="34" y="732">02 · 加载选项与参数冻结</text></a><text x="34" y="751" class="dim">所有算法通用</text>
+<rect class="opt" x="320" y="710" width="260" height="52" rx="8"/><a href="#pr-03"><text x="334" y="732">03 · Megatron-FSDP 接通</text></a><text x="334" y="751" class="dim">所有 Megatron 算法通用</text>
+<text x="20" y="788" class="dim">绿框＝可用基线；虚线框＝独立于 CSD，可随时并行。中间一列从上到下是关键路径。</text>
 </svg></div>
 <p class="note">图展示主要依赖；完整依赖以总表和卡片为准。dense 表示传完整词表的 logits；sparse 表示只传选定词项及其余概率质量；owner-local 表示每个 GPU 只在自己持有的序列分片上计算；replicated 表示每个 GPU 都拿到完整序列再计算。</p>
 <div class="scroll"><table><thead><tr><th>编号</th><th>交付内容</th><th>前置依赖</th><th>合入时谁在用</th></tr></thead><tbody>
