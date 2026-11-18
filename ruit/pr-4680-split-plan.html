@@ -15,13 +15,6 @@
 <p class="note">前三页是已有功能与审查说明；本页只讨论如何拆分；第五页是 PR 作者自己提出的另一份拆分方案。前三页的审查结论不由本方案重新判定。</p>
 <p>目标是完整保留原 PR 的有效能力：先把已有文件改到合适的名字和目录，合入能独立验证的修复，再交付最小可用的 CSD，最后逐项增加后端与优化。有一条贯穿全部拆分的规则：<strong>每个 PR 合入时，它带来的代码都要有调用方</strong>，不先合一块等后面的 PR 来用。</p>
 <div class="stats"><div class="stat"><strong>33,836</strong><span>原 PR 改动行：新增 33,011、删除 825</span></div><div class="stat"><strong>13</strong><span>建议的功能与修复单元</span></div><div class="stat"><strong>PR 06</strong><span>首个完整可用的 CSD</span></div><div class="stat"><strong>2</strong><span>个与 CSD 无关、不阻塞主线的 PR</span></div></div>
-<div class="callout"><strong>和上一版（12 个 PR）相比改了什么</strong><ul>
-<li><a href="#pr-01">PR 01</a> 现在包含两部分：采纳作者方案里的“先改名与移动”，加上原来的修复。两部分在同一个 PR 里分成先后的提交。</li>
-<li>原来单独的“分片 loss 基础算子”不再存在：没有调用方的算子不单独合入，每个算子跟着第一个用它的 PR 走。</li>
-<li>原来的“基础 CSD”太大，拆成三步：<a href="#pr-05">PR 05</a> 抽出两种方法共用的部分，<a href="#pr-06">PR 06</a> 交付只含默认路径的最小 CSD，<a href="#pr-07">PR 07</a> 补上其余 loss 变体。</li>
-<li><a href="#pr-02">PR 02</a>、<a href="#pr-03">PR 03</a> 核实后确认与 X-Token 和 CSD 都无关，标为不阻塞主线。</li>
-<li>原 07–12 顺延为 08–13，内容不变。</li>
-</ul>有 <a href="#open">6 项尚未确定</a>，其中两项会影响 PR 05–07 的切法。</div>
 <h2>一、先看依赖与交付顺序</h2>
 <div class="figure"><svg viewBox="0 0 900 800" role="img" aria-labelledby="diagram-title diagram-desc"><title id="diagram-title">13 个 PR 的依赖关系</title><desc id="diagram-desc">一棵自上而下的树。01 下面是 05，05 和 04 汇入 06。06 下面分三支：07、08、12。08 下面依次是 09、10、11、13；12 也汇入 13。02 和 03 独立，不阻塞主线。</desc><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="marker" d="M0,0 L8,4 L0,8 Z"/></marker></defs>
 <text x="20" y="26" class="label">主线：自上而下，箭头从前置 PR 指向依赖它的 PR</text>
