@@ -167,6 +167,7 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255
 <p class="pcref">With the slice, the same run stores <code>[-0.5, -0.25]</code>, which matches native. <code>append_arrays</code> keeps its 1-column check, so a wrong caller still fails loudly.</p>
 
 <div class="warn"><b>The consequence.</b> As written, one top-k request on the same engine, captured or not, fails every in-flight request on that frontend and stops it serving. Fix the slice before merge. Then run the PR's unchecked “captured serving smoke” box with a <code>top_logprobs=0</code> captured request running alongside a <code>top_logprobs=2</code> request.</div>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5266#discussion_r4610529740">review comment C3 — patches.py:91</a></p>
 
 </div>
 </body>
