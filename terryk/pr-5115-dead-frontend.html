@@ -116,10 +116,10 @@ svg .ahrf{fill:var(--red)}svg .ahgf{fill:var(--green)}
 <div class="status"><dl>
 <dt>Before</dt><dd>One frontend (#4979). If it died, every Gym session retried it forever and the run stopped with no error. RL never checked it after startup.</dd>
 <dt>This PR</dt><dd>Several frontends, each able to reach every engine. Each one still fails alone the same way: only its own sessions hang, but the step waits on them, so the run still stops. (With forest training, Gym gives up after 3 tries and those rollouts fail instead.)</dd>
-<dt>Status</dt><dd><span class="verdict open">Open, not fixed in this PR.</span> Raised as C21 (Gym sends the call to another frontend) and C22 (RL restarts a dead frontend and stops the run if it keeps dying), in a review that is still pending.</dd>
+<dt>Status</dt><dd><span class="verdict open">Open, not fixed in this PR.</span> Raised as C21 (RL turns on two options Gym already has: route around a failing URL, and a time limit on retries) and C22 (optional: restart a dead frontend), in a review that is still pending.</dd>
 </dl></div>
 <div class="bg"><b>Background.</b> A Dynamo <span class="tip" tabindex="0" data-tip="A CPU process that takes OpenAI-style HTTP calls, renders chat, and picks an engine with its own router.">frontend</span> takes Gym's chat calls and passes each one to any of the vLLM engines. With <code>num_frontends: 3</code>, Gym gets 3 URLs and keeps each <span class="tip" tabindex="0" data-tip="One Gym rollout: all its turns. Gym sends every turn of a session to the same URL.">session</span> on one of them. The engines run on GPUs and hold the calls; a frontend holds nothing the run needs to keep. Dotted words have a short explanation: hover or tap them.</div>
-<p>Gym picks a URL per session by hashing the session id (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2803-L2826"><code>_resolve_client</code></a>). When that URL refuses the connection, Gym's HTTP client waits 0.5 s and tries the same URL again (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L818">http_client.py L818</a>). It has no limit, because RL sets neither of the two options that would add one (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L1166-L1170">app.py L1166-L1170</a>); Gym's own comment says "a client retries a refused connection forever" (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L714-L717">L714-L717</a>). On the RL side, the driver reads the frontends' exit codes only while it waits for them at startup (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L669">L669</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L715-L730"><code>_assert_services_alive</code></a>), and nothing restarts a frontend.</p>
+<p>Gym picks a URL per session by hashing the session id (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2803-L2826"><code>_resolve_client</code></a>). When that URL refuses the connection, Gym's HTTP client waits 0.5 s and tries the same URL again (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L818">http_client.py L818</a>). It has no limit, because RL leaves Gym's limits off: <code>route_around_failing_endpoints</code> and <code>endpoint_connection_retry_timeout_s</code> both exist and default to off (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L1166-L1170">app.py L1166-L1170</a>); Gym's own comment says "a client retries a refused connection forever" (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L714-L717">L714-L717</a>). On the RL side, the driver reads the frontends' exit codes only while it waits for them at startup (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L669">L669</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L715-L730"><code>_assert_services_alive</code></a>), and nothing restarts a frontend.</p>
 
 <h2>One frontend dies: this PR, and the proposed fix</h2>
 <div class="scroll"><svg viewBox="0 0 1060 560" role="img" aria-label="One frontend dies: what happens in this PR and with the proposed fix">
@@ -168,21 +168,21 @@ svg .ahrf{fill:var(--red)}svg .ahgf{fill:var(--green)}
 <text class="n" x="38" y="453">✂ A cut for s2 s5 sent to F1 fails; they regenerate after restore (safe).</text>
 
 <!-- ================= RIGHT: PROPOSED ================= -->
-<text class="colh" x="544" y="24">Proposed (C21 + C22), not implemented</text>
+<text class="colh" x="544" y="24">Proposed: C21 (+ optional C22), not implemented</text>
 <text class="n" x="544" y="41">Same 3 frontends, 4 engines and 6 sessions</text>
 <rect class="box" x="556" y="54" width="476" height="48" rx="6"/>
 <text class="t" x="566" y="72">NeMo-Gym</text>
-<text class="d" x="566" y="90">s2 → F0 and s5 → F2 after F1 refuses   (C21)</text>
+<text class="d" x="566" y="90">route_around_failing_endpoints: true   (C21)</text>
 <path class="arr" d="M631,102 L631,150"/><text class="d" x="637" y="132">s1 s4 s2</text>
-<path class="arrr" d="M793,102 L793,150"/><text class="r" x="801" y="122">② refused once</text>
-<text class="o" x="801" y="136">③ resend elsewhere</text>
+<path class="arrr" d="M793,102 L793,150"/><text class="r" x="801" y="122">② 8 tries, then fail</text>
+<text class="o" x="801" y="136">③ 3 fails: skip F1</text>
 <path class="arr" d="M955,102 L955,150"/><text class="d" x="961" y="132">s3 s6 s5</text>
 
 <rect class="same" x="556" y="152" width="150" height="62" rx="8"/>
 <text class="t" x="566" y="172">F0</text><text class="d" x="566" y="190">serving s1 s4 s2</text>
 <rect class="new" x="718" y="152" width="150" height="62" rx="8"/>
-<text class="o" x="728" y="172">F1 · restarting</text><text class="d" x="728" y="190">same port, same files</text>
-<text class="d" x="728" y="205">④ watcher relaunches it</text>
+<text class="o" x="728" y="172">F1 · skipped by Gym</text><text class="d" x="728" y="190">one trial call / 60 s</text>
+<text class="d" x="728" y="205">④ C22: restart it</text>
 <rect class="same" x="880" y="152" width="150" height="62" rx="8"/>
 <text class="t" x="890" y="172">F2</text><text class="d" x="890" y="190">serving s3 s6 s5</text>
 
@@ -194,22 +194,22 @@ svg .ahrf{fill:var(--red)}svg .ahgf{fill:var(--green)}
 <rect class="same" x="919" y="264" width="113" height="40" rx="6"/><text class="t" x="929" y="289">e3 · fine</text>
 <text class="n" x="556" y="324">s2 and s5 restart from their prompt on another frontend.</text>
 
-<rect class="new" x="556" y="336" width="476" height="52" rx="6"/>
+<rect class="same" x="556" y="336" width="476" height="52" rx="6"/>
 <text class="t" x="566" y="355">v2 driver</text>
-<text class="o" x="566" y="372">⑤ before each rollout: is any frontend past its restart cap?</text>
-<text class="d" x="566" y="384">cap e.g. 5 restarts in 10 min → raise with its URL + exit code</text>
+<text class="g" x="566" y="372">⑤ re-sends the prompts whose calls failed (already in v2)</text>
+<text class="d" x="566" y="384">max_infra_attempts_per_prompt: 5 · by then Gym skips F1</text>
 
 <rect class="same" x="556" y="400" width="476" height="62" rx="6"/>
 <text class="g" x="566" y="419">Result: all 6 sessions finish.</text>
-<text class="n" x="566" y="437">F1 comes back on the URL Gym already has and takes sessions again.</text>
-<text class="n" x="566" y="453">If it keeps dying, the run stops with an error that names it.</text>
+<text class="n" x="566" y="437">If F1 comes back (C22), Gym's trial call gives it sessions again.</text>
+<text class="n" x="566" y="453">If every frontend dies, prompts drop and the run stops with an error.</text>
 
 <!-- legend -->
 <rect class="same" x="28" y="488" width="14" height="14" rx="3"/><text class="n" x="48" y="500">working</text>
 <rect class="bad" x="128" y="488" width="14" height="14" rx="3"/><text class="n" x="148" y="500">the problem</text>
 <rect class="new" x="250" y="488" width="14" height="14" rx="3"/><text class="n" x="270" y="500">proposed change</text>
 <text class="n" x="28" y="526">① F1's in-flight calls are lost: their replies have nowhere to go. ② Gym's next call to F1 is refused.</text>
-<text class="n" x="28" y="544">③ C21: Gym resends to another frontend. ④ C22: FrontendHost restarts F1. ⑤ C22: the driver stops the run if restarts run out.</text>
+<text class="n" x="28" y="544">③ C21: RL turns on Gym's existing route-around. ④ C22 (optional): FrontendHost restarts F1. ⑤ v2's existing prompt retry.</text>
 </svg></div>
 <div class="scroll"><table>
 <tr><th>When F1 dies</th><th>What happens</th></tr>
@@ -229,11 +229,11 @@ svg .ahrf{fill:var(--red)}svg .ahgf{fill:var(--green)}
 <tr><td>Can another URL take the call?</td><td>Not without that engine</td><td>Yes: every frontend reaches every engine</td></tr>
 <tr><td>Restart cost</td><td>A GPU worker and its weights</td><td>One CPU process; it has no state the run needs</td></tr>
 </table></div>
-<p>So the hang is not new in this PR, and #4979 had it with one frontend. What this PR changes is that the fix is now cheap: there are other frontends to fall back on, and a frontend is easy to restart.</p>
+<p>So the hang is not new in this PR, and #4979 had it with one frontend. What this PR changes is that the fix is now cheap: there are other frontends to fall back on, and Gym already knows how to fall back. C21's two settings apply whenever Gym gets more than one URL, so they cover the native path too.</p>
 
 <h2>The fix, as pseudocode (proposed, not implemented)</h2>
-<p class="where"><b>Where the fix lands: Gym and RL.</b> C21: Gym's <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2803-L2826"><code>vllm_model</code></a> resends a refused call to another URL, behind a config flag; RL turns the flag on for Dynamo. C22: RL only, in <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L275-L362"><code>FrontendHost</code></a> and the driver.</p>
-<p class="pclbl">C21 · a Gym call, before</p>
+<p class="where"><b>Where the fix lands: RL only, one function.</b> C21: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3084"><code>_build_gym_actor_config</code></a> sets two defaults on Gym's <code>vllm_model</code> block. <b>No Gym change:</b> the pinned Gym already has both options. C22 (optional): <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L275-L362"><code>FrontendHost</code></a>.</p>
+<p class="pclbl">Gym today (options off): a call to a dead URL</p>
 <pre class="pc"><span class="who"># Gym vllm_model · serving event loop, one task per call</span>
 def chat(session, call):
     url = pinned[session] or urls[hash(session) % 3]  <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2803-L2826">_resolve_client</a></span>
@@ -241,44 +241,54 @@ def chat(session, call):
     while True:                                       <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L1166-L1170">max_connection_retries=None</a></span>
         try: return await post(url, call)
         except ConnectionRefused: await <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L818">sleep(0.5)</a>    <span class="cm"># same url, no limit</span></pre>
-<p class="pclbl">C21 · a Gym call, after</p>
-<pre class="pc"><span class="who"># Gym vllm_model · serving event loop, one task per call</span>
+<p class="pclbl">Gym with route_around_failing_endpoints: true (existing Gym code, no change)</p>
+<pre class="pc"><span class="who"># Gym vllm_model with route_around_failing_endpoints: true (already in Gym)</span>
 def chat(session, call):
-    url = pinned[session] or urls[hash(session) % 3]
-<span class="add">    for url in [url] + other_urls(url):             <span class="cm"># every frontend reaches every engine</span></span>
-        ticket.backend = url                        <span class="cm"># the cut follows the call</span>
-<span class="add">        try: return await post(url, call)           <span class="cm"># a few retries per url</span></span>
-<span class="add">        except ConnectionRefused: mark_failed(url)  <span class="cm"># never sent, so safe to resend</span></span>
-<span class="add">    raise AllFrontendsDown                          <span class="cm"># a clear error, not a hang</span></span></pre>
-<p class="pcref">A refused connection means the call was never sent (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L660-L666"><code>is_unsent_connection_failure</code></a>), so sending it elsewhere is safe in every Gym mode, forest training included. Real code: <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2803-L2826"><code>_resolve_client</code></a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L755-L890">the retry loop</a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/models/_checkpoint.py#L320-L324"><code>note_generation_backend</code></a>.</p>
-<p class="pclbl">C22 · a frontend, before</p>
+    url = pinned[session]
+    if url failed and not due its 60 s trial: url = a working url  <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2854-L2868">_endpoint_serves</a></span>
+    ticket.backend = url                                           <span class="cm"># the cut follows the session</span>
+    for try in 1..8:                                               <span class="cm"># endpoint_connection_retries</span>
+        try: return await post(url, call)
+        except ConnectionRefused: await <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L818">sleep(0.5)</a>
+    count failure on url; 3 in a row: mark url failed              <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2889-L2908">_note_endpoint_failure</a></span>
+    raise                                                          <span class="cm"># v2 sends the prompt again</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2803-L2826"><code>_resolve_client</code></a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2839-L2852"><code>_assign_client</code></a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2854-L2868"><code>_endpoint_serves</code></a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2889-L2908"><code>_note_endpoint_failure</code></a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L755-L890">the retry loop</a>.</p>
+<p class="pclbl">C21 · RL's Gym config, before</p>
+<pre class="pc"><span class="who"># v2 driver · building each Gym actor&#x27;s config</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3084">_build_gym_actor_config</a>(cfg, base_urls):
+    if dynamo: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3132">_apply_dynamo_dialect</a>(cfg)  <span class="cm"># sets dynamo_frontend, reasoning_field</span>
+    ...                                    <span class="cm"># nothing about failover</span></pre>
+<p class="pclbl">C21 · RL's Gym config, after</p>
+<pre class="pc"><span class="who"># v2 driver · building each Gym actor&#x27;s config</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3084">_build_gym_actor_config</a>(cfg, base_urls):
+    if dynamo: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3132">_apply_dynamo_dialect</a>(cfg)
+<span class="add">    if len(base_urls) &gt; 1:                                                  <span class="cm"># native and Dynamo alike</span></span>
+<span class="add">        vllm_model.setdefault(&quot;route_around_failing_endpoints&quot;, True)       <span class="cm"># 8 tries, then skip the url</span></span>
+<span class="add">        vllm_model.setdefault(&quot;endpoint_connection_retry_timeout_s&quot;, 60.0)  <span class="cm"># time cap per call</span></span>
+    ...</pre>
+<p class="pcref"><code>setdefault</code> keeps any value a recipe sets itself. Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3054-L3081"><code>_apply_dynamo_dialect</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3084"><code>_build_gym_actor_config</code></a>.</p>
+<p class="pclbl">C22 (optional) · a frontend, before</p>
 <pre class="pc"><span class="who"># FrontendHost actor · one per frontend, 0 CPU, pinned to its node</span>
 def start(cmd):
     port = free_port()
     proc = launch(cmd, port)  <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L326">_ServiceProcess</a></span>
-    return url(port)          <span class="cm"># handed to Gym once</span>
-<span class="who"># v2 driver</span>
-def <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L651">wait_for_engines</a>():       <span class="cm"># startup only</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L715-L730">_assert_services_alive</a>()  <span class="cm"># the only read of a frontend&#x27;s exit code</span></pre>
-<p class="pclbl">C22 · a frontend, after</p>
+    return url(port)          <span class="cm"># nothing watches proc after this</span></pre>
+<p class="pclbl">C22 (optional) · a frontend, after</p>
 <pre class="pc"><span class="who"># FrontendHost actor · one per frontend, 0 CPU, pinned to its node</span>
 def start(cmd):
     port = free_port()
     proc = launch(cmd, port)
-<span class="add">    start_thread(watch, cmd, port)                   <span class="cm"># new watcher thread in the actor</span></span>
+<span class="add">    start_thread(watch, cmd, port)  <span class="cm"># new watcher thread in the actor</span></span>
     return url(port)
-<span class="add">def watch(cmd, port):                                <span class="cm"># watcher thread</span></span>
+<span class="add">def watch(cmd, port):               <span class="cm"># watcher thread</span></span>
 <span class="add">    while True:</span>
 <span class="add">        code = proc.wait()</span>
 <span class="add">        log(url(port), code)</span>
-<span class="add">        if restarts_in(10 min) &gt;= 5: failed = code; return</span>
-<span class="add">        proc = launch(cmd, port)                     <span class="cm"># same port, same chat files</span></span>
-<span class="who"># v2 driver, before each rollout</span>
-<span class="add">for host in frontends:</span>
-<span class="add">    if host.failed(): raise RuntimeError(url, code)  <span class="cm"># an error, not a hang</span></span></pre>
-<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L288-L329"><code>FrontendHost.start</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L569-L604"><code>_start_frontends</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L651-L713"><code>wait_for_engines</code></a>.</p>
-<p>The two fixes help each other. While F1 restarts, C21 sends its calls elsewhere. Once F1 is back on the same URL, Gym's sessions can use it again. If F1 keeps dying, C22 stops the run with an error that names F1, instead of a silent hang.</p>
-<div class="hl"><b>So what.</b> Today, one frontend crash stops training without an error, even though the GPUs and the other frontends are fine. With several frontends, that is avoidable. Ask Gym to send a refused call to another frontend (C21), and ask RL to restart a dead frontend on the same port, failing loudly when restarts run out (C22).</div>
+<span class="add">        if restarts_in(10 min) &gt;= 5: log(&quot;giving up&quot;); return</span>
+<span class="add">        proc = launch(cmd, port)    <span class="cm"># same port, same chat files</span></span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L288-L329"><code>FrontendHost.start</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L569-L604"><code>_start_frontends</code></a>.</p>
+<p>The few calls that fail before Gym switches are re-sent by v2 (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/algorithms/single_controller_utils/config.py#L163"><code>max_infra_attempts_per_prompt: 5</code></a>). If every frontend dies, every call fails, prompts are dropped, and the run stops with an error (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/algorithms/single_controller_utils/config.py#L190"><code>max_consecutive_dropped_prompts: 0</code></a>). C22 is only about getting the dead frontend's capacity back.</p>
+<div class="hl"><b>So what.</b> Today, one frontend crash stops training with no error, even though the GPUs and the other frontends are fine. Gym can already route around a dead URL and cap its retries; RL just has to turn that on when Gym gets more than one URL (C21). Restarting the dead frontend (C22) is a nice-to-have.</div>
 </div>
 </body>
 </html>
