@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5158 — how a prompt group picks its harness</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--orange)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.bg{border:1px dashed var(--border);border-radius:8px;padding:8px 14px;margin:0 0 14px;font-size:14px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .newbox{fill:var(--surface);stroke:var(--green);stroke-width:1.6}
+svg .same{fill:var(--surface2);stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 3}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .lblb{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .data{fill:var(--orange);font:11.5px ui-monospace,Menlo,monospace}
+svg .oc{fill:var(--green);opacity:.55}
+svg .pi{fill:var(--accent);opacity:.55}
+svg .tick{stroke:var(--text);stroke-width:2}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.hl{border-left:3px solid var(--accent);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+table{border-collapse:collapse;font-size:13.5px;margin:8px 0;width:100%}
+td,th{border:1px solid var(--border);padding:5px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How one taskset now trains on several harnesses: each prompt group picks one</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5158">NVIDIA-NeMo/RL #5158</a> · all links pinned to head <code>824c116</code></p>
+
+<div class="status"><dl>
+  <dt>Before</dt><dd>A taskset maps to exactly one Gym server in <code>environment_server_routes</code>. Every prompt group of that taskset runs on the same agent harness.</dd>
+  <dt>This PR</dt><dd>Adds <code>env.nemo_gym.multi_harness</code>: a taskset lists several servers, and each prompt group picks one of them by hashing its group ID onto the weights.</dd>
+  <dt>Status</dt><dd><span class="verdict open">New feature, under review.</span> The design works for harnesses of different agent types. Harnesses that share one agent type are refused at startup; see the second page.</dd>
+</dl></div>
+
+<nav class="chain">
+  <span class="here">1 · how a group picks its harness</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5158-same-type-harnesses.html">2 · same-type harnesses refused</a>
+</nav>
+<p class="chainnote">Two pages on this PR, one question each. This one: what the new route does next to the old one.</p>
+
+<div class="bg"><b>Background.</b> A <span class="tip" tabindex="0" data-tip="A named set of tasks in a Gym dataset, e.g. swe_rebench. Each task row carries task_id.taskset.">taskset</span> is a group of tasks. A <span class="tip" tabindex="0" data-tip="A Gym server entry that runs one agent on a task and has it scored. Examples: single_agent_turn, legacy_agent, harbor.">Gym Environment Server</span> runs one agent harness (OpenCode, Pi, …) on a task. GRPO scores each answer against its <b>prompt group's</b> mean reward, so all answers in one group must come from the same harness, or the model learns the gap between harnesses. Dotted words have a short explanation: hover or tap them.</div>
+
+<p>Both paths end the same way: RL writes the chosen server name into the row as
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L326-L335"><code>row["_ng_environment_server"]</code></a>,
+and Gym sends the row to that server. The only new step is how the name is chosen.
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L3364-L3390"><code>get_nemo_gym_route_name</code></a>
+now checks <code>multi_harness</code> first. For a listed taskset it calls
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym_multi_harness.py#L163-L194"><code>select(taskset, group_id)</code></a>.
+That hashes the group ID to a number in [0, 1) and finds which harness's slice of the weights it lands in.
+The hash needs no saved state, so the driver, every Gym actor and every retry pick the same server.</p>
+
+<svg viewBox="0 0 940 470" role="img" aria-label="Old and new route for three prompt groups">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--dim)"/></marker></defs>
+<text x="20" y="22" class="hdr">Before: one server per taskset</text>
+<text x="490" y="22" class="hdr">After: multi_harness, weights opencode_agent 3 · pi_agent 1</text>
+
+<!-- input rows -->
+<rect x="20" y="36" width="430" height="44" rx="6" class="box"/>
+<text x="32" y="55" class="lbl">rows of groups g8, g9, g10</text>
+<text x="32" y="72" class="data">{task_id:{taskset:"swe"}, _ng_group_id:"g8"} …</text>
+<rect x="490" y="36" width="430" height="44" rx="6" class="box"/>
+<text x="502" y="55" class="lbl">same rows of groups g8, g9, g10</text>
+<text x="502" y="72" class="data">{task_id:{taskset:"swe"}, _ng_group_id:"g8"} …</text>
+<path d="M235,80 V104" class="arr"/><path d="M705,80 V104" class="arr"/>
+
+<!-- route step -->
+<rect x="20" y="106" width="430" height="70" rx="6" class="box"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L3381-L3390"><text x="32" y="126">get_nemo_gym_route_name</text></a>
+<text x="32" y="146" class="lbl">environment_server_routes["swe"]</text>
+<text x="32" y="166" class="data">→ "swe_opencode" for every group</text>
+
+<rect x="490" y="106" width="430" height="180" rx="6" class="newbox"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L3377-L3380"><text x="502" y="126">get_nemo_gym_route_name → covers("swe")</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym_multi_harness.py#L182-L191"><text x="502" y="146">select("swe", group_id): sha256 → [0, 1)</text></a>
+<!-- weight bar 0..1, opencode 0..0.75 pi 0.75..1, width 360 from x=520 -->
+<rect x="520" y="178" width="270" height="22" class="oc"/>
+<rect x="790" y="178" width="90" height="22" class="pi"/>
+<text x="530" y="194" class="lbl">opencode_agent 3/4</text>
+<text x="796" y="194" class="lbl">pi 1/4</text>
+<text x="516" y="214" class="note">0</text><text x="783" y="214" class="note">0.75</text><text x="876" y="214" class="note">1</text>
+<!-- ticks: g9 .426 -> 520+.426*360=673 ; g8 .519 -> 707 ; g10 .791 -> 805 -->
+<line x1="673" y1="170" x2="673" y2="204" class="tick"/><text x="652" y="166" class="data">g9 .426</text>
+<line x1="707" y1="170" x2="707" y2="204" class="tick"/><text x="702" y="166" class="data">g8 .519</text>
+<line x1="805" y1="170" x2="805" y2="204" class="tick"/><text x="790" y="166" class="data">g10 .791</text>
+<text x="502" y="238" class="data">g8 → "swe_opencode"   g9 → "swe_opencode"</text>
+<text x="502" y="256" class="data">g10 → "swe_pi"</text>
+<text x="502" y="276" class="note">Same group ID → same pick in driver, every actor, every retry.</text>
+
+<path d="M235,176 V316" class="arr"/><path d="M705,286 V316" class="arr"/>
+
+<!-- converge -->
+<rect x="20" y="318" width="900" height="56" rx="6" class="same"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L313-L335"><text x="32" y="340">_prepare_materialized_nemo_gym_rows</text></a>
+<text x="32" y="362" class="lbl">row["_ng_environment_server"] = server  → Gym runs the row there. Same code from here on.</text>
+<path d="M235,374 V400" class="arr"/><path d="M705,374 V400" class="arr"/>
+
+<!-- metrics -->
+<rect x="20" y="402" width="430" height="56" rx="6" class="box"/>
+<text x="32" y="422" class="lbl">metrics</text>
+<text x="32" y="442" class="data">swe/reward/mean</text>
+<rect x="490" y="402" width="430" height="56" rx="6" class="newbox"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym_multi_harness.py#L379-L386"><text x="502" y="422">result["_ng_harness"] → harness_metric_namespace</text></a>
+<text x="502" y="442" class="data">swe/opencode_agent/reward/mean, swe/pi_agent/…</text>
+</svg>
+<p class="note" style="color:var(--dim);font-size:12.5px;margin-top:-6px">Green border = new in this PR. Blue dashed = where the two paths become one. The hash values are real outputs of <code>select()</code>'s formula for these group IDs. The bar shows each harness's share of the weights; a group goes to the slice its hash lands in.</p>
+
+<h2>The route, as pseudocode</h2>
+<p class="pclbl">Pick a server for one row — after (the before is the last two lines alone)</p>
+<pre class="pc"><span class="who"># driver, and again on each Gym actor before the row is sent</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L3364">route</a>(row):
+    taskset = row.task_id.taskset
+<span class="add">    if multi_harness.covers(taskset):</span>
+<span class="add">        u = sha256("v1" + row.group_id)[:8] / 2**64</span>      <span class="cm"># same group → same u everywhere</span>
+<span class="add">        return slice_of(u, weights_of(taskset)).server</span>  <span class="cm"># weights keyed by agent TYPE</span>
+    return environment_server_routes[taskset]          <span class="cm"># the old path, unchanged</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L3364-L3390"><code>get_nemo_gym_route_name</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym_multi_harness.py#L163-L194"><code>MultiHarnessRoutes.select</code></a>.</p>
+
+<p class="pclbl">Startup — new</p>
+<pre class="pc"><span class="who"># driver, once, after the Gym actors are up</span>
+<span class="add">infos  = actor.<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L1781-L1805">describe_environment_servers</a>(listed)</span>   <span class="cm"># each actor reads its own Gym config</span>
+<span class="add">routes = <a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym_multi_harness.py#L279-L376">resolve_multi_harness</a>(cfg, infos)</span>      <span class="cm"># one agent type per server; types must differ</span>
+<span class="add">for a in actors: a.<a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L1806-L1808">set_multi_harness_routes</a>(routes)</span>  <span class="cm"># driver and actors share one table</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L4079-L4140"><code>_install_multi_harness_routes</code></a>.</p>
+
+<h2>What still differs, and why keep both</h2>
+<table>
+<tr><th></th><th><code>environment_server_routes</code></th><th><code>multi_harness.routes</code></th></tr>
+<tr><td>Servers per taskset</td><td>one</td><td>several, one per harness</td></tr>
+<tr><td>Who picks</td><td>the config</td><td>hash of the group ID, weighted by agent type</td></tr>
+<tr><td>Metric names</td><td><code>swe/reward/mean</code></td><td><code>swe/&lt;agent&gt;/reward/mean</code>; no <code>swe/reward/…</code> key</td></tr>
+<tr><td>Startup checks</td><td>route exists</td><td>each server runs one agent; servers of a taskset run <i>different agent types</i>, one server type, one verifier</td></tr>
+<tr><td>Resume</td><td>nothing new</td><td>with token capture, a restored group must land on the same agent type, or the run stops</td></tr>
+</table>
+<p>Both stay: a taskset with one harness keeps the simple route, and a taskset goes in exactly one of the two (setup refuses both).</p>
+
+<div class="hl"><b>So what.</b> Groups never mix harnesses, and the split follows the weights without any saved state. That is the right shape for GRPO. The catch is the <i>agent type</i> rule in the startup checks: Gym often runs several harnesses under one agent type, and those configs are refused. <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5158-same-type-harnesses.html">Page 2</a> shows why, and the fix.</div>
+
+</div>
+</body>
+</html>
