@@ -9,10 +9,10 @@
 <button id="theme-toggle" type="button" aria-label="切换明暗主题">切换主题</button><main class="wrap">
 <p class="eyebrow">CSD · 作者的拆分方案</p><h1>PR 作者提出的拆法：<br>5 个依次合并的 PR</h1>
 
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4680">NVIDIA-NeMo/RL #4680</a> · 作者提案日期 2026-11-16</p>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4680">NVIDIA-NeMo/RL #4680</a> · 作者提案日期 2026-11-16 · <a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-author-split-plan-en.html">English</a></p>
 <div class="status"><strong>提案，尚未实施。</strong> 这是 PR 作者在 2026-11-16 提出的拆分方案，本页是它的中文转述，不含评审意见。目前没有移动或删减任何代码；作者希望团队先同意拆法和目录布局。PR 0–4 是方案编号，不是已经创建的 GitHub PR。</div>
 <nav class="chain" aria-label="PR 4680 相关页面"><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-csd-comparison.html">1 · CSD 与 X-Token</a><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-vocab-normalizer.html">2 · loss 归一化问题</a><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-packing-config.html">3 · 架构校验问题</a><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-4680-split-plan.html">4 · PR 拆分方案</a><span class="here" aria-current="page">5 · 作者的拆分方案</span></nav>
-<p class="note">前三页是已有功能与审查说明；第四页是评审方提出的 12 个 PR 的拆分方案；本页是 PR 作者自己的方案，两份方案相互独立。</p>
+<p class="note">前三页是已有功能与审查说明；第四页是评审方提出的拆分方案；本页是 PR 作者自己的方案，两份方案相互独立。</p>
 <p>把 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4680">PR #4680</a>（约 33,000 行新增）拆成 5 个依次合并的 PR；如果保留今天的目录布局，就不需要 PR 0，变成 4 个。每个 PR 单独通过 CI，每次合并后 X-Token 都照常可用。PR #4680 保持打开，作为参考分支，直到最后一块合入。</p>
 <div class="stats"><div class="stat"><strong>~33,000</strong><span>原 PR 新增行</span></div><div class="stat"><strong>5</strong><span>依次合并的 PR（不改目录则为 4）</span></div><div class="stat"><strong>PR 3</strong><span>CSD 首次可以运行</span></div><div class="stat"><strong>PR 4</strong><span>可选：lockstep packing</span></div></div>
 <h2>一、五个 PR：合并顺序与每步之后能用什么</h2>
