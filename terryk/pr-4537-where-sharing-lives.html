@@ -82,8 +82,8 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <div class="wrap">
 
 <h1>Who should decide which training rows share a prefix: the rollout reassembler, or Megatron?</h1>
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4537">NVIDIA-NeMo/RL #4537</a> with its Megatron-LM half,
-<a href="https://github.com/NVIDIA/Megatron-LM/pull/8152">Megatron-LM #8152</a>. Main links pin <code>defdaef4</code> (the PR's merge base); PR links pin <code>1110db98</code>.</p>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4537">NVIDIA-NeMo/RL #4537</a> with its Megatron-LM halves,
+<a href="https://github.com/NVIDIA/Megatron-LM/pull/7914">#7914</a> (model forward) and <a href="https://github.com/NVIDIA/Megatron-LM/pull/8152">#8152</a> (<code>megatron.rl</code> packing library). Main links pin <code>defdaef4</code> (the PR's merge base); PR links pin <code>1110db98</code>.</p>
 
 <div class="status"><dl>
 <dt>Main</dt><dd>Gym records each model call. <code>call_selection</code> picks the calls that train, and the rollout reassembler turns them into rows: one per rollout, or several per rollout with forest training (compaction, branches), sharing one reward and advantage. No row knows it shares tokens with another.</dd>

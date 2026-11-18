@@ -66,7 +66,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <div class="status"><dl>
 <dt>Before</dt><dd>NeMo RL computed every completion's prompt again for each completion, in both the log-probability pass and training.</dd>
 <dt>This PR</dt><dd>Computes each GRPO prompt once per forward, with its completions as branches of a one-level tree.</dd>
-<dt>Status</dt><dd><span class="verdict">Proposed — open, off by default.</span> Needs the unmerged Megatron-LM #8152 (it replaced #7914).</dd>
+<dt>Status</dt><dd><span class="verdict">Proposed — open, off by default.</span> Needs the unmerged Megatron-LM #7914 (model forward) and #8152 (packing library).</dd>
 </dl></div>
 
 <nav class="chain"><a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-batch-forming.html">how the batch is formed</a>
@@ -80,7 +80,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <rect class="panel" x="8" y="8" width="292" height="384" rx="10"/>
 <rect class="panel" x="316" y="8" width="292" height="384" rx="10"/>
 <rect class="panel" x="624" y="8" width="308" height="384" rx="10"/>
-<text class="ph" x="20" y="32">This PR (+ Megatron-LM #8152)</text>
+<text class="ph" x="20" y="32">This PR (+ Megatron-LM #7914, #8152)</text>
 <text class="ph" x="328" y="32">MiniMax Forge</text>
 <text class="ph" x="636" y="32">QwenGyre</text>
 <text class="pq" x="20" y="52">What is shared: one GRPO prompt</text>
