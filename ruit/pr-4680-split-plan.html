@@ -43,21 +43,22 @@
 <text x="20" y="788" class="dim">绿框＝可用基线；虚线框＝独立于 CSD，可随时并行。中间一列从上到下是关键路径。</text>
 </svg></div>
 <p class="note">图展示主要依赖；完整依赖以总表和卡片为准。dense 表示传完整词表的 logits；sparse 表示只传选定词项及其余概率质量；owner-local 表示每个 GPU 只在自己持有的序列分片上计算；replicated 表示每个 GPU 都拿到完整序列再计算。</p>
-<div class="scroll"><table><thead><tr><th>编号</th><th>交付内容</th><th>前置依赖</th><th>合入时谁在用</th></tr></thead><tbody>
-<tr><td><a href="#pr-01">PR 01</a></td><td>改名与移动（trainer、runner 用中性名字，X-Token 文件移入 <code>cross_tokenizer</code> 目录），加已有蒸馏路径的正确性和资源切换</td><td>独立</td><td>X-Token、普通蒸馏、value loss</td></tr>
-<tr><td><a href="#pr-02">PR 02</a></td><td>模型加载选项、参数冻结、配置类型声明</td><td>独立，不阻塞主线</td><td>需要自带一个用到非默认值的 recipe</td></tr>
-<tr><td><a href="#pr-03">PR 03</a></td><td>接通 Megatron-FSDP</td><td>独立，不阻塞主线</td><td>需要自带一个打开开关的 recipe</td></tr>
-<tr><td><a href="#pr-04">PR 04</a></td><td>子词表的建表与校验工具</td><td>PR 01 定下的目录方案</td><td>可直接运行的命令行工具</td></tr>
-<tr><td><a href="#pr-05">PR 05</a></td><td>两种方法共用的部分：loss 基类、trainer 分发点、共用算子</td><td>PR 01</td><td>X-Token</td></tr>
-<tr class="milestone"><td><a href="#pr-06">PR 06</a></td><td>最小 CSD：Automodel 单 teacher、dense、只含默认路径</td><td>PR 04、05</td><td>第一个 CSD recipe 和 nightly</td></tr>
-<tr><td><a href="#pr-07">PR 07</a></td><td>CSD loss 的其余变体</td><td>PR 06</td><td>通过配置选择</td></tr>
-<tr><td><a href="#pr-08">PR 08</a></td><td>Megatron dense CSD 与 router replay</td><td>PR 06；recipe 用到时依赖 02/03</td><td>Megatron CSD recipe</td></tr>
-<tr><td><a href="#pr-09">PR 09</a></td><td>Sparse teacher payload 与 IPC</td><td>PR 08</td><td>默认 K=128 的配置</td></tr>
-<tr><td><a href="#pr-10">PR 10</a></td><td>Owner-local KD 优化</td><td>PR 09</td><td>Megatron 学生</td></tr>
-<tr><td><a href="#pr-11">PR 11</a></td><td>Multi-teacher 与同 tokenizer 快路径</td><td>PR 10</td><td>多 teacher recipe</td></tr>
-<tr><td><a href="#pr-12">PR 12</a></td><td>持久数据身份</td><td>PR 06；同步后续训练能力分支</td><td>CSD collator</td></tr>
-<tr><td><a href="#pr-13">PR 13</a></td><td>Lockstep packing</td><td>PR 08–12</td><td>打开 packing 的配置</td></tr>
+<div class="scroll"><table><thead><tr><th>编号</th><th>交付内容</th><th>前置依赖</th><th>合入时谁在用</th><th>大概规模（新增行，含测试）</th></tr></thead><tbody>
+<tr><td><a href="#pr-01">PR 01</a></td><td>改名与移动（trainer、runner 用中性名字，X-Token 文件移入 <code>cross_tokenizer</code> 目录），加已有蒸馏路径的正确性和资源切换</td><td>独立</td><td>X-Token、普通蒸馏、value loss</td><td>实质改动约 400 行；另有 21 个文件移动、2 个改名、约 1,240 行 loss 原样搬移</td></tr>
+<tr><td><a href="#pr-02">PR 02</a></td><td>模型加载选项、参数冻结、配置类型声明</td><td>独立，不阻塞主线</td><td>需要自带一个用到非默认值的 recipe</td><td>约 400 行</td></tr>
+<tr><td><a href="#pr-03">PR 03</a></td><td>接通 Megatron-FSDP</td><td>独立，不阻塞主线</td><td>需要自带一个打开开关的 recipe</td><td>约 150 行，加一个新 recipe</td></tr>
+<tr><td><a href="#pr-04">PR 04</a></td><td>子词表的建表与校验工具</td><td>PR 01 定下的目录方案</td><td>可直接运行的命令行工具</td><td>约 700 行</td></tr>
+<tr><td><a href="#pr-05">PR 05</a></td><td>两种方法共用的部分：loss 基类、trainer 分发点、共用算子</td><td>PR 01</td><td>X-Token</td><td>约 1,000 到 1,500 行（新增的重构工作，原 PR 里没有对应的 diff）</td></tr>
+<tr class="milestone"><td><a href="#pr-06">PR 06</a></td><td>最小 CSD：Automodel 单 teacher、dense、只含默认路径</td><td>PR 04、05</td><td>第一个 CSD recipe 和 nightly</td><td>约 11,000 行</td></tr>
+<tr><td><a href="#pr-07">PR 07</a></td><td>CSD loss 的其余变体</td><td>PR 06</td><td>通过配置选择</td><td>约 3,000 行</td></tr>
+<tr><td><a href="#pr-08">PR 08</a></td><td>Megatron dense CSD 与 router replay</td><td>PR 06；recipe 用到时依赖 02/03</td><td>Megatron CSD recipe</td><td>约 2,400 行</td></tr>
+<tr><td><a href="#pr-09">PR 09</a></td><td>Sparse teacher payload 与 IPC</td><td>PR 08</td><td>默认 K=128 的配置</td><td>约 4,600 行</td></tr>
+<tr><td><a href="#pr-10">PR 10</a></td><td>Owner-local KD 优化</td><td>PR 09</td><td>Megatron 学生</td><td>约 2,400 行</td></tr>
+<tr><td><a href="#pr-11">PR 11</a></td><td>Multi-teacher 与同 tokenizer 快路径</td><td>PR 10</td><td>多 teacher recipe</td><td>约 1,500 行（其中约 400 行聚合逻辑已在 PR 05 的基类里，实际会更小）</td></tr>
+<tr><td><a href="#pr-12">PR 12</a></td><td>持久数据身份</td><td>PR 06；同步后续训练能力分支</td><td>CSD collator</td><td>约 400 行</td></tr>
+<tr><td><a href="#pr-13">PR 13</a></td><td>Lockstep packing</td><td>PR 08–12</td><td>打开 packing 的配置</td><td>约 5,700 行（含约 1,100 行设计文档）</td></tr>
 </tbody></table></div>
+<p class="note">规模是把原 PR 的 33,011 行新增按文件和所在函数归到各个 PR 后取整得到的，含测试，是粗估。其中 PR 06 和 07 合计约 14,000 行（源码约 8,000、测试约 6,000），两者之间怎么分还没有核实，见<a href="#open">仍需确认</a>。</p>
 <div class="callout"><strong>不能按目录搬运，也不能按层次切。</strong> 同一文件会参与多个阶段，尤其 <code>csd.py</code>、<code>loss_utils.py</code> 和训练控制器，要按函数、分支和 producer/consumer 链路提取。按“算子 → loss → 接入训练”这种层次切，前几块合入时必然没有调用方，所以本方案改为按“已有代码的改造”“可独立运行的工具”“能跑起来的最小功能”“可选的变体”来切。</div>
 <h2>二、13 个 PR 的范围与验收</h2><p class="note">点击标题展开。文件链接指向原 PR 当前 head 的实现，帮助定位待提取代码，不代表拆分后保留相同的文件位置。</p><div class="controls"><button type="button" id="expand-all">全部展开</button><button type="button" id="collapse-all">全部收起</button><button type="button" id="print-plan">打印 / 导出 PDF</button></div>
 <details class="card" id="pr-01"><summary><span class="num">01</span><span class="card-title">改名与移动，加已有蒸馏路径的正确性和资源切换<span class="card-meta">纯移动的提交在前，修复的提交在后 · 依赖：独立</span></span></summary><div class="body"><p class="commit-title">fix(distillation): move cross-tokenizer files under neutral names and correct teacher scoring</p>
@@ -104,7 +105,7 @@
 <h3>本阶段边界</h3><ul><li>不引入任何 CSD 代码或 CSD 配置键。</li><li>X-Token 用不到的算子不进本 PR，跟着第一个用它的 PR 走。</li></ul>
 <h3>风险</h3><p>基类要采用 CSD 那一版的实现（它是 X-Token 版的超集，例如跨进程求和用传入的进程组而不是全局组）。这会改变 X-Token 的代码路径，<strong>不是纯移动</strong>，要有前后对照。</p>
 <h3>验收要求</h3><ul><li>同一输入下，重构前后的 loss、梯度和指标逐项一致。</li><li>X-Token 单测全过；两个 X-Token nightly 做重构前后的对照。</li><li>多 teacher 聚合、学生 CE、同 tokenizer KL 在仓库里各只有一份实现。</li><li><strong>Recipe：不新增。</strong>现有的两个 X-Token nightly 就是重构前后的对照。</li></ul>
-<p class="note">粗估 2,000 到 2,500 行（含测试），未实测。</p>
+<p class="note">粗估 1,000 到 1,500 行（含测试）。这是新增的重构工作，原 PR 里没有对应的 diff，所以没有可以实测的基础。</p>
 <div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/loss_functions.py">nemo_rl/algorithms/loss/loss_functions.py（X-Token loss）</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L333">nemo_rl/algorithms/loss/csd.py:333（CSD loss，对照用）</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/xtoken_off_policy_distillation.py">nemo_rl/algorithms/xtoken_off_policy_distillation.py</a>
 </div></div></details>
 <details class="card" id="pr-06"><summary><span class="num">06</span><span class="card-title">最小 CSD：Automodel 单 teacher、dense、只含默认路径<span class="card-meta">首个可用版本 · 依赖：PR 04、05</span></span></summary><div class="body"><p class="commit-title">feat(csd): add single-teacher dense distillation with Automodel</p>
@@ -112,14 +113,14 @@
 <h3>本阶段不支持</h3><p>Megatron、sparse、owner-local、多 teacher、packing、router replay，以及默认路径之外的 loss 变体。<strong>不支持的取值在配置校验时明确报错</strong>，不保留不可达的实现。</p>
 <h3>接口与代码边界</h3><ul><li>表路径保持 <code>teachers[i].aligner</code>；本阶段只允许一个 teacher。</li><li>不要求 <code>sample_id</code>，其强制要求留到 PR 12。</li><li>dense IPC 重建若改变返回值，在同一个 PR 中更新所有现有调用者与测试。</li><li>不导入未来的 sparse reader 或 owner-local 类型；不为仅存在于原 PR 历史、未发布的配置键增加迁移层。</li><li>决定子词表的指纹是否在加载时校验（见 <a href="#pr-04">PR 04</a>）。</li></ul>
 <h3>验收要求</h3><ul><li>1:1、1:many、many:1、many:many chunk 对照独立概率参考。</li><li>验证 mask、全 masked batch、CE/KD scaling、CP 边界的数值和梯度。</li><li>真实 tokenizer 的 text/chat 输入；小模型至少完成 10 次 optimizer update、validation 和保存恢复。</li><li>nightly 的通过条件要比“loss 是有限值”更严，例如若干步后 loss 低于起始值的某个比例。后面带 recipe 的 PR 沿用这里定下的标准。</li><li>运行 X-Token 回归检查。</li><li><strong>Recipe：新增第一个 CSD recipe 和 nightly。</strong>名字按 main 现在的规则：<code>csd-qwen3-4b-to-llama3.2-1b-1n8g-automodel-tp4cp2</code>，由原 PR 里被禁用的 <code>-dtensor-</code> 版本改造而来。recipe 的 YAML、同名的驱动脚本、<code>nightly.txt</code> 里的一行三样一起加。</li></ul>
-<p class="note">粗估 5,000 到 6,000 行（含测试），未实测，仍超过约 5,000 行的评审预算。这基本是下限：collator、配置、trainer 接入、loss 的核心计算和 recipe 必须同时出现才能跑起来。</p>
+<p class="note">粗估约 11,000 行（含测试，其中测试约占一半），是约 5,000 行评审预算的两倍多，也是本方案里最大的一个 PR。collator、配置、trainer 接入、loss 的核心计算和 recipe 必须同时出现才能跑起来，所以很难再往下切；能不能再小取决于有多少可以挪到 PR 07。</p>
 <div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L2444">nemo_rl/algorithms/loss/csd.py:2444（CSD 的核心计算）</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/data/cross_tokenizer/csd_collate.py">nemo_rl/data/cross_tokenizer/csd_collate.py</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/examples/configs/csd.yaml">examples/configs/csd.yaml</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/examples/configs/recipes/llm/csd-qwen3-4b-to-llama3.2-1b-1n8g-dtensor-tp4cp2.yaml">csd-qwen3-4b-to-llama3.2-1b-1n8g-dtensor-tp4cp2.yaml（待改造的 recipe）</a>
 </div></div></details>
 <details class="card" id="pr-07"><summary><span class="num">07</span><span class="card-title">CSD loss 的其余变体<span class="card-meta">可选的比较方式 · 依赖：PR 06 · 能否这样切<a href="#open">待核实</a></span></span></summary><div class="body"><p class="commit-title">feat(csd): add remaining loss variants</p>
 <h3>纳入范围</h3><ul><li>KL 和 BCE 两种散度。</li><li>realized-only 和 pure-ALM 两种变体，以及它们的有效组合限制。</li><li>从投影矩阵（而不是子词表）取一一对应的 token：<code>common_indices_from_subtoks=false</code>。这条路径要求先用 X-Token 的工具做出投影矩阵。</li><li>放开 PR 06 里对应的配置校验。</li></ul>
 <h3>要顺带决定的一件事</h3><p>原 PR 里 <code>common_indices_from_subtoks</code> 在代码中的默认值是 <code>false</code>，而自带的示例配置显式写了 <code>true</code>。也就是代码默认走的是一条自带配置都不用的路径。本 PR 要么把默认值改成和示例一致，要么去掉默认值、要求显式填写。</p>
 <h3>验收要求</h3><ul><li>每种变体对照独立的概率参考，数值和梯度一致。</li><li>默认路径的结果与 PR 06 合入时一致。</li><li>无效组合在配置校验时报错。</li><li><strong>Recipe：不新增。</strong>每种变体靠数值对照的单测验证，不给每个变体开一个 nightly。</li></ul>
-<p class="note">粗估 2,000 到 3,000 行（含测试），未实测。省下的主要是测试：每种变体都有自己的数值对照。</p>
+<p class="note">粗估约 3,000 行（含测试）。PR 06 和 07 合计约 14,000 行，这里的 3,000 是按变体相关的测试量推的，两者之间的划分还没有核实。</p>
 <div class="refs"><strong>原实现定位</strong><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L151">nemo_rl/algorithms/loss/csd.py:151（CSD 的配置）</a><a href="https://github.com/NVIDIA-NeMo/RL/blob/83248b4789cc6361bc602abe9b13f509f5d7767f/nemo_rl/algorithms/loss/csd.py#L1540">nemo_rl/algorithms/loss/csd.py:1540（一一对应 token 的两种来源）</a>
 </div></div></details>
 <details class="card" id="pr-08"><summary><span class="num">08</span><span class="card-title">Megatron dense CSD 与 router replay<span class="card-meta">增加后端 · 依赖：PR 06；按 recipe 需要依赖 02/03</span></span></summary><div class="body"><p class="commit-title">feat(csd): support Megatron teachers and students</p>
