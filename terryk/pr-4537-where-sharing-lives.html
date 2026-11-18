@@ -88,7 +88,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <div class="status"><dl>
 <dt>Main</dt><dd>Gym records each model call. <code>call_selection</code> picks the calls that train, and the rollout reassembler turns them into rows: one per rollout, or several per rollout with forest training (compaction, branches), sharing one reward and advantage. No row knows it shares tokens with another.</dd>
 <dt>This PR</dt><dd>Adds one column, each row's first-prompt length, behind a flag on the same reassembler. Megatron then works out which rows share, from group id and prompt tokens, and shares only that first prompt. It refuses forest training.</dd>
-<dt>Status</dt><dd><span class="verdict">Proposed — not implemented.</span> The third column below is a design ask for the PR, raised in the review.</dd>
+<dt>Status</dt><dd><span class="verdict">Proposed — draft only, not in #4537.</span> The third column below is a design ask raised in the review. A draft of it, on top of the PR's branch, is open for critique: <a href="https://github.com/terrykong/RL/pull/30">terrykong/RL#30</a>.</dd>
 </dl></div>
 
 <nav class="chain"><a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-batch-forming.html">how the batch is formed</a>
@@ -286,7 +286,7 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916a
 <span class="add">data["shared_prefix_group_id"] = <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L916">row_group_ids</a>(meta)</span>                                  <span class="cm"># from the row&#x27;s group tag</span>
 <span class="add">rows = <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/megatron/data.py#L1038">build_shared_prefix_rows</a>(ids, lengths, prompt_lengths, group_ids)</span>              <span class="cm"># megatron.rl: same group + same prompt tokens</span>
 <span class="add">units = <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1603">plan_shared_prefix_execution_units</a>(rows, budget, M)</span>                           <span class="cm"># stars, forests of stars, dense bins</span></pre>
-<p class="pclbl">Proposed — not implemented, names are placeholders</p>
+<p class="pclbl">Proposed — drafted in <a href="https://github.com/terrykong/RL/pull/30">terrykong/RL#30</a>, not in #4537</p>
 <pre class="pc"><span class="who"># reassembler actor: a subclass, picked by config (like selection_policy)</span>
 <span class="add">class SharedPrefixRolloutReassembler(RolloutReassembler):</span>
 <span class="add">    def row_extras(self, rows, selected_calls):</span>                               <span class="cm"># new hook on the base class</span>

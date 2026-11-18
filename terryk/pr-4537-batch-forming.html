@@ -201,7 +201,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 </ul>
 
 <div class="hl"><b>So what.</b> At the same budget, shared mode does the same number of forwards, each with fewer tokens (24% fewer here), because the budget still counts every row at full length. Raising the budget also cuts the number of forwards: at 3× (1800) this example becomes <b>one forward per rank, 855 tokens instead of 1655</b>. The PR's large-scale run changed both at once, so its speedup mixes the two effects. One thing can undo it: a failed-rollout placeholder row cannot share, and it makes its whole bin run dense.</div>
-<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4251753098">review comment — shared-prefix-execution.md:47 (separate the two effects)</a></p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4611467855">review comment — shared-prefix-execution.md:47 (separate the two effects)</a></p>
 
 </div>
 </body>

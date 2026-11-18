@@ -128,7 +128,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <tr><td>Same numbers as no sharing?</td><td>Same loss formula; BF16 gradients differ slightly, an open question in the <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/docs/design-docs/shared-prefix-execution.md#L161-L172">design doc</a></td><td>Claims "strict mathematical equivalence"</td><td>Not the goal: it changes which tokens are trained</td></tr>
 <tr><td>Reported speed</td><td>26% lower step time on 848 GPUs, measured together with a 3× packing budget and different rollout work, so not prefix sharing alone</td><td>"40x training speedup", no baseline given</td><td>25.2% less forward-backward time with 5 paths vs all paths; its up-to-1.85× end-to-end gains come from GPU scheduling, not the tree</td></tr>
 </table></div>
-<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4251753098">review comment — shared-prefix-execution.md:47 (isolate the speedup)</a></p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4611467855">review comment — shared-prefix-execution.md:47 (isolate the speedup)</a></p>
 
 <h2>What this PR does not do</h2>
 <ul>
