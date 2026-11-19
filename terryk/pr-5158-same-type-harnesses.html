@@ -156,7 +156,7 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04
     return Info(agent=agent, ...)                                           <span class="cm"># weights, _ng_harness, resume check all use it</span></pre>
 <p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym_multi_harness.py#L238-L271"><code>describe_environment_server</code> agent lookup</a>; its only caller, <a href="https://github.com/NVIDIA-NeMo/RL/blob/824c116da72a8dd2af129c8b6a04a2568f3443bc/nemo_rl/environments/nemo_gym.py#L1781-L1805"><code>NemoGym.describe_environment_servers</code></a>, already imports from Gym on the actor.</p>
 <p>No saved run uses the type-based name yet, so changing it breaks no checkpoint. When an entry's name equals its type, as in the PR description's <code>opencode_agent</code> / <code>pi_agent</code> example, the weight keys stay the same.</p>
-<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5158">review comment C1 — nemo_gym_multi_harness.py:269</a></p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5158#discussion_r4623291583">review comment C1 — nemo_gym_multi_harness.py:269</a></p>
 
 <div class="warn"><b>So what.</b> As written, multi-harness training works only when every harness has its own agent type. Gym's own multi-harness benchmarks don't work that way, and they fail at startup with the error above. Naming harnesses by agent entry, using the helper Gym already has, removes the limit and keeps Gym and RL agreeing on which agent a server's results belong to.</div>
 
