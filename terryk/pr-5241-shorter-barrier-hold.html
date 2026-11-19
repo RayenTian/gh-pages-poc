@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5241 — how a rollout snapshot now holds the barrier for less time</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 12px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+.why{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:0 0 18px;border-radius:0 8px 8px 0;font-size:14px}
+.why p{margin:6px 0}
+.bg{border:1px dashed var(--border);border-radius:8px;padding:6px 14px;margin:0 0 16px;font-size:14px;color:var(--dim)}
+.bg p{margin:6px 0}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lblb{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:12px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13.5px -apple-system,sans-serif}
+svg .seq{fill:var(--orange);fill-opacity:.35;stroke:var(--orange)}
+svg .big{fill:var(--accent);fill-opacity:.3;stroke:var(--accent)}
+svg .ok{fill:var(--green);fill-opacity:.35;stroke:var(--green)}
+svg .lane{fill:none;stroke:var(--border);stroke-dasharray:4 3}
+svg .hold{stroke:var(--red);stroke-width:2.5}
+svg .holdt{fill:var(--red);font:bold 13px -apple-system,sans-serif}
+svg a text{text-decoration:underline}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.hl{border-left:4px solid var(--green);background:var(--surface);padding:8px 14px;margin:18px 0 0;border-radius:0 8px 8px 0;font-size:14px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+function wire(){var b=document.getElementById('theme-toggle');if(!b)return;b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+<h1>How a rollout snapshot now holds the data-plane barrier for less time</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5241">PR #5241</a> · stacked on <a href="https://github.com/NVIDIA-NeMo/RL/pull/5139">#5139</a> · permalinks at head <code>96c48d50</code>, removed code at base <code>68bd259c</code></p>
+
+<div class="status"><dl>
+<dt>Before</dt><dd>Under the barrier, a snapshot ran its checks, the recovery-state build and the TQ capture one after another. Gym's check and RL's check each listed the staging partition, with every key's tags.</dd>
+<dt>This PR</dt><dd>Starts all four phases together, builds the recovery state in a worker thread, lists keys without their tags, and lists the staging partition once for both checks.</dd>
+<dt>Status</dt><dd><span class="verdict good">Speedup measured: 15.21 s → 9.84 s hold (CPU, 131k rollouts).</span> One error-handling bug in the new code is open in the review; see the second page.</dd>
+</dl></div>
+
+<nav class="chain">
+<span class="here">1 · shorter barrier hold</span>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5241-hidden-release-error.html">2 · hidden release error</a>
+</nav>
+<p class="chainnote">Two pages on this PR. This one: why the hold got shorter.</p>
+
+<div class="bg">
+<p><b>Background.</b> A <i>rollout snapshot</i> saves in-flight rollouts so a crashed run can resume them. While it captures state, it holds the <span class="tip" tabindex="0" data-tip="A lock on TransferQueue (TQ), the store that holds rollout rows. While held, no TQ write can happen and Gym stays paused.">data-plane barrier</span>, so every rollout waits. The time spent under it is the <i>hold</i>. <span class="tip" tabindex="0" data-tip="The TQ partition where captured tokens wait before a rollout group is finished. At 131k rollouts it has 2.6M keys.">Staging</span> keys are listed to check that every row the saved state points at still exists. Dotted words have a short explanation: hover or tap them.</p>
+</div>
+
+<div class="why">
+<p><b>Why it should be faster.</b> Three changes. (1) The ~9 s <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L632">recovery-state build</a> moves to a thread, so the listings and the capture happen while it runs. (2) The new <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/data_plane/adapters/tq_controller_patch.py#L151"><code>nrl_list_keys</code></a> returns keys only, not every key's tags: 4.84 s → 1.02 s at 2.6M keys. (3) Staging is <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L527">listed once</a>, and Gym's check reuses that listing.</p>
+<p><b>What does not get faster.</b> The build itself (still ~9 s, now the floor of the hold). The listings and the controller capture are calls on one <a href="https://github.com/Ascend/TransferQueue/blob/05d4cc3377bee9b0f2897bbb90914ee20c0aea39/transfer_queue/controller.py#L943">TQ controller actor</a> that runs one call at a time, so they still wait for each other there. The benchmark does not include Gym's check, so the third change is not in the numbers.</p>
+</div>
+
+<h2>Under the barrier: one after another, then side by side</h2>
+<svg viewBox="0 0 940 400" role="img" aria-label="Timeline of barrier phases before and after">
+<text class="hdr" x="14" y="22">Before (#5139): one after another, on the controller event loop</text>
+<rect class="seq" x="150" y="36" width="20" height="30"/><text class="note" x="150" y="80">replay</text>
+<rect class="big" x="170" y="36" width="450" height="30"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/68bd259c7091bd25b7134e11a1b41c7a933c47c2/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L510"><text class="lbl" x="180" y="56">recovery-state build ≈ 9 s</text></a>
+<rect class="seq" x="620" y="36" width="242" height="30"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/68bd259c7091bd25b7134e11a1b41c7a933c47c2/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L531"><text class="lbl" x="628" y="56">staging check, tags 4.84 s</text></a>
+<rect class="seq" x="862" y="36" width="56" height="30"/><text class="note" x="918" y="80" text-anchor="end">TQ capture</text>
+<text class="note" x="14" y="56">one lane</text>
+<line class="hold" x1="150" y1="98" x2="910" y2="98"/><text class="holdt" x="150" y="118">hold 15.21 s</text>
+<text class="note" x="300" y="118">(+ Gym's own staging listing with tags, not in the benchmark)</text>
+
+<text class="hdr" x="14" y="160">After (this PR): four phases start together</text>
+<line class="lane" x1="150" y1="172" x2="920" y2="172"/>
+<text class="note" x="14" y="194">worker thread</text>
+<rect class="big" x="150" y="178" width="450" height="28"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L632"><text class="lbl" x="160" y="197">recovery-state build ≈ 9 s</text></a>
+<text class="note" x="14" y="236">TQ controller</text>
+<text class="note" x="14" y="250">(one call at a time)</text>
+<rect class="ok" x="150" y="222" width="12" height="28"/>
+<rect class="ok" x="162" y="222" width="51" height="28"/>
+<rect class="ok" x="213" y="222" width="40" height="28"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/data_plane/adapters/tq_controller_patch.py#L151"><text class="lbl" x="262" y="241">replay keys · staging keys 1.02 s · controller capture</text></a>
+<text class="note" x="14" y="282">storage units</text>
+<rect class="ok" x="150" y="266" width="40" height="28"/><text class="lbl" x="200" y="285">retain shard views</text>
+<text class="note" x="14" y="326">event loop</text>
+<rect class="ok" x="213" y="310" width="30" height="28"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L512"><text class="lbl" x="252" y="329">Gym's check, then RL's check, on the one staging listing</text></a>
+<line class="hold" x1="150" y1="356" x2="642" y2="356"/><text class="holdt" x="150" y="376">hold 9.84 s ≈ the build</text>
+<rect class="big" x="560" y="368" width="14" height="12"/><text class="note" x="580" y="378">build</text>
+<rect class="seq" x="630" y="368" width="14" height="12"/><text class="note" x="650" y="378">TQ work, before</text>
+<rect class="ok" x="780" y="368" width="14" height="12"/><text class="note" x="800" y="378">TQ work, after</text>
+</svg>
+<p class="pcref">Widths use 50 px per second where the PR measured a number (build, staging listing, totals). Small boxes are not to scale.</p>
+
+<h2>The change, as pseudocode</h2>
+<p class="pclbl">capture(), before</p>
+<pre class="pc"><span class="who"># controller event loop, barrier held</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/68bd259c7091bd25b7134e11a1b41c7a933c47c2/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L884">env.check_against_cut</a>(cut)      <span class="cm"># Gym lists staging itself, with tags</span>
+await <a href="https://github.com/NVIDIA-NeMo/RL/blob/68bd259c7091bd25b7134e11a1b41c7a933c47c2/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L501">check_replay</a>()             <span class="cm"># KV_LIST, with tags</span>
+state = <a href="https://github.com/NVIDIA-NeMo/RL/blob/68bd259c7091bd25b7134e11a1b41c7a933c47c2/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L510">build_recovery_state</a>()  <span class="cm"># ~9 s, on the loop</span>
+await <a href="https://github.com/NVIDIA-NeMo/RL/blob/68bd259c7091bd25b7134e11a1b41c7a933c47c2/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L531">check_staging</a>()            <span class="cm"># lists staging again, with tags</span>
+view = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/68bd259c7091bd25b7134e11a1b41c7a933c47c2/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L550">tq_capture</a>()       <span class="cm"># retain a TQ view</span></pre>
+<p class="pclbl">capture(), after</p>
+<pre class="pc"><span class="who"># controller event loop, barrier held</span>
+<span class="del">env.check_against_cut(cut)</span>
+<span class="add">phases = {</span>
+<span class="add">  "replay_inventory":  <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L623">check_replay</a>(),</span>              <span class="cm"># keys only</span>
+<span class="add">  "recovery_state":    <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L632">to_thread</a>(build_recovery_state),</span>  <span class="cm"># maps copied first, on the loop</span>
+<span class="add">  "staging_inventory": <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L512">check_staging</a>(env),</span>          <span class="cm"># list once; Gym check, then RL check</span>
+<span class="add">  "tq_capture":        <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L663">tq_capture</a>(),</span>
+<span class="add">}</span>
+<span class="add">results = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L464">run_capture_phases</a>(phases)</span>  <span class="cm"># all start now; on failure, release the view</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L551"><code>capture</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L464"><code>_run_capture_phases</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/inventory.py#L103"><code>list_staging_keys</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/data_plane/adapters/transfer_queue.py#L1623"><code>list_sample_ids</code></a>.</p>
+
+<div class="hl"><b>So what.</b> With the build in a thread, the hold is set by the slowest phase instead of the sum, so 15.2 s became 9.8 s. The next floor is the ~9 s build, which <a href="https://github.com/NVIDIA-NeMo/RL/pull/5185">#5185</a> roughly halves. Once it does, the controller calls that still run one at a time decide the hold. Running phases side by side also means a failure in one can meet a failure in another; <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5241-hidden-release-error.html">page 2</a> shows the one case the new error handling gets wrong.</div>
+</div>
+</body>
+</html>

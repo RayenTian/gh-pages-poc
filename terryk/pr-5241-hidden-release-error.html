@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5241 — when a capture cannot release its view, the error that says so gets lost</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 12px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .note{fill:var(--dim);font:12px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13.5px -apple-system,sans-serif}
+svg .box{fill:var(--surface);stroke:var(--border)}
+svg .ok{fill:var(--green);fill-opacity:.25;stroke:var(--green)}
+svg .soft{fill:var(--orange);fill-opacity:.25;stroke:var(--orange)}
+svg .bad{fill:var(--red);fill-opacity:.25;stroke:var(--red)}
+svg .badt{fill:var(--red);font:bold 12.5px -apple-system,sans-serif}
+svg .arr{stroke:var(--dim);stroke-width:1.6;fill:none;marker-end:url(#ah)}
+svg .ahf{fill:var(--dim)}
+svg a text{text-decoration:underline}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px;font-size:14px}
+.warn{border-left:4px solid var(--red);background:var(--surface);padding:8px 14px;margin:18px 0 0;border-radius:0 8px 8px 0;font-size:14px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+function wire(){var b=document.getElementById('theme-toggle');if(!b)return;b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+<h1>When a capture cannot release its TQ view, the error that says "stop checkpointing" gets lost</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5241">PR #5241</a> · permalinks at head <code>96c48d50</code>, removed code at base <code>68bd259c</code></p>
+
+<div class="status"><dl>
+<dt>Before</dt><dd>The TQ capture ran last and was awaited on its own, so a <code>CheckpointReleaseError</code> from it always reached the caller and stopped checkpointing.</dd>
+<dt>This PR</dt><dd>Runs the capture beside three other phases in <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L464"><code>_run_capture_phases</code></a>, which raises some other error first in two cases.</dd>
+<dt>Status</dt><dd><span class="verdict open">Open — not fixed in this PR.</span> Raised as review comment C1, with a fix and two regression tests.</dd>
+</dl></div>
+
+<nav class="chain">
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5241-shorter-barrier-hold.html">1 · shorter barrier hold</a>
+<span class="here">2 · hidden release error</span>
+</nav>
+<p class="chainnote">Two pages on this PR. This one: an error the new phase runner loses.</p>
+
+<p>A TQ capture keeps a <span class="tip" tabindex="0" data-tip="A frozen copy of TQ's state that the storage actors keep in memory until it is written and released.">view</span> on the storage actors. If the code cannot confirm the view was released, it raises <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/data_plane/adapters/tq_simple_checkpoint.py#L360-L366"><code>CheckpointReleaseError</code></a>: "storage actors may still retain it, so stop checkpointing". The snapshot pump <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L1228-L1237">retries</a> an <code>OSError</code> or a timeout, and stops only on other errors. So which error comes out of the phase runner decides whether a possibly held view triggers another snapshot.</p>
+
+<h2>Two ways the release error is lost</h2>
+<svg viewBox="0 0 940 330" role="img" aria-label="Two failure cases">
+<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="ahf" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+<text class="hdr" x="14" y="22">A · two phases fail at once</text>
+<rect class="bad" x="14" y="36" width="210" height="28"/><text class="lbl" x="22" y="55">replay_inventory: OSError</text>
+<rect class="ok" x="14" y="70" width="210" height="28"/><text class="lbl" x="22" y="89">recovery_state: ok</text>
+<rect class="ok" x="14" y="104" width="210" height="28"/><text class="lbl" x="22" y="123">staging_inventory: ok</text>
+<rect class="bad" x="14" y="138" width="210" height="28"/><text class="lbl" x="22" y="157">tq_capture: ReleaseError</text>
+<path class="arr" d="M224,50 C260,50 260,190 290,190"/>
+<path class="arr" d="M224,152 C250,152 255,190 290,190"/>
+<rect class="box" x="292" y="174" width="160" height="32"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L500"><text class="lbl" x="300" y="195">failed[0].result()</text></a>
+<text class="note" x="292" y="222">first in dict order wins;</text>
+<text class="note" x="292" y="237">tq_capture is always last</text>
+<rect class="soft" x="14" y="250" width="440" height="30"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L1228"><text class="lbl" x="22" y="270">raises OSError → "io_error" → retried</text></a>
+<text class="badt" x="14" y="302">Next snapshot starts; a view may still be held.</text>
+
+<text class="hdr" x="490" y="22">B · the snapshot is cancelled mid-capture</text>
+<rect class="box" x="490" y="36" width="430" height="28"/><text class="lbl" x="498" y="55">outer task cancelled → phases cancelled</text>
+<rect class="bad" x="490" y="80" width="430" height="44"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/data_plane/checkpoint.py#L120-L129"><text class="lbl" x="498" y="99">capture_checkpoint: late view, release fails</text></a>
+<text class="lbl" x="498" y="116">→ task ends with CheckpointReleaseError</text>
+<rect class="box" x="490" y="140" width="430" height="44"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L506"><text class="lbl" x="498" y="159">_release_captured_view: task raised → skip</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L491"><text class="lbl" x="498" y="176">bare raise → CancelledError</text></a>
+<path class="arr" d="M705,64 L705,78"/><path class="arr" d="M705,124 L705,138"/>
+<text class="badt" x="490" y="212">Caller sees a plain cancel; no log line names the held view.</text>
+<text class="note" x="490" y="236">At base the capture was awaited directly, so this</text>
+<text class="note" x="490" y="252">raised CheckpointReleaseError. The review's test passes</text>
+<text class="note" x="490" y="268">at base and fails at head.</text>
+<rect class="bad" x="660" y="290" width="14" height="12"/><text class="note" x="680" y="300">failed</text>
+<rect class="soft" x="730" y="290" width="14" height="12"/><text class="note" x="750" y="300">retryable</text>
+<rect class="ok" x="830" y="290" width="14" height="12"/><text class="note" x="850" y="300">fine</text>
+</svg>
+<p>Case A needs two failures at once, for example a full disk while the capture's own cleanup fails. It could not happen before, because a failing check meant the capture never started. Case B is a plain regression. Trainer checkpoints go through the <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L666">same runner</a> but are not retried, so case A matters less there.</p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5241">review comment C1 — snapshots.py:480</a></p>
+
+<h2>The fix, as pseudocode (proposed, not in the PR)</h2>
+<p class="where"><b>Where the fix lands: RL only, one function.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L464-L500"><code>_run_capture_phases</code></a> in <code>snapshots.py</code>, plus two tests in <code>test_checkpointing.py</code>. Nothing below is implemented.</p>
+<pre class="pc"><span class="who"># controller event loop, barrier held</span>
+tasks = {name: create_task(phase) for name, phase in phases}
+<span class="add">def raise_release_error(done):</span>                <span class="cm"># "stop checkpointing" beats any other error</span>
+<span class="add">    for t in done:</span>
+<span class="add">        if t raised CheckpointReleaseError: raise it</span>
+try:
+    await wait(tasks)                         <span class="cm"># all phases run to the end</span>
+except CancelledError:
+    cancel all; wait until all are done
+<span class="add">    raise_release_error(tasks)</span>               <span class="cm"># case B</span>
+    release the capture's view if it has one
+    raise
+failed = [t for t in tasks if t failed]
+if failed:
+<span class="add">    raise_release_error(failed)</span>              <span class="cm"># case A</span>
+    release the capture's view if it has one
+    failed[0].result()                        <span class="cm"># first phase error, as today</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L464-L500"><code>_run_capture_phases</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L503-L510"><code>_release_captured_view</code></a>.</p>
+
+<div class="warn"><b>So what.</b> A held storage view keeps memory on the TQ storage actors until released. <code>CheckpointReleaseError</code> exists so a run stops instead of piling up more views. In both cases above it is replaced by an error that either retries or looks like a normal shutdown. The fix is a few lines and keeps everything else the PR does.</div>
+</div>
+</body>
+</html>
