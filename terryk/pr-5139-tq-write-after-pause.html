@@ -82,7 +82,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <div class="status"><dl>
 <dt>Before</dt><dd>A rollout snapshot did every step while holding the data-plane barrier: no TQ writes, Gym parked. That included writing every TQ shard to disk and pickling the recovery state.</dd>
 <dt>This PR</dt><dd>With <code>data_plane.simple.async_checkpoint: true</code> (default off), the barrier only covers a cheap capture of the TQ data. Rollouts resume, and the disk write and pickling run after. Trainer checkpoints get the same split.</dd>
-<dt>Status</dt><dd><span class="verdict good">In review.</span> No crash or data-loss bug found. Open asks: a main-vs-PR timing number, two tests and a metric-name fix (see the review).</dd>
+<dt>Status</dt><dd><span class="verdict good">In review.</span> No crash or data-loss bug found. Open asks: two tests and a shorter, usage-only README section (see the review).</dd>
 </dl></div>
 
 <div class="bg">
@@ -92,7 +92,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <div class="why">
 <p><b>Why it should be faster.</b> The barrier no longer waits for disk. Writing every shard and pickling the recovery state move to after the barrier. Under the barrier, TQ only keeps references to its shards and turns the controller's index into bytes. The listing of replay and staging keys and the ledger copy stay inside, so they set the new floor.</p>
 <p><b>Measured.</b> On the PR's CPU script (131k rollouts), moving only the pickling cut the hold from 22.82 s to 15.21 s; the pickling now takes 6.57 s after the barrier. There is <b>no number yet for main versus this PR</b>, which is the main change. <b>Cost:</b> the pickling thread competes with the controller's event loop for the GIL after resume (the PR measured 5 ms median loop lag, one 0.37 s stall). Backends without the capture API keep the old path.</p>
-<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5139#discussion_r4626486106">review comment — C3 · snapshots.py:894</a></p>
+
 </div>
 
 <h2>What moved out of the pause</h2>
@@ -103,7 +103,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <rect class="new" x="510" y="10" width="22" height="14"/><text class="note" x="538" y="22">new step</text>
 <rect class="same" x="610" y="10" width="22" height="14"/><text class="note" x="638" y="22">same as before</text>
 <text class="hdr" x="20" y="62">main: everything under the barrier</text>
-<line class="hold" x1="20" y1="76" x2="760" y2="76"/><text class="holdt" x="24" y="72" dx="330">hold: not measured on main (review C3)</text>
+<line class="hold" x1="20" y1="76" x2="760" y2="76"/><text class="holdt" x="24" y="72" dx="330">hold: not measured on main</text>
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L394"><rect class="same" x="20" y="84" width="118" height="44" rx="5"/><text class="bx" x="27" y="102">list replay</text><text class="bx" x="27" y="118">keys</text></a>
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L402"><rect class="same" x="142" y="84" width="124" height="44" rx="5"/><text class="bx" x="149" y="102">build recovery</text><text class="bx" x="149" y="118">state</text></a>
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L417"><rect class="old" x="270" y="84" width="124" height="44" rx="5"/><text class="bx" x="277" y="102">torch.save +</text><text class="bx" x="277" y="118">sha256</text></a>
@@ -164,7 +164,7 @@ with <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06f
 <table class="t">
 <tr><th>Ask</th><th>Why</th></tr>
 <tr><td>A test that a deferred trainer save writes <code>rollout_recovery.pt</code> and its hash<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5139#discussion_r4626486065">review comment — C1 · test_checkpointing.py:3653</a></p></td><td>The trainer only gets the recovery payload from the value <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/single_controller.py#L4871"><code>persist()</code></a> returns. Dropping it passes every current test, and restore then rejects the checkpoint.</td></tr>
-<tr><td>Fix the README metric names<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5139#discussion_r4626486074">review comment — C2 · README.md:852</a></p></td><td>It says to compare with <code>environment_paused_seconds</code>, which is never logged (the key is <code>gym_parked_seconds</code>), and <code>tq_capture_seconds</code> holds the whole save on the old path.</td></tr>
+<tr><td>Replace the README section with a short usage section<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5139#discussion_r4626713788">review comment — C5 · README.md:818</a></p></td><td>It explains classes and lock order, copies the list of phase names, and names <code>environment_paused_seconds</code>, which is never logged (the key is <code>gym_parked_seconds</code>).</td></tr>
 <tr><td>A test for the deferred-path timing metrics<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5139#discussion_r4626486114">review comment — C4 · test_checkpointing.py:2446</a></p></td><td>The existing metric test only runs the old path, so <code>tq_persist_seconds</code> or <code>tq_release_seconds</code> could log 0 unnoticed.</td></tr>
 </table>
 <div class="hl">The barrier holds the same picture as before. Only the disk work moves, and the save still finishes, with hash and sidecars, before the snapshot is published. What is missing is the number that shows how much of the pause that saves against main.</div>
