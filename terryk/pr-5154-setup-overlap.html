@@ -187,13 +187,13 @@ output layer runs NCCL work on the trainer workers, which must not mix with the 
 <ol>
 <li><b>C1 · a test that can't fail.</b> The pool-failure test's fake communicator finishes the moment the pool fails, so a setup that
 raised the pool error without waiting would still pass (tried: 6 of 6 passes). Fix: keep the fake communicator running 0.5 s longer.
-<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5154/files">review comment — test_setup.py:2951</a></p></li>
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5154#discussion_r4633359982">review comment — test_setup.py:2951</a></p></li>
 <li><b>C2 · the moved config check has no test.</b> Nothing checks that the router-replay error now comes before any build.
 The nearby test that looks like it covers it hits a different error. Fix: one more case in the invalid-config table.
-<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5154/files">review comment — test_setup.py:1945</a></p></li>
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5154#discussion_r4633360014">review comment — setup.py:1447</a></p></li>
 <li><b>C3 · the PR description is out of date.</b> It still says the process waits for a stuck connection at exit (fixed since the daemon thread),
 that all three steps use one pool, and that setup raises "the first error" (it raises in a fixed order).
-<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5154/files">review comment — setup.py:1110</a></p></li>
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5154#discussion_r4633360026">review comment — setup.py:1110</a></p></li>
 </ol>
 
 <div class="hl"><b>So what.</b> Setup gets ~24 s faster today, and more on larger clusters, where all three steps take longer. The change is safe
