@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5185 — why the recovery save got faster, and why its output did not change</title>
+<style>
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2128; --border:#30363d;
+  --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --green:#3fb950;
+  --orange:#d29922; --red:#f85149;
+}
+:root[data-theme="light"]{
+  --bg:#ffffff; --surface:#f6f8fa; --surface2:#eaeef2; --border:#d0d7de;
+  --text:#1f2328; --dim:#59636e; --accent:#0969da; --green:#1a7f37;
+  --orange:#9a6700; --red:#cf222e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);
+  padding:2px 16px 10px;margin:0 0 18px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;
+  white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.good{color:var(--green)}
+.why{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:0 0 18px;
+  border-radius:0 8px 8px 0;font-size:14px}
+.why p{margin:6px 0}
+table{border-collapse:collapse;font-size:13.5px;margin:6px 0;width:100%}
+th,td{border:1px solid var(--border);padding:4px 8px;text-align:left;vertical-align:top}
+th{background:var(--surface2);font-weight:600}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tw{overflow-x:auto}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.2}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13.5px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:12px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .g-ok{fill:var(--green);fill-opacity:.5;stroke:var(--green)}
+svg .g-waste{fill:var(--red);fill-opacity:.45;stroke:var(--red)}
+svg .g-skip{fill:var(--dim);fill-opacity:.18;stroke:var(--dim);stroke-dasharray:3 2}
+svg .g-chk{fill:var(--surface2);stroke:var(--text);stroke-opacity:.6}
+svg .gt{fill:var(--text);font:bold 13px ui-monospace,Menlo,monospace}
+svg .arr{stroke:var(--dim);stroke-width:1.6;fill:none}
+svg .same{fill:var(--green);font:bold 12.5px -apple-system,sans-serif}
+svg .bad{fill:var(--red);font:12px -apple-system,sans-serif}
+svg a text{text-decoration:underline;fill:var(--accent);font:12px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.hl{border-left:3px solid var(--green);background:var(--surface);padding:10px 16px;margin:14px 0;border-radius:0 8px 8px 0}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);
+  border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Why the rollout-recovery save got faster, and why the saved file did not change</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5185">NVIDIA-NeMo/RL #5185</a>
+· <code>perf(checkpoint)</code> · permalinks pin head <code>d3e2af6c</code> (new code) and base <code>defdaef4</code> (old code).
+Dotted words have a short explanation: hover or tap them.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>Every save deep-copied the saved state of <em>every</em> prompt group, including groups it was about to throw away.</dd>
+  <dt>This PR</dt>
+  <dd>Skips those groups before copying, and copies plain dicts and lists with a small copier that reuses strings and numbers instead of copying them.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict good">Same output, about 2.6× faster (4.8× when half the groups are skipped).</span>
+  The saved state matched the old code in every case tested. Review: no bugs, two small cleanups (C1, C2).</dd>
+</dl>
+</div>
+
+<div class="why">
+<p><b>Why it should be faster.</b> Python's <code>copy.deepcopy</code> makes a new object for every dict and list, checks every string and number,
+and records each one in its <span class="tip" tabindex="0" data-tip="A dict deepcopy keeps from 'id of an object it has seen' to 'its copy', so an object that appears twice is copied once and cycles do not loop forever.">memo</span>.
+The new copier only rebuilds plain <code>dict</code> and <code>list</code> objects and hands strings, numbers, <code>bool</code> and <code>None</code> back as they are
+(they cannot change, so sharing them is safe). Separately, groups that the
+<span class="tip" tabindex="0" data-tip="The replay buffer holds finished groups waiting for training. The checkpoint already saves those groups from the buffer, so the recovery file does not need its own copy.">replay buffer already saves</span>
+are now skipped <em>before</em> the copy instead of after it.</p>
+<div class="tw"><table>
+<tr><th>Measured: 500 groups, 64 receipt entries each, CPU, Python 3.13.14</th><th>old</th><th>new</th><th>where the saving comes from</th></tr>
+<tr><td>no groups skipped</td><td class="n">112 ms</td><td class="n">43 ms</td><td>faster receipt copy ≈ 67 ms (98%); hand-written reward fields ≈ 3–4 ms</td></tr>
+<tr><td>half the groups skipped</td><td class="n">110 ms</td><td class="n">23 ms</td><td>not copying skipped groups ≈ 54 ms; faster copy of the rest ≈ 37 ms</td></tr>
+</table></div>
+<p><b>What is not faster:</b> the copy is still about 95% of the remaining time, and writing the file
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L413"><code>torch.save</code></a>, on a thread) is not touched.
+<b>When it is no faster:</b> receipts made mostly of tuples or dict/list subclasses go to <code>deepcopy</code> anyway, plus one cheap type check.
+These numbers are a CPU benchmark of the build step alone, not a full training run.</p>
+</div>
+
+<p>At each save, the controller builds the recovery state in
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L2305"><code>build_rollout_recovery_state</code></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L400">on its event loop</a>,
+so every millisecond here blocks the controller. For each prompt group it records the group's
+<span class="tip" tabindex="0" data-tip="A nested dict that says where a sealed rollout's captured data lives: a capture key plus a manifest list, one entry per model call, each with its own metadata dict.">receipt</span>
+and reward details. It must copy them, so later changes to the live ledger cannot leak into the saved file.</p>
+
+<h2>One save, before and after</h2>
+
+<svg viewBox="0 0 900 400" role="img" aria-label="Five prompt groups A to E. A and B are already saved by the replay buffer. Before: all five are checked, all five receipts are deep-copied, then A and B are dropped. After: all five are checked, A and B are skipped, only C, D and E are copied. Both save the same C, D, E.">
+  <text class="hdr" x="150" y="24">① check every group</text>
+  <text class="hdr" x="410" y="24">② copy receipts</text>
+  <text class="hdr" x="680" y="24">③ saved state</text>
+
+  <!-- BEFORE lane -->
+  <text class="lbl-b" x="16" y="72">Before</text>
+  <text class="note" x="16" y="90">base</text>
+  <g>
+    <rect class="g-chk" x="150" y="52" width="34" height="34" rx="5"/><text class="gt" x="162" y="74">A</text>
+    <rect class="g-chk" x="190" y="52" width="34" height="34" rx="5"/><text class="gt" x="202" y="74">B</text>
+    <rect class="g-chk" x="230" y="52" width="34" height="34" rx="5"/><text class="gt" x="242" y="74">C</text>
+    <rect class="g-chk" x="270" y="52" width="34" height="34" rx="5"/><text class="gt" x="282" y="74">D</text>
+    <rect class="g-chk" x="310" y="52" width="34" height="34" rx="5"/><text class="gt" x="322" y="74">E</text>
+  </g>
+  <path class="arr" d="M352 69 H400" marker-end="url(#ah)"/>
+  <g>
+    <rect class="g-waste" x="410" y="52" width="34" height="34" rx="5"/><text class="gt" x="422" y="74">A</text>
+    <rect class="g-waste" x="450" y="52" width="34" height="34" rx="5"/><text class="gt" x="462" y="74">B</text>
+    <rect class="g-ok" x="490" y="52" width="34" height="34" rx="5"/><text class="gt" x="502" y="74">C</text>
+    <rect class="g-ok" x="530" y="52" width="34" height="34" rx="5"/><text class="gt" x="542" y="74">D</text>
+    <rect class="g-ok" x="570" y="52" width="34" height="34" rx="5"/><text class="gt" x="582" y="74">E</text>
+  </g>
+  <path class="arr" d="M612 69 H670" marker-end="url(#ah)"/>
+  <g>
+    <rect class="g-ok" x="680" y="52" width="34" height="34" rx="5"/><text class="gt" x="692" y="74">C</text>
+    <rect class="g-ok" x="720" y="52" width="34" height="34" rx="5"/><text class="gt" x="732" y="74">D</text>
+    <rect class="g-ok" x="760" y="52" width="34" height="34" rx="5"/><text class="gt" x="772" y="74">E</text>
+  </g>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_recovery.py#L1682"><text x="150" y="106">state_dict L1682</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_recovery.py#L1721"><text x="410" y="106">copy.deepcopy × 5</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_recovery.py#L2264"><text x="680" y="106">drop A, B after copy</text></a>
+  <text class="bad" x="410" y="124">A and B copied, then thrown away</text>
+  <text class="note" x="150" y="146">finalizer rewards: convert all 5 groups with dataclasses.asdict, then keep only A, B</text>
+
+  <line x1="16" y1="168" x2="884" y2="168" stroke="var(--border)"/>
+
+  <!-- AFTER lane -->
+  <text class="lbl-b" x="16" y="210">After</text>
+  <text class="note" x="16" y="228">this PR</text>
+  <g>
+    <rect class="g-chk" x="150" y="190" width="34" height="34" rx="5"/><text class="gt" x="162" y="212">A</text>
+    <rect class="g-chk" x="190" y="190" width="34" height="34" rx="5"/><text class="gt" x="202" y="212">B</text>
+    <rect class="g-chk" x="230" y="190" width="34" height="34" rx="5"/><text class="gt" x="242" y="212">C</text>
+    <rect class="g-chk" x="270" y="190" width="34" height="34" rx="5"/><text class="gt" x="282" y="212">D</text>
+    <rect class="g-chk" x="310" y="190" width="34" height="34" rx="5"/><text class="gt" x="322" y="212">E</text>
+  </g>
+  <path class="arr" d="M352 207 H400" marker-end="url(#ah)"/>
+  <g>
+    <rect class="g-skip" x="410" y="190" width="34" height="34" rx="5"/><text class="gt" x="422" y="212">A</text>
+    <rect class="g-skip" x="450" y="190" width="34" height="34" rx="5"/><text class="gt" x="462" y="212">B</text>
+    <rect class="g-ok" x="490" y="190" width="34" height="34" rx="5"/><text class="gt" x="502" y="212">C</text>
+    <rect class="g-ok" x="530" y="190" width="34" height="34" rx="5"/><text class="gt" x="542" y="212">D</text>
+    <rect class="g-ok" x="570" y="190" width="34" height="34" rx="5"/><text class="gt" x="582" y="212">E</text>
+  </g>
+  <path class="arr" d="M612 207 H670" marker-end="url(#ah)"/>
+  <g>
+    <rect class="g-ok" x="680" y="190" width="34" height="34" rx="5"/><text class="gt" x="692" y="212">C</text>
+    <rect class="g-ok" x="720" y="190" width="34" height="34" rx="5"/><text class="gt" x="732" y="212">D</text>
+    <rect class="g-ok" x="760" y="190" width="34" height="34" rx="5"/><text class="gt" x="772" y="212">E</text>
+  </g>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L1757"><text x="150" y="244">same checks L1757</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L1771"><text x="410" y="244">skip A, B</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L1798"><text x="490" y="244">fast copy × 3</text></a>
+  <text class="same" x="680" y="244">same saved state ✓</text>
+  <text class="note" x="150" y="284">finalizer rewards: convert only A, B, with three small hand-written functions</text>
+
+  <!-- what the copy does to one receipt -->
+  <text class="note" x="150" y="316">one receipt: {"capture_key", "manifest": [{"model_call_id", "metadata": {"sizes": [4, 7, 9]}}, … ×64]}</text>
+  <text class="note" x="150" y="336">deepcopy: new dict, list, dict, dict, list — and every string and number looked up in the memo</text>
+  <text class="note" x="150" y="356">fast copy: the same new dicts and lists — strings and numbers reused as they are</text>
+
+  <!-- legend -->
+  <rect class="g-ok" x="150" y="372" width="14" height="14" rx="3"/><text class="note" x="170" y="384">copied and saved</text>
+  <rect class="g-waste" x="290" y="372" width="14" height="14" rx="3"/><text class="note" x="310" y="384">copied, then thrown away</text>
+  <rect class="g-skip" x="470" y="372" width="14" height="14" rx="3"/><text class="note" x="490" y="384">checked, not copied</text>
+  <text class="note" x="620" y="384">A, B = already saved by replay buffer</text>
+
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="var(--dim)"/></marker></defs>
+</svg>
+
+<p>Both versions run the safety checks on all five groups, including A and B. Only the copy work changes.
+The team checked the output three ways: the base and head code gave the same saved state with 0, 1 and 2 groups skipped,
+5,000 random receipts copied the same with both copiers, and the PR's own tests fail if a field is added to
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/reward_penalties.py#L153"><code>RewardChecks</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/reward_penalties.py#L360"><code>RewardLogContext</code></a> or
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/reward_penalties.py#L381"><code>FinalizedReward</code></a>
+without updating the hand-written functions.</p>
+
+<h2>The code, as pseudocode</h2>
+
+<p class="pclbl">Build the recovery state, before</p>
+<pre class="pc"><span class="who"># controller event loop, once per save</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_recovery.py#L2228">build</a>(ledger, replay_owned):
+    groups = []
+    for g in ledger:                           <span class="cm"># A B C D E</span>
+        check(g)                               <span class="cm"># safety + prompt identity</span>
+        groups.append(<a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_recovery.py#L1721">deepcopy</a>(g.receipt))
+    groups = [g for g in groups
+              if g.id not in replay_owned]     <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_recovery.py#L2264">drops A, B</a></span>
+    rewards = {id: <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_recovery.py#L2257">asdict</a>(r) for id, r in finalizer_rewards}
+    rewards = keep_only(rewards, replay_owned)  <span class="cm"># keeps A, B</span></pre>
+
+<p class="pclbl">Build the recovery state, after</p>
+<pre class="pc"><span class="who"># controller event loop, once per save</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L2305">build</a>(ledger, replay_owned):
+    groups = []
+    for g in ledger:                           <span class="cm"># A B C D E</span>
+        check(g)                               <span class="cm"># safety + prompt identity</span>
+<span class="add">        if g.id in replay_owned: continue</span>      <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L1771">skip A, B before copying</a></span>
+        groups.append(<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L1798">fast_copy</a></span>(g.receipt))
+<span class="del">    groups = [g for g in groups if g.id not in replay_owned]</span>
+    rewards = {id: <span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L2334">to_dict</a></span>(r) for id, r in finalizer_rewards
+<span class="add">               if id in replay_owned</span>}          <span class="cm"># convert only A, B</span>
+    rewards = keep_only(rewards, replay_owned)  <span class="cm"># C1: now does nothing</span></pre>
+
+<p class="pclbl">The new copier</p>
+<pre class="pc"><span class="who"># called once per receipt; memo is shared down the whole receipt</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L119">fast_copy</a>(x, memo={}):
+    if type(x) in {str, bytes, int, float, bool, complex, None}:
+        return x                               <span class="cm"># cannot change: share it</span>
+    if id(x) in memo: return memo[id(x)]       <span class="cm"># same object twice, or a cycle</span>
+    if type(x) is dict: return new dict of fast_copy(k): fast_copy(v)
+    if type(x) is list: return new list of fast_copy(v)
+    return <a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L146">deepcopy</a>(x, memo)                  <span class="cm"># tuples, subclasses, anything else</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L119"><code>_copy_checkpoint_value</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L1749"><code>RolloutRecoveryLedger.state_dict</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620144b8755bfd0/nemo_rl/experience/rollout_recovery.py#L2305"><code>build_rollout_recovery_state</code></a>.
+<code>type(x) is dict</code> checks the exact type, so a dict subclass keeps its own copy behavior.</p>
+
+<h2>What the review asks</h2>
+
+<p><b>C1 · cleanup.</b> The rewards are now filtered twice: once in the new comprehension and again in the old loop.
+The output is right, but the rule "keep only replay-owned groups" now lives in two places. The ask: let the old loop filter only the metrics.</p>
+<!--CREF-C1-->
+<p><b>C2 · test gap.</b> The end-to-end test builds its "before" snapshot with the same copier it is testing.
+If the copier ever shared a list with the ledger, the snapshot would share it too, and the "ledger was not changed" check would still pass.
+The ask: take that snapshot with <code>copy.deepcopy</code>. With that one line, a broken copier fails the test.</p>
+<!--CREF-C2-->
+
+<div class="hl">Nearly all of the gain is the receipt copier plus skipping groups before copying them.
+The three hand-written reward functions save only 3–4 ms per 500 groups on Python 3.13; their tests keep them in step with the dataclasses.
+The saved state is the same as before, so this change is safe to land once C1 and C2 are done.</div>
+
+</div>
+</body>
+</html>
