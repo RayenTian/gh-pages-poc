@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR #4508: how batched prefix I/O works</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--orange:#9a6700;--red:#cf222e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--orange)}
+.bg{border:1px dashed var(--border);border-radius:8px;padding:10px 14px;font-size:14px;margin:0 0 16px;background:var(--surface)}
+.hl{border-left:3px solid var(--accent);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .box{fill:var(--surface2);stroke:var(--border)}
+svg .put{fill:var(--surface);stroke:var(--accent)}
+svg .lock{fill:none;stroke:var(--orange);stroke-width:2;stroke-dasharray:5 3}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .small{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .row{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .big{fill:var(--green);font:bold 13px -apple-system,sans-serif}
+svg .orn{fill:var(--orange);font:11px -apple-system,sans-serif}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .sep{stroke:var(--border);stroke-dasharray:4 4}
+svg a text{text-decoration:underline;fill:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12.5px ui-monospace,Menlo,monospace;margin:2px 4px 2px 0}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+svg .bad{fill:var(--surface2);stroke:var(--red);stroke-width:1.6}
+svg .red{fill:var(--red);font:bold 12px -apple-system,sans-serif}
+svg .arr2{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah2)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px;font-size:14px}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)}.diff .del{color:var(--red)}.diff .hunk{color:var(--accent)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pcpair{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>What changes when prefix saves and restores go to TransferQueue in batches, and what the rebase onto Dynamo breaks</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4508">NVIDIA-NeMo/RL #4508</a>, part 10 of 11 in the partial-checkpointing stack, on top of <a href="https://github.com/NVIDIA-NeMo/RL/pull/4612">#4612</a>.
+Permalinks pin the PR head <code>507a670</code>; "before" links pin the base <code>f06773e</code>; Dynamo links pin <a href="https://github.com/NVIDIA-NeMo/RL/pull/4979">#4979</a> at <code>766f81d</code>.
+The review comments are in a pending review; their links work once it is published.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>At a checkpoint, each unfinished model call saved its tokens with its own TransferQueue write. After a restart, each resumed request read its own saved rows on its own thread.</dd>
+  <dt>This PR</dt>
+  <dd>Groups the saves into a few large writes, and merges the reads of requests that resume together into one shared read. Two config keys set the batch limits.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Works today; one open problem after the rebase.</span> The batching works on today's head. After the planned rebase onto Dynamo support (#4979), the shared restore read is skipped on both native vLLM and Dynamo. <b>Open, tracked in C13 and C14</b>, fix shown below. Cut-time batched writes need no change on Dynamo.</dd>
+</dl>
+</div>
+
+<nav class="chain">
+  <span class="here">1 · how it works</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4508-what-can-shrink.html">2 · what can shrink</a>
+</nav>
+<p class="chainnote">Two pages on this PR. This one: what the PR does, and the one problem the rebase onto Dynamo causes. Next: the code that can still go.</p>
+
+<div class="bg"><b>Background.</b> When RL saves a checkpoint in the middle of generation, each unfinished model call writes its tokens so far to
+<span class="tip" tabindex="0" data-tip="TQ: the shared tensor store RL uses to pass rows between processes. One write call is a put; one read call is a get.">TransferQueue (TQ)</span>, one row per call. After a restart, Gym sends the call back with the keys of its saved rows, and the call continues from them instead of starting over.
+Dotted words have a short explanation: hover or tap them.</div>
+
+<p>Before, the save loop wrote one call at a time
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L466"><code>_cut_active</code></a> →
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/data_plane/tq_token_sink.py#L511"><code>stage_generation_prefix</code></a>).
+Now <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L761"><code>_cut_batched</code></a>
+freezes calls one by one, keeps each locked, and writes up to 256 rows in one
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/data_plane/tq_token_sink.py#L772"><code>stage_generation_prefix_batch</code></a> call.
+On restore, the new <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L23"><code>PrefixReadBatcher</code></a> waits 2 ms, merges the keys of every request that asked, and runs one get.</p>
+
+<h2>The two paths, on one small example</h2>
+<p style="font-size:14px">Example: 3 unfinished calls (c0, c1, c2) and a batch limit of 2 rows. On restore, c1 has 2 saved rows (one from an earlier checkpoint), so the 3 requests need 4 keys.</p>
+
+<svg viewBox="0 0 940 470" role="img" aria-label="Save and restore, before and after this PR">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--dim)"/></marker></defs>
+<text class="hdr" x="150" y="20">At a checkpoint (save)</text>
+<text class="hdr" x="590" y="20">After a restart (restore)</text>
+<line class="sep" x1="470" y1="8" x2="470" y2="462"/>
+<line class="sep" x1="8" y1="236" x2="932" y2="236"/>
+<text class="row" x="14" y="46">Before</text>
+<text class="row" x="14" y="262">This PR</text>
+
+<!-- BEFORE SAVE -->
+<rect class="box" x="30" y="62" width="110" height="28" rx="5"/><text class="lbl" x="40" y="81">c0 · 40 tok</text>
+<rect class="box" x="30" y="104" width="110" height="28" rx="5"/><text class="lbl" x="40" y="123">c1 · 700 tok</text>
+<rect class="box" x="30" y="146" width="110" height="28" rx="5"/><text class="lbl" x="40" y="165">c2 · 25 tok</text>
+<path class="arr" d="M142,76 H238"/><path class="arr" d="M142,118 H238"/><path class="arr" d="M142,160 H238"/>
+<rect class="put" x="240" y="62" width="100" height="28" rx="5"/><text class="lbl" x="252" y="81">put [c0]</text>
+<rect class="put" x="240" y="104" width="100" height="28" rx="5"/><text class="lbl" x="252" y="123">put [c1]</text>
+<rect class="put" x="240" y="146" width="100" height="28" rx="5"/><text class="lbl" x="252" y="165">put [c2]</text>
+<text class="big" x="356" y="123">3 puts</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/data_plane/tq_token_sink.py#L511"><text class="lbl" x="30" y="200">stage_generation_prefix</text></a>
+<text class="small" x="30" y="218">each call is locked only for its own write</text>
+
+<!-- AFTER SAVE -->
+<rect class="lock" x="22" y="272" width="126" height="94" rx="7"/>
+<rect class="box" x="30" y="280" width="110" height="28" rx="5"/><text class="lbl" x="40" y="299">c0 · 40 tok</text>
+<rect class="box" x="30" y="322" width="110" height="28" rx="5"/><text class="lbl" x="40" y="341">c1 · 700 tok</text>
+<rect class="lock" x="22" y="372" width="126" height="44" rx="7"/>
+<rect class="box" x="30" y="380" width="110" height="28" rx="5"/><text class="lbl" x="40" y="399">c2 · 25 tok</text>
+<path class="arr" d="M150,318 H238"/><path class="arr" d="M150,394 H238"/>
+<rect class="put" x="240" y="300" width="120" height="36" rx="5"/><text class="lbl" x="250" y="323">put [c0, c1]</text>
+<rect class="put" x="240" y="380" width="120" height="28" rx="5"/><text class="lbl" x="250" y="399">put [c2]</text>
+<text class="big" x="376" y="358">2 puts</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/data_plane/tq_token_sink.py#L772"><text class="lbl" x="30" y="436">stage_generation_prefix_batch</text></a>
+<text class="orn" x="30" y="454">dashed = calls held locked until their group's put returns</text>
+
+<!-- BEFORE RESTORE -->
+<rect class="box" x="490" y="62" width="120" height="28" rx="5"/><text class="lbl" x="500" y="81">r0 · 1 key</text>
+<rect class="box" x="490" y="104" width="120" height="28" rx="5"/><text class="lbl" x="500" y="123">r1 · 2 keys</text>
+<rect class="box" x="490" y="146" width="120" height="28" rx="5"/><text class="lbl" x="500" y="165">r2 · 1 key</text>
+<path class="arr" d="M612,76 H698"/><path class="arr" d="M612,118 H698"/><path class="arr" d="M612,160 H698"/>
+<rect class="put" x="700" y="62" width="110" height="28" rx="5"/><text class="lbl" x="712" y="81">get [k0]</text>
+<rect class="put" x="700" y="104" width="110" height="28" rx="5"/><text class="lbl" x="712" y="123">get [k1, k2]</text>
+<rect class="put" x="700" y="146" width="110" height="28" rx="5"/><text class="lbl" x="712" y="165">get [k3]</text>
+<text class="big" x="826" y="123">3 gets</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L944"><text class="lbl" x="490" y="200">resolve_restore</text></a>
+<text class="small" x="490" y="218">each request reads its own rows on its own thread</text>
+
+<!-- AFTER RESTORE -->
+<rect class="box" x="490" y="280" width="120" height="28" rx="5"/><text class="lbl" x="500" y="299">r0 · 1 key</text>
+<rect class="box" x="490" y="322" width="120" height="28" rx="5"/><text class="lbl" x="500" y="341">r1 · 2 keys</text>
+<rect class="box" x="490" y="364" width="120" height="28" rx="5"/><text class="lbl" x="500" y="383">r2 · 1 key</text>
+<path class="arr" d="M612,294 L648,330"/><path class="arr" d="M612,336 H648"/><path class="arr" d="M612,378 L648,342"/>
+<rect class="put" x="650" y="318" width="96" height="36" rx="5"/><text class="lbl" x="660" y="341">wait 2 ms</text>
+<path class="arr" d="M748,336 H770"/>
+<rect class="put" x="772" y="318" width="150" height="36" rx="5"/><text class="lbl" x="780" y="341">get [k0,k1,k2,k3]</text>
+<text class="big" x="800" y="306">1 get</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L23"><text class="lbl" x="650" y="380">PrefixReadBatcher</text></a>
+<text class="small" x="490" y="418">rows go back to each request, then into</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1139"><text class="lbl" x="490" y="436">resolve_restore(…, chunks)</text></a>
+<text class="orn" x="490" y="454">today only the vLLM chat handler passes chunks; see below</text>
+</svg>
+
+<p style="font-size:14px">Both write paths build a row with
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/data_plane/tq_token_sink.py#L581"><code>_encode_record</code></a>, the old single-row body moved. The per-call freeze, ack and seal logic is the old body too, now the generator
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L471"><code>_cut_transaction</code></a>, so a batch can keep several calls frozen at once.
+Both restore paths end in <code>resolve_restore</code>, which checks the prefix digest and lets the call regenerate if anything is wrong.
+A call that finishes while its group's put runs waits for its lock (asked in the review body). A failed group put is retried one row at a time, so a bad row fails only its own call.</p>
+
+<h2>The same change as pseudocode</h2>
+<p style="font-size:14px">Names are shortened and error paths trimmed, but each block keeps the real threads and locks. Underlined names link to the real line. <span style="color:var(--orange)">Orange</span> says where the code runs. In the "after" blocks, <b style="color:var(--green)">green</b> lines are new and <span style="color:var(--red);text-decoration:line-through">red</span> lines are gone; plain lines are unchanged.</p>
+
+<p class="pclbl">Save, before</p>
+<pre class="pc"><span class="who"># serving event loop: Gym asks this worker to cut</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L320">run_cut</a>(inventory):
+    return await <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L325">run_in_executor</a>(cut_thread, cut, inventory)  <span class="cm"># one cut thread per worker</span>
+
+<span class="who"># cut thread</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L713">cut</a>(inventory):
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L736">read_progress</a>(inventory.calls)                            <span class="cm"># one engine read for every call</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L740">for call</a> in inventory.calls:                              <span class="cm"># one call at a time</span>
+        if <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L741">past_deadline</a>(): fail(rest); break
+        with call.<a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L492">lifecycle_lock</a>:                             <span class="cm"># the call cannot finish or abort meanwhile</span>
+            row = <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L501">freeze</a>(call)
+            key = <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L631">tq.put</a>([row])                               <span class="cm"># 1 TQ write per call</span>
+            ack = <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L651">build_ack</a>(call, key)
+            <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L665">seal</a>(call, key)                                   <span class="cm"># any error: roll back; this call regenerates</span>
+        acks.append(ack)
+
+<span class="who"># serving threads, at the same time: a call that finishes</span>
+await to_thread(<a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2539">finish_capture</a>, call)                         <span class="cm"># waits on call.lifecycle_lock</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L320-L328"><code>run_cut</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L713-L790"><code>checkpoint_cut</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L466-L665"><code>_cut_active</code></a> (at the base).</p>
+
+<p class="pclbl">Save, after</p>
+<pre class="pc"><span class="who"># cut thread (same entry point, same thread)</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L710">cut</a>(inventory):
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L733">read_progress</a>(inventory.calls)
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L761">group</a> = []</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L912">for call</a> in inventory.calls:
+        if <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L913">past_deadline</a>(): fail(<span class="add">group + </span>rest); break
+<span class="del">        with call.lifecycle_lock:</span>
+<span class="del">            row = freeze(call); key = tq.put([row]); ack = build_ack(call, key); seal(call, key)</span>
+<span class="add">        tx = <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L924">cut_transaction</a>(call)</span>                           <span class="cm"># a generator; it takes call.lifecycle_lock</span>
+<span class="add">        row = <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L931">next</a>(tx)</span>                                       <span class="cm"># freeze; the lock stays held</span>
+<span class="add">        group.append((tx, row))</span>
+<span class="add">        if <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L948">len(group)</a> == 256 or tokens(group) &gt;= 4_194_304:</span>
+<span class="add">            flush(group)</span>
+<span class="add">    flush(group)</span>
+
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L858">flush</a>(group):</span>                                            <span class="cm"># still on the cut thread</span>
+<span class="add">    if <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L862">past_deadline</a>(): roll back group; return</span>
+<span class="add">    try:    keys = <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/data_plane/tq_token_sink.py#L772">tq.put</a>([row for _, row in group])</span>         <span class="cm"># 1 TQ write for up to 256 calls</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L841">except</a>: keys = [tq.put([row]) or None for row in group]</span>  <span class="cm"># retry one row each, once</span>
+<span class="add">    for tx, key in zip(group, keys): ack = <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L882">tx.send(key)</a></span>      <span class="cm"># build every ack first</span>
+<span class="add">    for tx in group: <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L887">tx.send(None)</a></span>                           <span class="cm"># then seal; each lock is released</span>
+                                                             <span class="cm"># C8: these two loops can be one; each call already fails on its own</span>
+
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L471">cut_transaction</a>(call):</span>                                   <span class="cm"># the old per-call body, split at the put</span>
+<span class="add">    with call.<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L502">lifecycle_lock</a>:</span>
+<span class="add">        row = <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L511">freeze</a>(call)</span>
+<span class="add">        key = <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L641">yield row</a></span>                                      <span class="cm"># paused, lock held, until its group is written</span>
+<span class="add">        ack = <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L645">build_ack</a>(call, key)</span>
+<span class="add">        <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L660">yield ack</a></span>                                            <span class="cm"># C8: the second pause</span>
+<span class="add">        <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L661">seal</a>(call, key)</span>
+
+<span class="who"># serving threads, at the same time: a call that finishes</span>
+await to_thread(<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2551">finish_capture</a>, call)                        <span class="cm"># now waits for its whole group&#x27;s write</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L761-L970"><code>_cut_batched</code></a> with its
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L817-L856"><code>stage</code></a> and
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L858-L909"><code>flush</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L471-L665"><code>_cut_transaction</code></a>,
+and the write <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/data_plane/tq_token_sink.py#L772"><code>stage_generation_prefix_batch</code></a>.</p>
+
+<p class="pclbl">Restore, before</p>
+<pre class="pc"><span class="who"># serving event loop: one coroutine per resumed request, many at once</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1847">handle_restored_request</a>(request):
+    admission, saved = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1851">to_thread</a>(resolve_restore, request.admission)
+
+<span class="who"># a pool thread, one per request</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L944">resolve_restore</a>(admission):
+    rows = <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L961">tq.get</a>(admission.staging_keys)  <span class="cm"># 1 TQ read per request</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L823">check_digests</a>(rows)                    <span class="cm"># any error: drop the cut; the call regenerates</span>
+    return admission, rows</pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1847-L1855">chat handler</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f06773eaf30acfd1fc535d38a8eecb6d6d16cff1/nemo_rl/models/generation/prefix_recovery/recovery.py#L944"><code>resolve_restore</code></a> (at the base).</p>
+
+<p class="pclbl">Restore, after</p>
+<pre class="pc"><span class="who"># serving event loop: one coroutine per resumed request, many at once</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1858">handle_restored_request</a>(request):
+<span class="add">    rows = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1859">reader.fetch</a>(request.admission.staging_keys)</span>      <span class="cm"># joins a shared read</span>
+<span class="add"></span>                                                                   <span class="cm"># on error: logged at DEBUG, rows = None</span>
+    admission, saved = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1862">to_thread</a>(resolve_restore, request.admission<span class="add">, rows</span>)
+
+<span class="who"># a pool thread, one per request</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1139">resolve_restore</a>(admission<span class="add">, rows=None</span>):
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1161">if rows is None</a>:</span>                                               <span class="cm"># the shared read failed: read again here</span>
+        rows = <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1162">tq.get</a>(admission.staging_keys)
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1164">check_digests</a>(rows)
+    return admission, rows
+
+<span class="add">class <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L23">PrefixReadBatcher</a>:</span>                                           <span class="cm"># one per worker, bound to the serving loop</span>
+<span class="add">    async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L51">fetch</a>(keys):</span>
+<span class="add">        futures = [<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L62">queue.add</a>(key) for key in keys]</span>
+<span class="add">        start <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L73">runner()</a> once, as a task on this loop</span>
+<span class="add">        return await <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L74">gather</a>(futures)</span>
+
+<span class="who">    # background task on the serving loop</span>
+<span class="add">    async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L104">runner</a>():</span>
+<span class="add">        while True:</span>
+<span class="add">            await <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L107">queue.not_empty</a></span>
+<span class="add">            await <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L108">sleep</a>(0.002)</span>                                     <span class="cm"># 2 ms for other requests to join</span>
+<span class="add">            batch = <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L109">queue.take</a>(up to 256 distinct keys)</span>
+<span class="add">            rows = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L91">to_thread</a>(tq.get, batch)</span>                  <span class="cm"># 1 TQ read for many requests</span>
+<span class="add">            <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L100">on error</a>: await to_thread(tq.get, [key]) for each key</span>  <span class="cm"># retry each key alone, once</span>
+<span class="add">            <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L134">hand each row</a> (or its error) to every request waiting on it</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1858-L1867">chat handler</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L995-L1012"><code>read_restore_chunks</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1139-L1162"><code>resolve_restore</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_read_batcher.py#L51-L140"><code>PrefixReadBatcher</code></a>.
+The shared read only happens because the chat handler calls <code>reader.fetch</code> first. The next section is about what happens when the rebase deletes that handler.</p>
+
+<h2>After the rebase onto #4979, the shared read is skipped (C13) — fix proposed, not in the PR</h2>
+<p>Merge plan: #4583 → main; #4979 (Dynamo) on #4583; #4612 on #4979; this PR on #4612. #4979 deletes the vLLM chat handler, the one place this PR calls
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1858-L1867"><code>read_restore_chunks</code></a>.
+Native and Dynamo then share one restore path, and it passes no rows:</p>
+
+<svg viewBox="0 0 940 190" role="img" aria-label="Restore path after the rebase">
+<defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--dim)"/></marker></defs>
+<rect class="box" x="14" y="20" width="200" height="34" rx="5"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/766f81d004ced81f457adf4d05eee298754c4a23/nemo_rl/models/generation/vllm/chat_server.py#L376"><text class="lbl" x="24" y="42">native chat_server</text></a>
+<rect class="box" x="14" y="76" width="200" height="34" rx="5"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/766f81d004ced81f457adf4d05eee298754c4a23/nemo_rl/models/generation/dynamo/vllm/adapter.py#L374"><text class="lbl" x="24" y="98">Dynamo adapter</text></a>
+<path class="arr2" d="M216,37 L262,58"/><path class="arr2" d="M216,93 L262,72"/>
+<rect class="box" x="264" y="48" width="150" height="34" rx="5"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/766f81d004ced81f457adf4d05eee298754c4a23/nemo_rl/models/generation/vllm/prompt_and_capture.py#L443"><text class="lbl" x="274" y="70">start_capture</text></a>
+<path class="arr2" d="M416,65 H446"/>
+<rect class="box" x="448" y="48" width="200" height="34" rx="5"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/766f81d004ced81f457adf4d05eee298754c4a23/nemo_rl/models/generation/vllm/prompt_and_capture.py#L119-L135"><text class="lbl" x="458" y="70">resolve_restored_call</text></a>
+<path class="arr2" d="M650,65 H680"/>
+<rect class="bad" x="682" y="48" width="244" height="34" rx="5"/>
+<text class="lbl" x="692" y="70">resolve_restore(adm, ids)</text>
+<text class="red" x="682" y="102">no chunks → 1 get per restore</text>
+<text class="small" x="682" y="122">r0, r1, r2 → 3 gets, as before this PR</text>
+<text class="small" x="14" y="150">PrefixReadBatcher is never called. Restores still work, so no test fails and no error or</text>
+<text class="small" x="14" y="168">generation_prefix_read_batch log line appears. Each worker serves restores on one event loop in both modes.</text>
+</svg>
+
+<p class="where"><b>Where the fix lands: RL only.</b>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1139-L1187"><code>PrefixRecovery.resolve_restore</code></a> in this PR, and one call in #4979's
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/766f81d004ced81f457adf4d05eee298754c4a23/nemo_rl/models/generation/vllm/prompt_and_capture.py#L131-L134"><code>resolve_restored_call</code></a>.
+<b>No Dynamo-only code:</b> both paths call that function. <b>Cut-time writes need no change:</b> Dynamo calls the same
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/766f81d004ced81f457adf4d05eee298754c4a23/nemo_rl/models/generation/dynamo/vllm/adapter.py#L241"><code>run_cut</code></a>.</p>
+
+<p class="pclbl">The fix, as pseudocode (proposed, not run)</p>
+<pre class="pc"><span class="who"># serving event loop: native chat_server or Dynamo adapter, after #4979</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/766f81d004ced81f457adf4d05eee298754c4a23/nemo_rl/models/generation/vllm/prompt_and_capture.py#L119">resolve_restored_call</a>(request):
+<span class="del">    admission, saved = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/766f81d004ced81f457adf4d05eee298754c4a23/nemo_rl/models/generation/vllm/prompt_and_capture.py#L132">to_thread</a>(resolve_restore, request.admission)</span>  <span class="cm"># no rows: the shared read never runs</span>
+<span class="add">    admission, saved = await resolve_restore(request.admission)</span>
+
+<span class="who"># PrefixRecovery in this PR: the read moves inside, so no caller can skip it</span>
+<span class="del">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1139">resolve_restore</a>(admission, rows=None):</span>
+<span class="add">async def resolve_restore(admission):</span>
+<span class="add">    rows = await reader.fetch(admission.staging_keys)</span>                       <span class="cm"># on the serving loop; restores share the read</span>
+<span class="del">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1161">if rows is None</a>:</span>
+<span class="del">        rows = tq.get(admission.staging_keys)</span>                               <span class="cm"># the second read goes</span>
+<span class="add">    await to_thread(check_digests, rows)</span>                                    <span class="cm"># slow checks stay off the loop</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L1177">on any error</a>: WARNING, drop the cut; the call regenerates
+
+<span class="del">async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/507a67034002469644c29a86d3b2b1c906f5b6d3/nemo_rl/models/generation/prefix_recovery/recovery.py#L995">read_restore_chunks</a>(admission): ...</span>                               <span class="cm"># deleted, with its DEBUG log</span></pre>
+<p style="font-size:13.5px">What each piece does: <code>resolve_restore</code> now does the shared read itself, so no caller can skip it. Any read failure, including a wrong-loop call, reaches the existing <code>except</code>: a WARNING, and the call regenerates. Before, a DEBUG log hid it and the rows were read again.
+The <code>chunks=</code> argument, <code>_fetch_chunks</code> and <code>read_restore_chunks</code> go, about −25 source lines. The return type stays the same, so the routes from #4612 C27 and the media from #4979 C92 ride on the same object.
+About 8 test calls gain <code>await</code>. C14 replaces the two fallback tests with one test of 4 concurrent restores through <code>resolve_restored_call</code> that asserts one read, plus one log grep in the prefix-recovery functional script, which also runs behind Dynamo. Sketch, not run.</p>
+<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4508#discussion_r4577477105">C13 — recovery.py:995</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/4508#discussion_r4577477174">C14 — test_vllm_token_capture_hosting.py:4145</a></p>
+
+<div class="hl"><b>So what.</b> The batching itself is sound and reuses the old code well. But its restore half hangs on one call site that the Dynamo rebase deletes, and nothing would notice: restores would quietly go back to one read each.
+Moving the read into <code>resolve_restore</code> fixes that for native and Dynamo at once, and makes the PR smaller. The other size cuts are on the next page, <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4508-what-can-shrink.html">2 · what can shrink</a>.</div>
+
+</div>
+</body>
+</html>

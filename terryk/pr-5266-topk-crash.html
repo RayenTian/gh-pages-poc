@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5266 — a top-k neighbor crashes packed capture</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 14px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--red)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.warn{border-left:4px solid var(--red);background:var(--surface);padding:10px 16px;margin:18px 0;border-radius:0 8px 8px 0}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .ok{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .cA{fill:var(--accent);opacity:.35}
+svg .cB{fill:var(--orange);opacity:.35}
+svg .lane{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .lbl{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .val{fill:var(--text);font:11.5px ui-monospace,Menlo,monospace}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .red{fill:var(--red);font:bold 11.5px ui-monospace,Menlo,monospace}
+svg .grn{fill:var(--green);font:bold 11.5px ui-monospace,Menlo,monospace}
+svg .arr{stroke:var(--dim);stroke-width:1.5;fill:none;marker-end:url(#ah)}
+svg .arrR{stroke:var(--red);stroke-width:1.8;fill:none;marker-end:url(#ahr)}
+svg .ahd{fill:var(--dim)} svg .ahr{fill:var(--red)}
+svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>A request that asks for top-k logprobs crashes packed capture for its whole frontend</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5266">NVIDIA-NeMo/RL #5266</a>.
+NeMo-RL links pin the PR head <code>8299d55f</code>; vLLM links pin <code>v0.33.0</code> (<code>4ba787ec</code>).</p>
+
+<div class="status"><dl>
+<dt>Before</dt><dd>vLLM's own code stores a no-top-k request's logprob fine, even when a neighbor in the same engine step asked for top-k: it keeps only the first column.</dd>
+<dt>This PR</dt><dd>The packed store accepts only one column per row and raises on anything wider, inside vLLM's output loop.</dd>
+<dt>Status</dt><dd><span class="verdict open">Open — not fixed in this PR.</span> Raised in review comment C3 with a 1-line fix. Found by reading vLLM 0.33 source plus a CPU run of the PR's class; not run on a GPU.</dd>
+</dl></div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5266-packed-vs-flat.html">packed vs native</a>
+  <span class="here">top-k crash</span>
+</nav>
+<p class="chainnote">Two pages on this PR, one question each. This one: the crash and its fix.</p>
+
+<p>vLLM samples all running requests together in one engine step. If any request in that step wants top-k logprobs, vLLM makes the logprob array that wide for <em>every</em> row: <code>max_num_logprobs + 1</code> columns (<a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/worker/gpu_input_batch.py#L1139-L1140">gpu_input_batch.py:1139</a>, <a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/outputs.py#L34-L38">outputs.py:34</a>). Each request then gets its own rows, but the columns are not cut (<a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/outputs.py#L47-L56"><code>slice_request</code></a>). Column 0 is always the token that was sampled. The packed hook itself sends captured top-k requests down the native path (<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L76">patches.py:76</a>), so they are expected to share the engine.</p>
+
+<h2>One engine step, two requests</h2>
+
+<svg viewBox="0 0 940 440" role="img" aria-label="Request A (packed, no top-k) and request B (top_logprobs=2) share an engine step; A gets a 3-column row; native keeps column 0, packed raises and the output loop dies">
+<defs>
+<marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="ahd" d="M0,0 L8,4 L0,8 z"/></marker>
+<marker id="ahr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="ahr" d="M0,0 L8,4 L0,8 z"/></marker>
+</defs>
+<rect class="box" x="14" y="12" width="912" height="96" rx="8"/>
+<text class="lbl" x="28" y="34">① one engine step: request A (captured, packed, top_logprobs=0) + request B (top_logprobs=2)</text>
+<rect class="cA" x="28" y="46" width="390" height="22"/><text class="val" x="36" y="62">row A:  ids [9, 9, 11]   values [-0.25, -0.25, -1.75]</text>
+<rect class="cB" x="28" y="72" width="390" height="22"/><text class="val" x="36" y="88">row B:  ids [ … ]   values [ … ]   (also 3 columns)</text>
+<text class="note" x="432" y="62">width = B's 2 top-k + 1 sampled = 3 columns, for every row.</text>
+<text class="note" x="432" y="80">Column 0 is the sampled token. A asked for none of the rest.</text>
+<a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/sample/sampler.py#L146"><text x="432" y="98">sampler.py:146</text></a>
+
+<path class="arr" d="M200 108 L200 136"/><path class="arr" d="M700 108 L700 136"/>
+<text class="lane" x="14" y="132">native vLLM path</text>
+<text class="lane" x="486" y="132">packed path (this PR), request A only</text>
+
+<rect class="ok" x="14" y="140" width="440" height="88" rx="8"/>
+<text class="lbl" x="28" y="162">② append_logprobs_for_next_position, num_logprobs=0</text>
+<text class="val" x="28" y="183">zip with ranks (1,) → keeps column 0 only</text>
+<text class="grn" x="28" y="203">stored: (9, -0.25, rank 1)</text>
+<a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/logprobs.py#L178-L196"><text x="300" y="218">vllm/logprobs.py:178</text></a>
+
+<rect class="bad" x="486" y="140" width="440" height="88" rx="8"/>
+<text class="lbl" x="500" y="162">② update() → append_arrays(ids, values, ranks)</text>
+<text class="val" x="500" y="183">ids.shape (1, 3); check needs shape[1] == 1</text>
+<text class="red" x="500" y="203">ValueError: Expected one selected token…</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/packed_logprobs.py#L56-L61"><text x="760" y="218">packed_logprobs.py:56</text></a>
+
+<path class="arr" d="M200 228 L200 256"/><path class="arrR" d="M700 228 L700 256"/>
+
+<rect class="ok" x="14" y="260" width="440" height="66" rx="8"/>
+<text class="lbl" x="28" y="282">③ step done; A and B keep generating</text>
+<text class="val" x="28" y="304">A's logprobs so far: [-0.5, -0.25]</text>
+
+<rect class="bad" x="486" y="260" width="440" height="66" rx="8"/>
+<text class="lbl" x="500" y="282">③ output_handler: "AsyncLLM output_handler failed."</text>
+<text class="val" x="500" y="304">propagate_error → every in-flight request fails</text>
+<a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/engine/async_llm.py#L936-L944"><text x="500" y="320">async_llm.py:936</text></a>
+
+<path class="arrR" d="M700 326 L700 352"/>
+<rect class="bad" x="486" y="356" width="440" height="50" rx="8"/>
+<text class="lbl" x="500" y="378">④ the output_handler task has ended</text>
+<text class="val" x="500" y="396">that HTTP frontend stops returning results</text>
+
+<rect class="ok" x="14" y="356" width="14" height="12"/><text class="note" x="34" y="366">works</text>
+<rect class="bad" x="90" y="356" width="14" height="12"/><text class="note" x="110" y="366">fails</text>
+<rect class="cA" x="160" y="356" width="14" height="12"/><text class="note" x="180" y="366">request A row</text>
+<rect class="cB" x="270" y="356" width="14" height="12"/><text class="note" x="290" y="366">request B row</text>
+<text class="note" x="14" y="392">Trigger: packing on, and any request on the same engine</text>
+<text class="note" x="14" y="408">with top_logprobs ≥ 1 (uncaptured caller, or a captured</text>
+<text class="note" x="14" y="424">top-k request the hook skips).</text>
+</svg>
+
+<p>The values come from a CPU run of the PR's <code>PackedSelectedLogprobs</code>, fed one 1-column row (<code>-0.5</code>) and then the 3-column row above. Native vLLM's rule, applied to the same row, keeps <code>(9, -0.25, 1)</code>. The packed class raises <code>ValueError: Expected one selected token and rank per position</code>. The exception leaves <code>process_outputs</code>, and vLLM's output loop has no per-request catch around it.</p>
+
+<h2>The fix — proposed, not in the PR</h2>
+<p class="where"><b>Where the fix lands: RL only, one line in <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L91-L93"><code>patches.py</code> <code>update</code></a>, plus a 3-column test case</b> in <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/tests/unit/models/generation/test_vllm_patches.py#L979"><code>test_hook_only_changes_eligible_requests</code></a> and the real-vLLM test (<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/tests/unit/models/generation/test_vllm_patches.py#L1073-L1079">test_vllm_patches.py:1073</a>), which today only feeds 1-column rows. No vLLM change.</p>
+
+<p class="pclbl">The fix, as pseudocode (proposed; the slice was run on CPU, not on a GPU)</p>
+<pre class="pc"><span class="who"># generation actor, vLLM output loop (one task, every engine step)</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L87">update</a>(rows):
+    ids, vals, ranks, _ = rows                    <span class="cm"># ids [1, 3] here</span>
+    before = len(history)
+<span class="del">    history.append_arrays(ids, vals, ranks)</span>       <span class="cm"># raises on width 3</span>
+<span class="add">    history.append_arrays(ids[:, :1], vals[:, :1], ranks)</span>  <span class="cm"># keep column 0, like native</span>
+    cumulative = history.cumulative_after(cumulative, start=before)</pre>
+<p class="pcref">With the slice, the same run stores <code>[-0.5, -0.25]</code>, which matches native. <code>append_arrays</code> keeps its 1-column check, so a wrong caller still fails loudly.</p>
+
+<div class="warn"><b>The consequence.</b> As written, one top-k request on the same engine, captured or not, fails every in-flight request on that frontend and stops it serving. Fix the slice before merge. Then run the PR's unchecked “captured serving smoke” box with a <code>top_logprobs=0</code> captured request running alongside a <code>top_logprobs=2</code> request.</div>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5266#discussion_r4610529740">review comment C3 — patches.py:91</a></p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5201 — why Pixtral VLMs could not use token capture, and what this PR adds</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--orange)}
+.bg{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.shapes{font-size:13.5px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;margin:10px 0}
+.warn{border-left:4px solid var(--orange);background:var(--surface);padding:10px 14px;margin:18px 0;border-radius:0 8px 8px 0}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .ok{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .shared{fill:var(--surface2);stroke:var(--green);stroke-width:2}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .lblb{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .redt{fill:var(--red);font:12px ui-monospace,Menlo,monospace}
+svg .grnt{fill:var(--green);font:12px ui-monospace,Menlo,monospace}
+svg .num{fill:var(--orange);font:bold 13px -apple-system,sans-serif}
+svg .tk-img{fill:var(--green);opacity:.45}
+svg .tk-brk{fill:var(--dim);opacity:.45}
+svg .tk-end{fill:var(--orange);opacity:.5}
+svg .tk-ctx{fill:var(--accent);opacity:.45}
+svg .tkt{fill:var(--text);font:10px ui-monospace,Menlo,monospace}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Why a Pixtral VLM could not use token capture, and what this PR adds</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5201">NVIDIA-NeMo/RL #5201</a>
+· feat(vllm): token capture for Pixtral (Mistral3) images · permalinks pin head <code>2fc3ba0</code>
+(before-the-PR links pin the merge base <code>bb9ed78</code>).</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>Token capture only understood one image format: the Nemotron Omni processor. Turning it on for a
+  Pixtral (Mistral3) model failed at setup, and even past setup the capture code would refuse every Pixtral image.</dd>
+  <dt>This PR</dt>
+  <dd>Teaches the vLLM worker and <code>capture_processed_media</code> to read Pixtral images and stage them in the
+  same packed format Omni already uses, so the storage and trainer-side code stay unchanged.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Worker side done; not usable from a run on <code>main</code> yet.</span>
+  The driver check in <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/algorithms/single_controller_utils/setup.py#L1355-L1358"><code>setup.py</code></a>
+  still refuses any VLM that is not Omni. The PR says so, and a code comment says so. A follow-up must open that check
+  and give Pixtral a learner that reads the packed images.</dd>
+</dl>
+</div>
+
+<div class="bg"><b>Background: token capture.</b> In GRPO the policy generates with vLLM, then the trainer
+computes log-probs on the same conversation. Without token capture, the trainer <i>rebuilds</i> the input:
+it re-tokenizes the chat and re-runs the image processor. If anything differs (pixels, image size, where the image
+tokens sit), the trainer scores a slightly different input than the one the policy saw.
+With <span class="tip" tabindex="0" data-tip="Config key token_capture.enabled. The async vLLM worker stores each call's new tokens and the exact processed images it used; the trainer builds rollouts from those stored rows.">token capture</span>
+on, the vLLM worker stores the exact tokens and the exact processed pixels it used, and the trainer reads those.
+For a VLM this is how the learner sees the same pixels and image-token positions the policy did.
+Dotted words have a short explanation: hover or tap them.</div>
+
+<h2>The gap: Pixtral lays out image tokens in rows, Omni in one run</h2>
+
+<p>Two things stopped Pixtral. First, the worker's setup accepted only Omni's processor and raised
+<code>Media capture requires vLLM's Omni dynamic-resolution processor</code>
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/bb9ed784e4bb2129dc57b04e26d6f06a51c39194/nemo_rl/models/generation/vllm/vllm_worker_async.py#L907-L913">before, worker:907</a>).
+Second, the capture code required an image's tokens to be <b>one unbroken run</b>
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/bb9ed784e4bb2129dc57b04e26d6f06a51c39194/nemo_rl/data/captured_media.py#L479-L484">before, captured_media:479</a>).
+Pixtral writes an image as rows of <code>[IMG]</code> tokens with a break token after each row, so it can never be one run.
+The PR's own test feeds a Pixtral prompt down the Omni path and gets exactly that rejection
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/tests/unit/data/test_captured_media_pixtral.py#L208-L215"><code>test_omni_still_requires_one_contiguous_run</code></a>).</p>
+
+<div class="shapes"><b>Reading the shapes</b> (one 56×84 image, from the PR's unit test, patch size 14, merge 2):
+<code>[3, 56, 84]</code> = <code>[colors, height, width]</code>, raw pixels. ·
+One <code>[IMG]</code> token covers a 28×28 cell (14 px patch × merge 2), so the image is 2 rows × 3 columns = 6 image tokens. ·
+<code>imgs [1, 24, 588]</code> = <code>[batch, patches, numbers per patch]</code>: 24 patches of 14×14 pixels, 588 = 3 colors × 14 × 14.</div>
+
+<svg viewBox="0 0 960 600" role="img" aria-label="Two lanes, Omni and Pixtral, from driver check through worker setup, token check and pixels, to the shared packed format">
+  <text class="hdr" x="20" y="22">Same 56×84 image, two processors</text>
+  <text class="lblb" x="20" y="48">Omni (supported before)</text>
+  <text class="lblb" x="500" y="48">Pixtral / Mistral3 (what this PR adds)</text>
+
+  <!-- step 0 driver -->
+  <text class="num" x="4" y="84">0</text>
+  <rect class="ok" x="20" y="64" width="440" height="46" rx="7"/>
+  <text class="lbl" x="32" y="84">driver: uses_image_placeholder(processor)</text>
+  <text class="grnt" x="32" y="101">✓ Omni processor is on the list</text>
+  <rect class="bad" x="500" y="64" width="440" height="46" rx="7"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/algorithms/single_controller_utils/setup.py#L1355-L1358"><text x="512" y="84">setup.py:1355 (unchanged)</text></a>
+  <text class="redt" x="512" y="101">✗ still raises on main, before and after</text>
+
+  <!-- step 1 worker setup -->
+  <text class="num" x="4" y="148">1</text>
+  <rect class="ok" x="20" y="128" width="440" height="58" rx="7"/>
+  <text class="lbl" x="32" y="148">worker setup_token_capture</text>
+  <text class="grnt" x="32" y="166">✓ NanoNemotronVLProcessingInfo, dynamic tiler</text>
+  <text class="note" x="32" y="180">reads the image-context token id + patch size</text>
+  <rect class="ok" x="500" y="128" width="440" height="58" rx="7"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/models/generation/vllm/vllm_worker_async.py#L912-L919"><text x="512" y="148">worker:912 new Mistral3ProcessingInfo branch</text></a>
+  <text class="grnt" x="512" y="166">✓ image_token_index, patch 14, merge 2</text>
+  <text class="redt" x="512" y="180">before: ValueError "requires … Omni …"</text>
+
+  <!-- step 2 tokens -->
+  <text class="num" x="4" y="214">2</text>
+  <text class="note" x="20" y="214">prompt tokens for the image (green = image token that gets an embedding)</text>
+  <rect class="box" x="20" y="222" width="440" height="96" rx="7"/>
+  <g>
+    <rect class="tk-ctx" x="32" y="234" width="62" height="22" rx="3"/><text class="tkt" x="44" y="249">ctx</text>
+    <rect class="tk-ctx" x="98" y="234" width="62" height="22" rx="3"/><text class="tkt" x="110" y="249">ctx</text>
+    <rect class="tk-ctx" x="164" y="234" width="62" height="22" rx="3"/><text class="tkt" x="176" y="249">ctx</text>
+    <text class="tkt" x="236" y="249">… one unbroken run</text>
+  </g>
+  <text class="lbl" x="32" y="280">check: positions are one run</text>
+  <text class="grnt" x="32" y="300">✓ passes</text>
+
+  <rect class="box" x="500" y="222" width="440" height="96" rx="7"/>
+  <g>
+    <rect class="tk-img" x="510" y="234" width="46" height="22" rx="3"/><text class="tkt" x="516" y="249">IMG</text>
+    <rect class="tk-img" x="559" y="234" width="46" height="22" rx="3"/><text class="tkt" x="565" y="249">IMG</text>
+    <rect class="tk-img" x="608" y="234" width="46" height="22" rx="3"/><text class="tkt" x="614" y="249">IMG</text>
+    <rect class="tk-brk" x="657" y="234" width="46" height="22" rx="3"/><text class="tkt" x="663" y="249">BRK</text>
+    <rect class="tk-img" x="706" y="234" width="46" height="22" rx="3"/><text class="tkt" x="712" y="249">IMG</text>
+    <rect class="tk-img" x="755" y="234" width="46" height="22" rx="3"/><text class="tkt" x="761" y="249">IMG</text>
+    <rect class="tk-img" x="804" y="234" width="46" height="22" rx="3"/><text class="tkt" x="810" y="249">IMG</text>
+    <rect class="tk-end" x="853" y="234" width="46" height="22" rx="3"/><text class="tkt" x="859" y="249">END</text>
+  </g>
+  <text class="redt" x="512" y="276">before: ✗ "requires contiguous image embedding positions"</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/data/captured_media.py#L531-L553"><text x="512" y="294">after (captured_media:531): count IMG = 6</text></a>
+  <text class="grnt" x="512" y="310">✓ 6 = (56/28 rows) × (84/28 cols) = 2 × 3</text>
+
+  <!-- step 3 pixels -->
+  <text class="num" x="4" y="352">3</text>
+  <rect class="ok" x="20" y="334" width="440" height="58" rx="7"/>
+  <text class="lbl" x="32" y="354">pixel_values_flat [3, 56, 84]</text>
+  <text class="note" x="32" y="372">+ imgs_sizes [56, 84] from the processor</text>
+  <text class="note" x="32" y="386">already in the engine's model dtype</text>
+  <rect class="ok" x="500" y="334" width="440" height="58" rx="7"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/data/captured_media.py#L394-L423"><text x="512" y="354">_processed_pixtral_tensors (new)</text></a>
+  <text class="lbl" x="512" y="372">pixel_values [3, 56, 84] float32</text>
+  <text class="grnt" x="512" y="386">→ cast to model dtype (bf16); size from the tensor</text>
+
+  <!-- arrows to shared -->
+  <path class="arr" d="M240 392 L240 420 L470 420 L470 432"/>
+  <path class="arr" d="M720 392 L720 420 L490 420 L490 432"/>
+
+  <!-- step 4 shared -->
+  <text class="num" x="4" y="458">4</text>
+  <rect class="shared" x="20" y="432" width="920" height="70" rx="8"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/data/captured_media.py#L326"><text x="32" y="454">pack_images (shared, unchanged)</text></a>
+  <text class="lbl" x="32" y="474">imgs [1, 24, 588]   imgs_sizes [[56, 84]]</text>
+  <text class="grnt" x="32" y="494">The two paths become one here. Same staged columns, same trainer-side reassembly.</text>
+
+  <!-- step 5 downstream -->
+  <text class="num" x="4" y="540">5</text>
+  <rect class="box" x="20" y="520" width="440" height="56" rx="7"/>
+  <text class="lbl" x="32" y="542">TQ sink + RolloutReassembler</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/experience/rollout_reassembler.py#L266"><text x="32" y="562">_concat_media / _trainer_media: no change</text></a>
+  <rect class="box" x="500" y="520" width="440" height="56" rx="7" style="stroke-dasharray:5 4"/>
+  <text class="lbl" x="512" y="542">learner that reads Pixtral imgs</text>
+  <text class="note" x="512" y="562">not in this PR (follow-up, per the PR body)</text>
+</svg>
+
+<p class="pcref">Legend: green border = works, red border = refused, dashed = still missing. Numbers 0–5 are the order a run goes through.</p>
+
+<h2>How the PR closes the gap</h2>
+
+<p class="where"><b>Where it lands: RL only, two source files.</b>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/models/generation/vllm/vllm_worker_async.py#L896-L938"><code>vllm_worker_async.py</code></a>
+picks the image family at setup and passes it on;
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/data/captured_media.py#L394-L556"><code>captured_media.py</code></a>
+reads Pixtral pixels and checks Pixtral's token rows.
+<b>No change</b> to the TQ sink or the reassembler: Pixtral is packed into the format they already read.</p>
+
+<p class="pclbl">Worker setup, after (new lines green)</p>
+<pre class="pc"><span class="who"># vLLM worker, once at startup</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/models/generation/vllm/vllm_worker_async.py#L849">setup_token_capture</a>(capture_media):
+    info = engine.mm_processor.info
+<span class="add">    if isinstance(info, <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/models/generation/vllm/vllm_worker_async.py#L912">Mistral3ProcessingInfo</a>):</span>
+<span class="add">        family = "pixtral"</span>
+<span class="add">        image_token = cfg.image_token_index</span>      <span class="cm"># [IMG]</span>
+<span class="add">        patch, merge = cfg.vision_config.patch_size, cfg.spatial_merge_size</span>  <span class="cm"># 14, 2</span>
+<span class="add">    else:</span>
+        require Omni dynamic tiler, else raise   <span class="cm"># unchanged Omni checks</span>
+        image_token, patch = omni context token, cfg.patch_size</pre>
+
+<p class="pclbl">Capture one image, before → after</p>
+<pre class="pc"><span class="who"># vLLM worker, per chat call, off the event loop</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/data/captured_media.py#L426">capture_processed_media</a>(prompt, family, cast_dtype, merge):
+    for image in prompt.images:
+<span class="add">        if family == "pixtral":</span>
+<span class="add">            pixels = image.pixel_values.to(cast_dtype)</span>          <span class="cm"># fp32 → bf16, size = tensor's own H, W</span>
+<span class="add">            positions = where token == [IMG]</span>                    <span class="cm"># 6 of the 8 tokens</span>
+<span class="add">            require len(positions) == (H/28) * (W/28)</span>          <span class="cm"># 2 × 3 = 6</span>
+        else:
+            pixels = image.pixel_values_flat
+            require positions are one unbroken run      <span class="cm"># the check Pixtral always failed</span>
+        require every position holds the image token
+        imgs += <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/data/captured_media.py#L326">pack_images</a>(pixels)                      <span class="cm"># [1, 24, 588] — same for both</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/data/captured_media.py#L394"><code>_processed_pixtral_tensors</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/data/captured_media.py#L531-L566">the Pixtral position check</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/2fc3ba0ef632a65956a510c177044dd1f88612f2/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1198-L1210">the call site that passes the family and dtype</a>.</p>
+
+<p class="pcref">Review comments on this change (all small; none blocks the worker side):</p>
+<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5201#discussion_r4604721394">C2 · getattr defaults kept only for test stubs — vllm_worker_async.py:1201</a></p>
+<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5201#discussion_r4604721411">C3 · setup error still says Omni only — vllm_worker_async.py:925</a></p>
+<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5201#discussion_r4604721434">C4 · width half of the geometry check untested — test_captured_media_pixtral.py:126</a></p>
+<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5201#discussion_r4604868646">C5 · driver and worker keep separate lists of supported families — vllm_worker_async.py:912</a></p>
+
+<div class="warn"><b>So what.</b> This is the worker half of Pixtral support. After it, a Pixtral image is captured, checked
+against its own size, and staged exactly like an Omni image, so nothing downstream of the worker changes.
+But a GRPO run on <code>main</code> still stops at the driver check in step 0. To train a Pixtral VLM with token capture,
+a follow-up must add Pixtral to that check and give it a learner that reads the packed <code>imgs</code>.
+The PR says this was tested end to end on an internal branch that already has those pieces.</div>
+
+</div>
+</body>
+</html>

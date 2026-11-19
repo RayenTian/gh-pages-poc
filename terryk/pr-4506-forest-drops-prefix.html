@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #4506 — why forest training throws away every restored prefix</title>
+<style>
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2128; --border:#30363d;
+  --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --green:#3fb950;
+  --orange:#d29922; --red:#f85149;
+}
+:root[data-theme="light"]{
+  --bg:#ffffff; --surface:#f6f8fa; --surface2:#eaeef2; --border:#d0d7de;
+  --text:#1f2328; --dim:#59636e; --accent:#0969da; --green:#1a7f37;
+  --orange:#9a6700; --red:#cf222e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);
+  padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;
+  white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--red)}
+.bg{border-left:3px solid var(--dim);background:var(--surface);padding:10px 14px;margin:0 0 16px;
+  font-size:14px;border-radius:0 8px 8px 0}
+.warn{border-left:3px solid var(--orange);background:var(--surface);
+  padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)}
+.diff .del{color:var(--red)}
+.diff .hunk{color:var(--accent)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .box-good{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .box-bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .t{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .d{fill:var(--text);font:11.5px ui-monospace,Menlo,monospace}
+svg .bad{fill:var(--red);font:bold 11.5px ui-monospace,Menlo,monospace}
+svg .good{fill:var(--green);font:bold 11.5px ui-monospace,Menlo,monospace}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .lane{fill:var(--green);font:bold 13px -apple-system,sans-serif}
+svg .lane-bad{fill:var(--red);font:bold 13px -apple-system,sans-serif}
+svg .arrow{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg .ah{fill:var(--dim)}
+svg .sw-good{fill:var(--green)} svg .sw-bad{fill:var(--red)}
+svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);
+  border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace;margin:2px 4px 2px 0}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border-bottom:1px solid var(--border);padding:5px 8px;text-align:left;vertical-align:top}
+th{color:var(--dim);font-weight:600;font-size:12px}
+.tbl{overflow-x:auto}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Why forest training throws away every restored prefix</h1>
+<p class="sub">Explainer for <a href="https://github.com/NVIDIA-NeMo/RL/pull/4506">NVIDIA-NeMo/RL #4506</a>. All permalinks pin the PR head <code>b6aff18f</code> and the Gym version it pins, <code>5911d628</code>. The review comment is in a pending review; its link works once the review is published.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>Turn-level recovery only. A model call still decoding at the checkpoint restarts from the start of its turn, so there is no saved prefix to lose.</dd>
+  <dt>This PR</dt>
+  <dd>Adds <code>target_level: prefix</code>: the tokens a running call has decoded are saved, and the restarted call continues from them. With <code>token_capture.forest_training: true</code>, the worker drops that saved prefix before using it.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Open — not fixed in this PR.</span> Nothing breaks loudly: every restored call quietly decodes again from scratch. Tracked in review comment C26, which asks to fix it in this PR.</dd>
+</dl>
+</div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4506-prefix-vs-turn.html">prefix vs turn</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4506-checkpoint-sequence.html">checkpoint sequence</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4506-how-cut-copies.html">how the cut copies tokens</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4506-prefix-on-dynamo.html">prefix with Dynamo</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4506-size-and-reuse.html">size and reuse</a>
+  <span class="here">forest training drops the prefix</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4506-how-it-fits.html">how it fits (proposed)</a>
+</nav>
+<p class="chainnote">Seven pages on this PR, one question each — this one: why a restored prefix is lost when forest training is on.</p>
+
+<div class="bg"><b>Background: how Gym links one model call to the next.</b>
+<p style="margin:6px 0">Token capture records the exact tokens of every model call, so training sees what the model really produced. To reuse those tokens, Gym links each call to the call before it in the same rollout. Each call reaches the vLLM worker with an <b>admission</b>: Gym's note saying which rollout the call belongs to, which earlier call it continues, and, after a restore, the saved prefix to resume (<code>generation_cut</code>). The setting <code>parent_resolution</code> picks how Gym finds that earlier call (<a href="https://github.com/NVIDIA-NeMo/RL/blob/d33e36284fded7ef7bb5a0790ba3375723a4e91c/nemo_rl/environments/nemo_gym.py#L1174-L1176">nemo_gym.py:1174</a>):</p>
+<div class="tbl"><table>
+<tr><th></th><th>Default (<code>fingerprint</code>)</th><th>Forest training (<code>source_history</code>)</th></tr>
+<tr><td>Turned on by</td><td>always, unless forest training is on</td><td><code>token_capture.forest_training: true</code> (<a href="https://github.com/NVIDIA-NeMo/RL/blob/d33e36284fded7ef7bb5a0790ba3375723a4e91c/nemo_rl/algorithms/single_controller_utils/config.py#L693-L696">config.py:693</a>)</td></tr>
+<tr><td>Made for</td><td>a chat that only grows: each prompt is the last prompt, plus the last answer, plus a new message</td><td>agents that edit their own history: they summarize old turns, start sub-agents, or retry. One rollout's calls form a tree instead of one chain, and training keeps the chosen branches.</td></tr>
+<tr><td>What Gym sends</td><td><code>mode="token_in"</code> with the earlier tokens. The worker always continues from them.</td><td><code>mode="candidate"</code> ("this call <i>may</i> continue that one"), plus two fingerprints. RL decides.</td></tr>
+</table></div>
+<p style="margin:6px 0"><b><code>request_replay</code> is that first fingerprint.</b> It has nothing to do with router replay, and it is not the message text. It holds one (role, hash) pair per message of this request, as the agent sent it, plus a hash of the chat-template options (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/nemo_gym/token_id_capture/staging/records.py#L177-L205">Gym records.py:177-205</a>). The second fingerprint, <code>candidate_replay</code>, holds the message count and one hash for the earlier call's messages. RL's <code>decide_capture_input</code> compares the two (<a href="https://github.com/NVIDIA-NeMo/RL/blob/d33e36284fded7ef7bb5a0790ba3375723a4e91c/nemo_rl/models/generation/capture_context.py#L43-L89">capture_context.py:43-89</a>):</p>
+<ul style="margin:4px 0">
+<li>If the new request is the earlier call's messages, plus new messages that start right after the model's answer, RL continues from the earlier tokens.</li>
+<li>Otherwise RL starts a new chain from the rendered text.</li>
+</ul>
+<p style="margin:6px 0">With forest training, every call carries <code>request_replay</code>, so every call goes through this decision. Either way, the decision builds a <b>new</b> admission, and that new admission never copies <code>generation_cut</code>. That is the bug below. Dotted words have a short explanation: hover or tap them.</p></div>
+
+<p><b>Example: one parent, two possible next calls.</b> Parent call P sent <code>[system S, user U1]</code> and answered <code>A1</code>. Gym saved P's <code>candidate_replay</code> summary: 3 messages, and one hash over (S, U1, A1) (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/nemo_gym/token_id_capture/external_capture.py#L352-L358">external_capture.py:352</a>).</p>
+<div class="tbl"><table>
+<tr><th>Next call sends</th><th>Its <code>request_replay</code></th><th>Gym: do the first 3 match P?</th><th>RL decides</th></tr>
+<tr><td><code>[S, U1, A1, tool T1]</code></td><td>4 (role, hash) pairs</td><td>yes → <code>mode="candidate"</code> with P's summary</td><td>The new part <code>[T1]</code> starts right after the answer A1, so continue from P's exact tokens.</td></tr>
+<tr><td><code>[S, U_summary, …]</code> (the agent compacted its history)</td><td>(role, hash) pairs for the new list</td><td>no → no parent is linked</td><td>Start a new chain from the rendered text.</td></tr>
+</table></div>
+<p>Gym also compares the two chat-template hashes. If they differ, it starts a new chain even when the messages match (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/nemo_gym/token_id_capture/external_capture.py#L146-L158">external_capture.py:146-158</a>).</p>
+
+<p>Gym attaches the saved prefix to the call's admission and then deletes its own copy
+(<a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/nemo_gym/_checkpoint/model.py#L449-L457">Gym model.py:449-457</a>, <code>restored_cuts.take</code>), so it is offered exactly once.
+With forest training, Gym links calls by source history
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/b6aff18f982137a538bbf5d3540983e0d094a95c/nemo_rl/environments/nemo_gym.py#L1174-L1176">nemo_gym.py:1174-1176</a>), so the admission carries <code>request_replay</code>.
+The worker sends any such admission through <code>decide_capture_input</code>
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/b6aff18f982137a538bbf5d3540983e0d094a95c/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2176-L2203">vllm_worker_async.py:2176-2203</a>), which builds a new admission and leaves <code>generation_cut</code> out
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/b6aff18f982137a538bbf5d3540983e0d094a95c/nemo_rl/models/generation/capture_context.py#L43-L89">capture_context.py:43-89</a>). The worker's own comment says so: "A candidate decision rebuilds the admission without a cut".</p>
+
+<h2>Same restored call, two kinds of admission</h2>
+
+<svg viewBox="0 0 940 372" role="img" aria-label="Two lanes for the same restored call with a 13-token budget and 5 saved tokens. Normal admission: the cut is kept, the prompt grows to 16 ids, vLLM decodes 8 tokens. Forest admission: decide_capture_input drops the cut, vLLM decodes all 13 tokens again, nothing counts it, and the 5-token chunk row stays in TQ.">
+  <text class="t" x="16" y="22">Restored call: prompt 11 ids, 13-token budget, 5 tokens saved at the checkpoint</text>
+  <rect class="sw-good" x="620" y="11" width="13" height="12" rx="2"/><text class="note" x="639" y="21">prefix used</text>
+  <rect class="sw-bad" x="740" y="11" width="13" height="12" rx="2"/><text class="note" x="759" y="21">prefix lost</text>
+
+  <!-- normal lane -->
+  <text class="lane" x="16" y="52">Default linking: admission has no request_replay</text>
+  <rect class="box" x="16" y="60" width="210" height="80" rx="7"/>
+  <text class="t" x="26" y="78">1 · Gym admission</text>
+  <text class="d" x="26" y="96">mode token_in</text>
+  <text class="d" x="26" y="112">request_replay: None</text>
+  <text class="d" x="26" y="128">generation_cut: 5 ids</text>
+  <rect class="box-good" x="246" y="60" width="210" height="80" rx="7"/>
+  <text class="t" x="256" y="78">2 · worker</text>
+  <text class="d" x="256" y="96">admission used as sent</text>
+  <text class="good" x="256" y="112">cut kept</text>
+  <text class="d" x="256" y="128">prefix checked</text>
+  <rect class="box-good" x="476" y="60" width="210" height="80" rx="7"/>
+  <text class="t" x="486" y="78">3 · request to vLLM</text>
+  <text class="d" x="486" y="96">prompt 11 + 5 = 16</text>
+  <text class="d" x="486" y="112">max_tokens 13 − 5 = 8</text>
+  <rect class="box-good" x="706" y="60" width="218" height="80" rx="7"/>
+  <text class="t" x="716" y="78">4 · result</text>
+  <text class="good" x="716" y="96">decodes 8 new tokens</text>
+  <text class="d" x="716" y="112">counted as restored</text>
+  <text class="d" x="716" y="128">chunk row deleted</text>
+  <path class="arrow" d="M226 100 L241 100"/><path class="ah" d="M245 100 L238 96 L238 104 Z"/>
+  <path class="arrow" d="M456 100 L471 100"/><path class="ah" d="M475 100 L468 96 L468 104 Z"/>
+  <path class="arrow" d="M686 100 L701 100"/><path class="ah" d="M705 100 L698 96 L698 104 Z"/>
+  <a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/nemo_gym/_checkpoint/model.py#L449-L457" target="_blank" rel="noopener"><text x="16" y="156">Gym attaches cut :449</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b6aff18f982137a538bbf5d3540983e0d094a95c/nemo_rl/models/generation/generation_cut_capture.py#L460-L506" target="_blank" rel="noopener"><text x="246" y="156">_resolve_usable_generation_cut</text></a>
+
+  <!-- forest lane -->
+  <text class="lane-bad" x="16" y="196">Forest admission (forest_training: true)</text>
+  <rect class="box" x="16" y="204" width="210" height="80" rx="7"/>
+  <text class="t" x="26" y="222">1 · Gym admission</text>
+  <text class="d" x="26" y="240">request_replay: set</text>
+  <text class="d" x="26" y="256">(forest training)</text>
+  <text class="d" x="26" y="272">generation_cut: 5 ids</text>
+  <rect class="box-bad" x="246" y="204" width="210" height="80" rx="7"/>
+  <text class="t" x="256" y="222">2 · worker</text>
+  <text class="d" x="256" y="240">decide_capture_input</text>
+  <text class="d" x="256" y="256">builds a new admission</text>
+  <text class="bad" x="256" y="272">cut dropped</text>
+  <rect class="box-bad" x="476" y="204" width="210" height="80" rx="7"/>
+  <text class="t" x="486" y="222">3 · request to vLLM</text>
+  <text class="d" x="486" y="240">prompt 11 ids</text>
+  <text class="d" x="486" y="256">max_tokens 13</text>
+  <rect class="box-bad" x="706" y="204" width="218" height="80" rx="7"/>
+  <text class="t" x="716" y="222">4 · result</text>
+  <text class="bad" x="716" y="240">decodes all 13 again</text>
+  <text class="bad" x="716" y="256">not counted anywhere</text>
+  <text class="bad" x="716" y="272">chunk row left in TQ</text>
+  <path class="arrow" d="M226 244 L241 244"/><path class="ah" d="M245 244 L238 240 L238 248 Z"/>
+  <path class="arrow" d="M456 244 L471 244"/><path class="ah" d="M475 244 L468 240 L468 248 Z"/>
+  <path class="arrow" d="M686 244 L701 244"/><path class="ah" d="M705 244 L698 240 L698 248 Z"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b6aff18f982137a538bbf5d3540983e0d094a95c/nemo_rl/environments/nemo_gym.py#L1174-L1176" target="_blank" rel="noopener"><text x="16" y="300">source_history :1174</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b6aff18f982137a538bbf5d3540983e0d094a95c/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2176-L2203" target="_blank" rel="noopener"><text x="246" y="300">worker branch :2176</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b6aff18f982137a538bbf5d3540983e0d094a95c/nemo_rl/models/generation/capture_context.py#L43-L89" target="_blank" rel="noopener"><text x="246" y="314">decide_capture_input :43</text></a>
+
+  <text class="note" x="16" y="344">Gym already deleted its copy of the cut when it attached it, so nothing retries it. The row cleanup in step 2</text>
+  <text class="note" x="16" y="360">of the normal lane runs only when the worker sees the cut, so the forest lane never deletes the 5-token chunk row.</text>
+</svg>
+
+<p>Nothing is wrong with the tokens the run trains on: the call just decodes its whole reply again, as turn recovery would. But the run pays for prefix mode (the extra snapshot work) and gets none of its benefit. The restore counters stay at zero, so it looks as if no call was ever cut. The chunk rows also stay in TQ until the next restore clears rows nothing points to.</p>
+
+<h2>What would fix it — proposed, not in the PR</h2>
+
+<p>Nothing below is implemented.</p>
+<p class="where"><b>Where the fix lands: RL only, about 4 lines in one function.</b>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d33e36284fded7ef7bb5a0790ba3375723a4e91c/nemo_rl/models/generation/capture_context.py#L43-L91"><code>decide_capture_input</code></a> in <code>capture_context.py</code> keeps the cut on both admissions it builds. A new chain that carries a cut is served, so the worker's splice sees it. <b>No Gym change:</b> Gym already attaches the cut to every admission; RL is what drops it.</p>
+
+<pre class="diff"><span class="hunk">@@ capture_context.py L44-L48 · decide_capture_input (new chain)</span>
+     root = CaptureAdmission(
+         capture_key=admission.capture_key,
+         model_call_id=admission.model_call_id,
+         mode="text",
+<span class="add">+        generation_cut=admission.generation_cut,
+</span>     )
+<span class="add">+    # A restored cut must reach the worker's splice; a plain new chain still renders as text.
++    root_serving = root if root.generation_cut is not None else None
+</span><span class="hunk">@@ capture_context.py L54, L61, L80 · each new-chain return</span>
+<span class="del">-        return CaptureInputDecision(root, None, True)
+</span><span class="add">+        return CaptureInputDecision(root, root_serving, True)
+</span><span class="hunk">@@ capture_context.py L81-L90 · continue from the parent</span>
+     serving = CaptureAdmission(
+         ...
+         required_prefix_token_ids=admission.required_prefix_token_ids,
+<span class="add">+        generation_cut=admission.generation_cut,
+</span>     )</pre>
+
+<p><b>Why this is safe.</b> Before splicing, the worker rebuilds the prefix record from the admission and compares its digest with the cut's (<a href="https://github.com/NVIDIA-NeMo/RL/blob/d33e36284fded7ef7bb5a0790ba3375723a4e91c/nemo_rl/models/generation/generation_cut_capture.py#L475-L487">generation_cut_capture.py:475-487</a>). The digest covers the mode, the parent, the earlier length and the whole token prefix. A restored call sends the same messages, so it gets the same decision as the original call, and the digest matches. If it ever differed, the call would simply regenerate and clear its rows, as any unusable cut does. Test with one unit case per branch, plus one run of the prefix-recovery test with <code>++token_capture.forest_training=true</code>.</p>
+<p class="cref"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4506#discussion_r4505634874">C26 review comment — vllm_worker_async.py:2203</a></p>
+
+<div class="warn">
+<strong>So what.</strong> Prefix mode plus forest training is accepted at setup today and quietly behaves like turn mode, with extra snapshot cost and leftover rows in TQ. Keeping the cut through one decision function fixes it in this PR, with no Gym bump.
+</div>
+
+</div>
+</body>
+</html>

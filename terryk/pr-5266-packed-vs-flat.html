@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5266 — where captured logprobs go, with and without packing</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 14px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--red)}.verdict.good{color:var(--green)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:10px 0;font-size:14px}
+.fast{border-left:4px solid var(--orange);background:var(--surface);padding:8px 14px;margin:10px 0;font-size:14px}
+.hl{border-left:4px solid var(--accent);background:var(--surface);padding:10px 16px;margin:18px 0;border-radius:0 8px 8px 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .new{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .hot{fill:var(--surface);stroke:var(--orange);stroke-width:2}
+svg .lane{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .lbl{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .val{fill:var(--text);font:11.5px ui-monospace,Menlo,monospace}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .warm{fill:var(--orange);font:11.5px -apple-system,sans-serif}
+svg .arr{stroke:var(--dim);stroke-width:1.5;fill:none;marker-end:url(#ah)}
+svg .ahd{fill:var(--dim)}
+svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Where a captured request's logprobs go, with and without packing</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5266">NVIDIA-NeMo/RL #5266</a>
+(“perf(vllm): add opt-in packed captured logprob histories”). NeMo-RL links pin the PR head
+<code>8299d55f</code>; vLLM links pin <code>v0.33.0</code> (<code>4ba787ec</code>).</p>
+
+<div class="status"><dl>
+<dt>Before</dt><dd>With <code>flat_logprobs: true</code>, vLLM's own code stores each generated token's logprob. Per engine step it turns the numbers into Python lists, decodes each token to text, and appends to a <code>FlatLogprobs</code> object.</dd>
+<dt>This PR</dt><dd>Adds <code>packed_capture_logprobs</code> (off by default). For captured, text-only, no-top-k, non-streamed requests, it swaps vLLM's store for three numeric arrays and a bulk append, and reads the selected values back without building a dict per token.</dd>
+<dt>Status</dt><dd><span class="verdict open">Open — one crash bug, and no speed numbers on this head yet.</span> The crash is on the <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5266-topk-crash.html">next page</a>; both are in the review comments.</dd>
+</dl></div>
+
+<nav class="chain">
+  <span class="here">packed vs native</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5266-topk-crash.html">top-k crash</a>
+</nav>
+<p class="chainnote">Two pages on this PR, one question each. This one: what the new path does differently.</p>
+
+<div class="bg"><b>Background.</b> In RL training, each generated token needs the log-probability the generator gave it, so training can compare it to its own. NeMo-RL serves vLLM over HTTP. For <span class="tip" tabindex="0" data-tip="A request whose tokens and logprobs NeMo-RL records itself, through the Gym token-capture hook, instead of reading them from the HTTP reply.">captured</span> requests it reads the logprobs straight from vLLM's per-request state with <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/utils.py#L72"><code>extract_generation_logprobs</code></a>. The cost this PR attacks is CPU time on the generation actor while vLLM files those numbers away, one token at a time. Dotted words have a short explanation: hover or tap them.</div>
+
+<div class="fast"><b>Why it should be faster.</b> The GPU work is the same in both paths. The packed path skips three CPU steps per token: turning numpy rows into Python lists, decoding the token to text (vLLM's <a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/engine/logprobs.py#L97-L108"><code>convert_ids_list_to_tokens</code> + <code>_verify_tokens</code></a>), and one append per token. A multi-token step becomes one <code>frombytes</code> copy per column. Nothing reads the skipped text for captured requests: NeMo-RL already skips building the reply's logprob objects for them (<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2390-L2401">vllm_worker_async.py:2390</a>). <b>The only numbers so far</b> are an older CPU-only synthetic run (8 requests × 131,072 tokens: 7.56 s → 6.07 s), not measured on this head and not as a share of a training step.</div>
+
+<h2>One token, through both paths</h2>
+
+<p>One engine step makes one token for one captured request: token <code>7</code>, logprob <code>-0.5</code>, rank <code>4</code>. vLLM hands it over as <code>ids [1, 1]</code> = <code>[positions, columns]</code>. Column 0 is always the sampled token. The hook decides per request which path the request takes (<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L72-L80">patches.py:72-80</a>). Values below are from a real run of the PR's class.</p>
+
+<svg viewBox="0 0 940 470" role="img" aria-label="Two lanes: native vLLM path and packed path, from engine row to the value training reads; they converge at extract_generation_logprobs">
+<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="ahd" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+<text class="lane" x="14" y="22">native vLLM (flat_logprobs: true)</text>
+<text class="lane" x="490" y="22">packed (packed_capture_logprobs: true)</text>
+
+<rect class="box" x="14" y="34" width="912" height="56" rx="8"/>
+<text class="lbl" x="28" y="56">① engine row for this request (same input, both lanes)</text>
+<text class="val" x="28" y="77">ids [[7]]   values [[-0.5]] float32   ranks [4]      shape [positions=1, columns=1]</text>
+
+<path class="arr" d="M220 90 L220 112"/><path class="arr" d="M700 90 L700 112"/>
+
+<rect class="box" x="14" y="114" width="440" height="96" rx="8"/>
+<text class="lbl" x="28" y="136">② LogprobsProcessor._update_sample_logprobs</text>
+<text class="val" x="28" y="157">for each position: .tolist() → [7] [-0.5] 4</text>
+<text class="val" x="28" y="175">decode token 7 to text (tokenizer)</text>
+<a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/engine/logprobs.py#L73-L122"><text x="28" y="198">vllm/v1/engine/logprobs.py:73</text></a>
+
+<rect class="new" x="486" y="114" width="440" height="96" rx="8"/>
+<text class="lbl" x="500" y="136">② update() installed by PackedCaptureLogprobs</text>
+<text class="val" x="500" y="157">append_arrays(ids, values, ranks)</text>
+<text class="val" x="500" y="175">no .tolist(), no decode; 1 copy per column</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L87-L96"><text x="500" y="198">patches.py:87</text></a>
+
+<path class="arr" d="M220 210 L220 232"/><path class="arr" d="M700 210 L700 232"/>
+
+<rect class="box" x="14" y="234" width="440" height="96" rx="8"/>
+<text class="lbl" x="28" y="256">③ stored in FlatLogprobs (Python lists)</text>
+<text class="val" x="28" y="277">token_ids [7]  logprobs [-0.5]  ranks [4]</text>
+<text class="val" x="28" y="295">decoded_tokens ["…text…"]</text>
+<a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/logprobs.py#L178-L196"><text x="28" y="318">vllm/logprobs.py:178</text></a>
+
+<rect class="new" x="486" y="234" width="440" height="96" rx="8"/>
+<text class="lbl" x="500" y="256">③ stored in PackedSelectedLogprobs (arrays)</text>
+<text class="val" x="500" y="277">_ids q[7]  _values d[-0.5]  _ranks q[4]</text>
+<text class="val" x="500" y="295">no text kept (decoded_token is None)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/packed_logprobs.py#L27-L45"><text x="500" y="318">packed_logprobs.py:24</text></a>
+
+<path class="arr" d="M220 330 L420 368"/><path class="arr" d="M700 330 L520 368"/>
+
+<rect class="hot" x="190" y="370" width="560" height="62" rx="8"/>
+<text class="lbl" x="204" y="392">④ extract_generation_logprobs — the two paths meet here</text>
+<text class="val" x="204" y="414">both return [-0.5]  →  training's generation logprobs</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/utils.py#L100-L103"><text x="580" y="424">utils.py:100</text></a>
+
+<rect class="new" x="14" y="446" width="14" height="12"/><text class="note" x="34" y="456">new in this PR</text>
+<rect class="hot" x="150" y="446" width="14" height="12"/><text class="note" x="170" y="456">where they converge</text>
+<text class="warm" x="320" y="456">After ④ only decoded_token differs; nothing reads it for captured requests.</text>
+</svg>
+
+<h2>The same change as pseudocode</h2>
+<p class="pclbl">Per engine step, before (native vLLM)</p>
+<pre class="pc"><span class="who"># generation actor, vLLM output loop (one task)</span>
+def <a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/engine/logprobs.py#L73">_update_sample_logprobs</a>(rows):
+    for ids, vals, rank in rows:               <span class="cm"># one loop turn per token</span>
+        ids, vals = ids.tolist(), vals.tolist() <span class="cm"># numpy → Python lists</span>
+        text = decode(ids)                      <span class="cm"># tokenizer, per token</span>
+        cumulative += vals[0]
+        <a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/logprobs.py#L178">append_logprobs_for_next_position</a>(store, ids, vals, text, rank)</pre>
+<p class="pclbl">Per engine step, after (packed request)</p>
+<pre class="pc"><span class="who"># generation actor, vLLM output loop (one task)</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L87">update</a>(rows):</span>                              <span class="cm"># set on this request only, at add_request</span>
+<span class="add">    before = len(history)</span>
+<span class="add">    history.<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/packed_logprobs.py#L51">append_arrays</a>(ids, vals, ranks)</span>  <span class="cm"># whole step at once; C3: rows can be wider</span>
+<span class="add">    cumulative = history.cumulative_after(cumulative, start=before)</span>
+<span class="del">    for ids, vals, rank in rows: ... decode(ids) ...</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L40-L108"><code>PackedCaptureLogprobs</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/packed_logprobs.py#L27"><code>PackedSelectedLogprobs</code></a>, installed from <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1097-L1108"><code>setup_token_capture</code></a> on every HTTP frontend.</p>
+
+<div class="hl"><b>So what.</b> Both paths hand training the same numbers, and for captured requests nothing reads the text the new path skips. So this is a pure CPU saving on the generation actor, if it holds up. Two things block it: a crash when another request in the same engine step asks for top-k logprobs (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5266-topk-crash.html">next page</a>), and no numbers yet on this head that show the saving as a share of a training step.</div>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5266#discussion_r4610529740">review comment C3 — patches.py:91</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5266#discussion_r4610529787">review comment C4 — config.py:124</a></p>
+
+</div>
+</body>
+</html>

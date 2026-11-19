@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR #5176: what can shrink</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--orange:#9a6700;--red:#cf222e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--orange)}
+.bg{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 14px;font-size:14px;margin:0 0 14px}
+.hl{border-left:3px solid var(--accent);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+svg{max-width:100%;height:auto;display:block;margin:16px 0}
+svg .t{fill:var(--text);font:12px -apple-system,sans-serif}
+svg .tb{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .m{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .d{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .prep{fill:var(--accent);opacity:.35}
+svg .put{fill:var(--orange);opacity:.55}
+svg .seal{fill:var(--green);opacity:.55}
+svg .lane{fill:var(--surface);stroke:var(--border)}
+svg .ax{stroke:var(--border)}
+svg .conv{stroke:var(--green);stroke-dasharray:5 4;fill:none}
+svg a text{text-decoration:underline}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12.5px ui-monospace,Menlo,monospace;margin:2px 4px 2px 0}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px;font-size:14px}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)}.diff .del{color:var(--red)}.diff .hunk{color:var(--accent)}
+
+svg .colh{fill:var(--text);font:bold 14px -apple-system,sans-serif}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .h{fill:var(--dim);font:bold 11.5px -apple-system,sans-serif}
+svg .box{fill:var(--surface);stroke:var(--border)}
+svg .panel{fill:none;stroke:var(--dim);stroke-dasharray:6 4}
+svg .panel2{fill:none;stroke:var(--orange);stroke-dasharray:6 4}
+svg .same{fill:var(--surface2);stroke:var(--border)}
+svg .new{fill:var(--surface2);stroke:var(--green);stroke-width:1.5}
+svg .cl{fill:var(--surface);stroke:var(--accent)}
+svg .tq{fill:var(--surface);stroke:var(--orange);stroke-width:1.5}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg .arw{stroke:var(--orange);stroke-width:1.6;fill:none}
+svg .dash{stroke:var(--accent);stroke-dasharray:4 3;fill:none}
+svg .ahf{fill:var(--dim)}
+svg .w{fill:var(--orange);font:bold 11px -apple-system,sans-serif}
+svg a text{fill:var(--accent);font:12px ui-monospace,Menlo,monospace;text-decoration:underline}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>About 560 of #5176's 2,281 added lines can go without losing a measured speedup</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176">NVIDIA-NeMo/RL #5176</a>, part 11 of 11 in the partial-checkpointing stack.
+Counts are the PR's own commit <code>788133a..981376a</code> (+2,281 / −49). Permalinks pin <code>981376a</code>.
+The review is pending; its comment links work once it is published.</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>#4508 writes generation-prefix rows in batches from one thread, with the worker's own TransferQueue client.</dd>
+  <dt>This PR</dt>
+  <dd>Adds a column encoder, a prepare/write pipeline and a writer actor: 1,390 source lines and 880 test lines, behind three settings that are off by default.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Proposed in the review, not done:</span> the cuts below. Each one keeps the behavior the benchmark measured.</dd>
+</dl>
+</div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-who-calls-what.html">1 · who calls what</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-write-paths.html">2 · new path vs old path</a>
+  <span class="here">3 · what can shrink</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5176-one-actor-pattern.html">4 · one actor pattern</a>
+</nav>
+<p class="chainnote">Four pages on this PR. This one: which lines can go, and why each cut is safe.</p>
+
+<p>Two asks do most of the work. <b>C15</b> drops the PR's three settings (<code>prefix_writer_actor</code>, <code>prefix_write_pipeline.enabled</code>,
+<code>direct_column_encoding</code>), which today allow six ways to write a cut, and picks the new path whenever the run can use it: text-only capture on TransferQueue <code>simple</code>.
+The old path stays only for media capture and other TQ backends, which the new one does not support (<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L851-L856">L851-L856</a>).
+<b>C2</b> keeps the NumPy byte views, because Ray 2.58 copies torch tensors (and so a <code>TensorDict</code>) through torch's own pickle but hands NumPy arrays to the actor in place
+(≈ 45 + 14 ms against ≈ 2 + 0 ms for a 128 MiB batch). It shrinks them to two helpers and replaces the 94-line
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L280-L373"><code>RayPrefixWriterClient</code></a> with a thin wrapper.</p>
+
+<svg viewBox="0 0 960 300" role="img" aria-label="Added lines per file, with the part the review asks to remove">
+<style>.lbl{fill:var(--text);font:11px ui-monospace,Menlo,monospace}.num{fill:var(--dim);font:11px ui-monospace,Menlo,monospace}
+.keep{fill:var(--surface2);stroke:var(--border)}.cut{fill:var(--orange);opacity:.9}.lg{fill:var(--text);font:12px -apple-system,sans-serif}</style>
+<rect x="200" y="12" width="14" height="12" class="keep"/><text x="220" y="22" class="lg">stays</text>
+<rect x="280" y="12" width="14" height="12" class="cut"/><text x="300" y="22" class="lg">review asks to remove (comment IDs in brackets)</text>
+<text x="190" y="53" class="lbl" text-anchor="end">tests (3 files)</text>
+<rect x="200" y="40" width="438" height="18" class="keep"/>
+<rect x="638" y="40" width="108" height="18" class="cut"/>
+<text x="753" y="53" class="num">+882 → −175  (C2 C3 C8 C15)</text>
+<text x="190" y="79" class="lbl" text-anchor="end">prefix_pipeline.py</text>
+<rect x="200" y="66" width="255" height="18" class="keep"/>
+<rect x="455" y="66" width="19" height="18" class="cut"/>
+<text x="479" y="79" class="num">+441 → −30  (C3 C15)</text>
+<text x="190" y="105" class="lbl" text-anchor="end">prefix_writer_actor.py</text>
+<rect x="200" y="92" width="105" height="18" class="keep"/>
+<rect x="305" y="92" width="146" height="18" class="cut"/>
+<text x="456" y="105" class="num">+404 → −235  (C2 C3 C8)</text>
+<text x="190" y="131" class="lbl" text-anchor="end">direct_prefix_batch.py</text>
+<rect x="200" y="118" width="130" height="18" class="keep"/>
+<rect x="330" y="118" width="3" height="18" class="cut"/>
+<text x="339" y="131" class="num">+214 → −5  (C9)</text>
+<text x="190" y="157" class="lbl" text-anchor="end">recovery.py</text>
+<rect x="200" y="144" width="68" height="18" class="keep"/>
+<rect x="268" y="144" width="2" height="18" class="cut"/>
+<text x="275" y="157" class="num">+112 → −3  (C15)</text>
+<text x="190" y="183" class="lbl" text-anchor="end">tq_token_sink.py</text>
+<rect x="200" y="170" width="39" height="18" class="keep"/>
+<rect x="239" y="170" width="5" height="18" class="cut"/>
+<text x="250" y="183" class="num">+71 → −8  (C15)</text>
+<text x="190" y="209" class="lbl" text-anchor="end">vllm_worker_async.py</text>
+<rect x="200" y="196" width="22" height="18" class="keep"/>
+<rect x="222" y="196" width="19" height="18" class="cut"/>
+<text x="247" y="209" class="num">+66 → −30  (C2 C15)</text>
+<text x="190" y="235" class="lbl" text-anchor="end">vllm/config.py</text>
+<rect x="200" y="222" width="1" height="18" class="keep"/>
+<rect x="201" y="222" width="21" height="18" class="cut"/>
+<text x="228" y="235" class="num">+36 → −34  (C15)</text>
+<text x="190" y="261" class="lbl" text-anchor="end">docs + 6 YAML</text>
+<rect x="200" y="248" width="9" height="18" class="keep"/>
+<rect x="209" y="248" width="24" height="18" class="cut"/>
+<text x="238" y="261" class="num">+52 → −38  (C15)</text>
+<text x="200" y="290" class="lg">Total: about 558 of 2,281 → about +1,723. Estimates; exact counts depend on how each ask is written.</text>
+</svg>
+
+<h2>Each cut, and why the behavior stays</h2>
+<table>
+<tr><th>ID</th><th>What goes</th><th>Why nothing measured is lost</th><th>Lines</th></tr>
+<tr><td>C2</td><td><code>G_DTYPES</code>, <code>PackedColumn</code>, <code>PrefixPut</code>, the bf16 branch, <code>RayPrefixWriterClient</code></td><td>Two helpers do the same no-copy byte views for every dtype; the actor options already keep writes ordered and failures loud.</td><td>≈ 205</td></tr>
+<tr><td>C3</td><td>Timing fields, per-write INFO logs, <code>snapshot()</code>, <code>stats()</code></td><td>Only log lines and tests read them.</td><td>≈ 130</td></tr>
+<tr><td>C8</td><td><code>_validate_keys</code> in the actor</td><td>Its only caller sends generation-cut keys for the same partition, so it never fires.</td><td>≈ 26</td></tr>
+<tr><td>C9</td><td>Copied dense-or-jagged tail in the encoder</td><td>One helper, same output.</td><td>≈ 5</td></tr>
+<tr><td>C15</td><td>The three settings, their checks in two places, 6 YAML blocks, the doc table, the config tests</td><td>The run already says which path can work; the new path won every measured row, and the old one stays where it is needed.</td><td>≈ 185</td></tr>
+</table>
+<p class="cref" id="crefs">🔴 Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656731">C2 · prefix_writer_actor.py:95</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656734">C3 · prefix_writer_actor.py:86</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656753">C8 · prefix_writer_actor.py:202</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4577656754">C9 · direct_prefix_batch.py:70</a><a href="https://github.com/NVIDIA-NeMo/RL/pull/5176#discussion_r4591760426">C15 · vllm/config.py:119</a></p>
+
+<h2>The two biggest cuts, as pseudocode (proposed, not run)</h2>
+<p>Nothing below is implemented.</p>
+<p class="where"><b>Where it lands: RL only.</b> No TQ or Ray change.</p>
+<p class="pclbl">C2 · the hop to the writer actor</p>
+<pre class="pc"><span class="who"># writer thread in the vLLM worker (proposed: two small helpers, a thin wrapper)</span>
+cols = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/tq_token_sink.py#L840">encode_prefix_groups</a>(rows)<span class="cm">                                                        # one TensorDict</span>
+<span class="del">ref = ray.put(PrefixPut(pack_columns(cols)))</span><span class="cm">                                             # ~100 lines: dtype table, bf16 branch, checks</span>
+<span class="del">RayPrefixWriterClient.put_samples(...)</span><span class="cm">                                                   # ~95 lines: locks, timings, reply checks</span>
+<span class="add">columns = {name: to_bytes(t) for name, t in cols.items()}</span><span class="cm">                                # NumPy uint8 views, no copy</span>
+<span class="add">ray.get(actor.put_samples.remote(columns=columns, ...))</span><span class="cm">                                  # Ray copies once into shared memory</span>
+
+<span class="who"># PrefixWriterActor process (CPU only, same node)</span>
+<span class="del">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L204">put</a>(batch): fields = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L130">unpack_columns</a>(batch.columns)</span>
+<span class="add">def put_samples(columns, ...): fields = {k: from_bytes(*v) for k, v in columns.items()}</span><span class="cm">  # reads shared memory in place</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L225">own_tq_client.put_samples</a>(sample_ids, fields, tags)</pre>
+<p class="pcref">Real code today: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L95"><code>pack_columns</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L130"><code>unpack_columns</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_writer_actor.py#L280"><code>RayPrefixWriterClient</code></a>.</p>
+<p class="pclbl">C15 · choosing the write path</p>
+<pre class="pc"><span class="who"># vLLM worker, setup_token_capture (proposed: no settings)</span>
+<span class="del">writer_on   = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L842">cfg.prefix_writer_actor</a></span><span class="cm">                                                       # 3 settings, 6 combinations</span>
+<span class="del">pipeline_on = cfg.prefix_write_pipeline.enabled</span>
+<span class="del">encoder_on  = cfg.prefix_write_pipeline.direct_column_encoding</span>
+<span class="add">fast = prefix_cuts and not capture_media and tq_backend == &#x27;simple&#x27;</span><span class="cm">                         # decided once, from what the run is</span>
+<span class="add">if fast:</span>
+<span class="add">    pipeline = PrefixWritePipeline(encoder=direct, limits=parts.generation_prefix_batch_*)</span><span class="cm">  # existing limits</span>
+<span class="add">    writer   = <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L987">create_prefix_writer</a>()</span><span class="cm">                                                       # fails clearly if no free CPU</span>
+<span class="add">else:</span>
+<span class="add">    keep today&#x27;s path</span><span class="cm">                                                                       # media capture, other TQ backends</span></pre>
+<p class="pcref">Real code today: <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/vllm_worker_async.py#L842-L874"><code>setup_token_capture</code> checks</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/models/generation/vllm/config.py#L354-L383"><code>validate_vllm_async_actor_settings</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/981376a3d01e1c4fc1c3313879d0c34bc3856b20/nemo_rl/data_plane/prefix_pipeline.py#L32-L42"><code>PrefixWritePipelineConfig</code></a>.</p>
+
+<div class="hl"><b>So what.</b> The three speedups the PR measured all survive: the column encoder, the prepare/write overlap and the separate writer process, and they become the default.
+What goes is a no-copy bridge written longer than it needs to be, metrics nothing reads, and settings that let a run pick a slower path for no reason.
+The PR would then be about +1,723 lines. A further option is to split it: encoder + pipeline first (the bigger win), then the writer actor.</div>
+
+</div>
+</body>
+</html>

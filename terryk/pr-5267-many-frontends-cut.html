@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR #5267: one cut across several frontends</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--orange:#9a6700;--red:#cf222e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--orange)}
+.bg{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 14px;font-size:14px;margin:0 0 14px}
+.fast{border-left:4px solid var(--green);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.hl{border-left:3px solid var(--accent);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .t{fill:var(--text);font:12px -apple-system,sans-serif}
+svg .tb{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .m{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .d{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .ok{fill:var(--green);font:bold 11px ui-monospace,Menlo,monospace}
+svg .bad{fill:var(--red);font:bold 11px ui-monospace,Menlo,monospace}
+svg .proc{fill:none;stroke:var(--dim);stroke-dasharray:6 4}
+svg .box{fill:var(--surface);stroke:var(--border)}
+svg .new{fill:var(--surface);stroke:var(--green);stroke-width:1.6}
+svg .gym{fill:var(--surface2);stroke:var(--accent)}
+svg .tq{fill:var(--surface2);stroke:var(--orange)}
+svg .arr{stroke:var(--text);stroke-width:1.3;fill:none}
+svg .arrg{stroke:var(--green);stroke-width:1.6;fill:none}
+svg .arrd{stroke:var(--dim);stroke-width:1.1;fill:none;stroke-dasharray:3 3}
+svg .sep{stroke:var(--border)}
+svg .redfill{fill:var(--red);opacity:.12;stroke:var(--red)}
+svg a text{text-decoration:underline}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12.5px ui-monospace,Menlo,monospace;margin:2px 4px 2px 0}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How one checkpoint cut reaches calls spread over several vLLM HTTP frontends</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5267">PR #5267</a> · stacked on <a href="https://github.com/NVIDIA-NeMo/RL/pull/5176">#5176</a> · permalinks pinned to head <code>955c92cd</code> (this PR) and <code>d42cf304</code> (the PR below it)</p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>A worker with more than one HTTP frontend refused prefix cuts at setup. Only a single frontend could cut.</dd>
+  <dt>This PR</dt>
+  <dd>The frontend that gets Gym's cut call asks the other frontends, over a private local port, to cut the calls they serve. It then merges all the answers into one receipt.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">New feature, under review.</span> The author's H100 run passed. No CI run uses more than one frontend yet, and the review asks for tests (links below).</dd>
+</dl>
+</div>
+
+<div class="bg"><b>Background.</b> During an RL checkpoint, Gym asks each vLLM worker to save the tokens generated so far for every call still running. This is a <span class="tip" tabindex="0" data-tip="Gym sends a list of calls (the inventory). The worker saves each call's tokens so far to TQ and answers with one receipt: one ack per call, either 'saved, here are the keys' or 'failed, regenerate it'.">generation cut</span>. After a restore, a saved call resumes from those tokens instead of starting over. One worker can run several <span class="tip" tabindex="0" data-tip="Separate HTTP server processes (vllm_cfg.http_api_server_count) that share one listening socket and one inference engine. They split the CPU work of HTTP, chat templates and tokenizing.">HTTP frontends</span> that share one listening socket. A call's tokens live only in the frontend that took its request. Dotted words have a short explanation: hover or tap them.</div>
+
+<div class="fast"><b>Why it should be faster.</b> Each frontend cuts only its own calls, and all frontends cut at the same time. So the cut's wall time is about the slowest frontend's share, not the sum. The TQ writes and Gym's own prepare/commit are the same amount of work. The author measured one run per setting (from the PR description): with the write pipeline on, the cut took 0.19–0.25 s with 1 frontend and 0.06–0.07 s with 4. Gym's pause barely moved (1.48 s vs 1.44 s), because the cut is now a small part of it. It is slower only when a frontend stalls: then the cut waits up to <code>token_capture.control_timeout_s</code> for it.</div>
+
+<h2>Same 3 calls, one frontend vs two</h2>
+<p>Gym's inventory names 3 calls: <b>c1</b> is running on frontend A, <b>c2</b> is running on frontend B, and <b>c3</b> has not reached the worker yet. Gym's request lands on B, because the kernel picks a frontend on the shared socket.</p>
+
+<svg viewBox="0 0 960 516" role="img" aria-label="Cut with one frontend vs two frontends">
+  <!-- legend -->
+  <rect x="12" y="8" width="14" height="10" class="new"/><text x="32" y="17" class="d">new in this PR</text>
+  <text x="130" y="17" class="ok">✓</text><text x="142" y="17" class="d">saved (resumes)</text>
+  <text x="240" y="17" class="bad">✗</text><text x="252" y="17" class="d">failure ack (regenerates)</text>
+  <text x="400" y="17" class="m">·</text><text x="410" y="17" class="d">null = "not mine"</text>
+  <line x1="318" y1="30" x2="318" y2="508" class="sep"/>
+
+  <!-- LEFT: before -->
+  <text x="12" y="48" class="tb">Today's path: 1 frontend</text>
+  <rect x="12" y="58" width="294" height="44" rx="6" class="gym"/>
+  <text x="22" y="76" class="tb">Gym policy server</text>
+  <text x="22" y="93" class="m">POST /generation-cut [c1,c2,c3]</text>
+  <line x1="160" y1="102" x2="160" y2="140" class="arr" marker-end="url(#ah)"/>
+  <rect x="12" y="122" width="294" height="210" rx="8" class="proc"/>
+  <text x="22" y="138" class="d">vLLM worker (Ray actor, GPU), 1 frontend</text>
+  <rect x="24" y="146" width="270" height="78" rx="6" class="box"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/generation_cut_route.py#L77-L78"><text x="34" y="164" class="t">① run_cut (route, no peers)</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/prefix_recovery/recovery.py#L923"><text x="34" y="182" class="t">② checkpoint_cut: cut every call</text></a>
+  <text x="34" y="204" class="m">c1 </text><text x="54" y="204" class="ok">✓</text>
+  <text x="74" y="204" class="m">c2 </text><text x="94" y="204" class="ok">✓</text>
+  <text x="114" y="204" class="m">c3 </text><text x="134" y="204" class="bad">✗</text>
+  <text x="152" y="204" class="d">unknown → failure</text>
+  <rect x="24" y="234" width="270" height="44" rx="6" class="box"/>
+  <text x="34" y="252" class="t">③ receipt → Gym</text>
+  <text x="34" y="270" class="m">[c1 ✓, c2 ✓, c3 ✗]</text>
+  <rect x="24" y="290" width="270" height="34" rx="6" class="redfill"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/d42cf3046d5a2761314323ffc3b6029c59629c9d/nemo_rl/models/generation/vllm/vllm_worker_async.py#L919-L922"><text x="34" y="306" class="t">2+ frontends with cuts: ValueError</text></a>
+  <text x="34" y="319" class="d">at setup (removed by this PR)</text>
+  <rect x="12" y="460" width="294" height="44" rx="6" class="tq"/>
+  <text x="22" y="478" class="tb">TQ (shared store)</text>
+  <text x="22" y="495" class="m">W: rows of c1, c2</text>
+  <line x1="160" y1="224" x2="160" y2="460" class="arrd"/>
+
+  <!-- RIGHT: after -->
+  <text x="332" y="48" class="tb">This PR: 2 frontends, one engine</text>
+  <rect x="332" y="58" width="616" height="44" rx="6" class="gym"/>
+  <text x="342" y="76" class="tb">Gym policy server</text>
+  <text x="342" y="93" class="m">POST /generation-cut [c1,c2,c3]  → shared socket, kernel picks B</text>
+  <line x1="800" y1="102" x2="800" y2="146" class="arr" marker-end="url(#ah)"/>
+  <rect x="332" y="122" width="616" height="320" rx="8" class="proc"/>
+  <text x="342" y="138" class="d">vLLM worker (Ray actor, GPU): 2 frontend processes, one shared socket, one engine</text>
+
+  <!-- frontend A -->
+  <rect x="344" y="150" width="270" height="280" rx="6" class="box"/>
+  <text x="354" y="168" class="tb">frontend A</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2867-L2868"><text x="354" y="185" class="t">private port 127.0.0.1:A (new)</text></a>
+  <text x="354" y="203" class="m">holds c1 (running)</text>
+  <rect x="356" y="250" width="246" height="66" rx="6" class="new"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/generation_cut_route.py#L97"><text x="366" y="268" class="t">③ /generation-cut/claims</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/prefix_recovery/recovery.py#L929"><text x="366" y="285" class="t">cut_claims: only calls it knows</text></a>
+  <text x="366" y="305" class="m">[c1 </text><text x="394" y="305" class="ok">✓</text><text x="404" y="305" class="m">active, ·, ·]</text>
+
+  <!-- frontend B -->
+  <rect x="666" y="150" width="270" height="280" rx="6" class="box"/>
+  <text x="676" y="168" class="tb">frontend B (got Gym's call)</text>
+  <text x="676" y="185" class="t">private port 127.0.0.1:B</text>
+  <text x="676" y="203" class="m">holds c2 (running)</text>
+  <rect x="678" y="212" width="246" height="40" rx="6" class="new"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/generation_cut_route.py#L80-L92"><text x="688" y="229" class="t">① cut_claims, its own calls</text></a>
+  <text x="688" y="245" class="m">[·, c2 </text><text x="736" y="245" class="ok">✓</text><text x="746" y="245" class="m">active, ·]</text>
+  <rect x="678" y="262" width="246" height="40" rx="6" class="new"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/generation_cut_route.py#L135"><text x="688" y="279" class="t">② ask A, at the same time as ①</text></a>
+  <text x="688" y="295" class="d">waits up to control_timeout_s</text>
+  <rect x="678" y="314" width="246" height="58" rx="6" class="new"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/prefix_recovery/recovery.py#L197"><text x="688" y="331" class="t">④ merge_cut_claims</text></a>
+  <text x="688" y="347" class="d">running wins; nobody claims → ✗</text>
+  <text x="688" y="364" class="m">[c1 </text><text x="716" y="364" class="ok">✓</text><text x="726" y="364" class="m">, c2 </text><text x="760" y="364" class="ok">✓</text><text x="770" y="364" class="m">, c3 </text><text x="804" y="364" class="bad">✗</text><text x="814" y="364" class="m">]</text>
+  <rect x="678" y="382" width="246" height="38" rx="6" class="box"/>
+  <text x="688" y="405" class="t">⑤ one receipt → Gym</text>
+
+  <!-- B -> A arrows -->
+  <path d="M678 282 L602 282" class="arrg" marker-end="url(#ahg)"/>
+  <text x="618" y="276" class="d">POST</text>
+  <path d="M602 300 L678 330" class="arrg" marker-end="url(#ahg)"/>
+  <text x="610" y="330" class="d">claims</text>
+
+  <!-- TQ -->
+  <rect x="332" y="460" width="616" height="44" rx="6" class="tq"/>
+  <text x="342" y="478" class="tb">TQ (shared store)</text>
+  <text x="342" y="495" class="m">W: A writes c1 rows, B writes c2 rows · R: on restore, any frontend reads by key</text>
+  <line x1="480" y1="430" x2="480" y2="460" class="arrd"/>
+  <line x1="800" y1="430" x2="800" y2="460" class="arrd"/>
+
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--text)"/></marker>
+    <marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--green)"/></marker>
+  </defs>
+</svg>
+<p>At startup (new), the owner frontend collects every frontend's private URL and sends the full list to all of them, so any frontend can lead a cut. A frontend that errors or misses the timeout claims nothing: its calls get ✗ and regenerate after a restore. The checkpoint itself never fails.</p>
+
+<table>
+<tr><th>Question</th><th>Answer from the code</th></tr>
+<tr><td>Where do the two paths meet?</td><td>Both run the same cut code, <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/prefix_recovery/recovery.py#L968"><code>_checkpoint_steps</code></a> / <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/prefix_recovery/recovery.py#L1024"><code>_cut_batched</code></a>. The only difference is the <code>claims_only</code> flag: a call this frontend does not know becomes <code>null</code> (<a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/prefix_recovery/recovery.py#L604">L604</a>) instead of a failure ack. The merge turns a call nobody claims back into a failure, so one frontend's answer comes out the same either way.</td></tr>
+<tr><td>Can the peer call go to another node?</td><td>No. Each frontend binds its private port on <code>127.0.0.1</code> (<a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2867-L2868">L2867</a>). All frontends of a worker live on one node.</td></tr>
+<tr><td>Does Gym accept a merged receipt?</td><td>Yes. Gym checks only that every inventory call has exactly one ack, in any order, matching that call. Nothing ties an ack to a frontend.</td></tr>
+<tr><td>What else is now per frontend?</td><td>Cut settings travel to child frontends with the <code>capture</code> command (<a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1084">L1084</a>). <code>flush</code> also reaches children (<a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/vllm_worker_async.py#L3382">L3382</a>). Prefix counts are summed over frontends (<a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/vllm_worker_async.py#L3390">L3390</a>).</td></tr>
+</table>
+
+<h2>The route, as pseudocode</h2>
+<p class="pclbl">Before (one frontend only)</p>
+<pre class="pc"><span class="who"># the frontend's serving event loop</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/d42cf3046d5a2761314323ffc3b6029c59629c9d/nemo_rl/models/generation/vllm/generation_cut_route.py#L43">generation_cut</a>(inventory):
+    check bearer token
+    return <a href="https://github.com/NVIDIA-NeMo/RL/blob/d42cf3046d5a2761314323ffc3b6029c59629c9d/nemo_rl/models/generation/vllm/generation_cut_route.py#L64">run_cut</a>(inventory)                   <span class="cm"># unknown call → failure ack</span></pre>
+<p class="pclbl">After</p>
+<pre class="pc"><span class="who"># any frontend's serving event loop</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/generation_cut_route.py#L67">generation_cut</a>(inventory):
+    check bearer token
+<span class="add">    if not peers:</span>                                <span class="cm"># 1 frontend: path unchanged</span>
+        return run_cut(inventory)
+<span class="add">    claims = await gather(</span>                       <span class="cm"># all at once</span>
+<span class="add">        <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/prefix_recovery/recovery.py#L476">run_cut_claims</a>(inventory),</span>               <span class="cm"># mine; null for the rest</span>
+<span class="add">        *[<a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/generation_cut_route.py#L135">ask_peer</a>(url, inventory) for url in peers])</span>  <span class="cm"># POST /claims on 127.0.0.1</span>
+<span class="add">    return <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/prefix_recovery/recovery.py#L197">merge_cut_claims</a>(inventory, claims)</span>     <span class="cm"># running wins; unclaimed → failure</span>
+
+<span class="who"># ask_peer: timeout, HTTP error or bad answer</span>
+<span class="add">    → [null] * calls</span>                             <span class="cm"># that peer's calls regenerate</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/generation_cut_route.py#L67-L94"><code>checkpoint_generation_cut</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/generation_cut_route.py#L135-L179"><code>_peer_cut_claims</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/955c92cde43ce89243233eb144b3343b414d853a/nemo_rl/models/generation/vllm/vllm_worker_async.py#L833-L838">peers set at startup</a>.</p>
+
+<h2>What the review asks</h2>
+<div class="hl">The design holds up: the merge is a small pure function, and Gym accepts the merged receipt as is. The open asks are about proof. No CI run turns on prefix cuts with more than one frontend. Two new paths (a stalled peer, and peers set at startup) can break without any test failing. The settings sent to child frontends are a hand-written copy of a function's arguments. That copy already went stale once in the PR below, and this PR fixes it.</div>
+<p class="cref">
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528626">C1 — capture kwargs test · vllm_worker_async.py:1098</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528642">C2 — fast CI run, 2 frontends · nemo-gym-integration.md:81</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528651">C3 — stalled-peer test · generation_cut_route.py:173</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528667">C4 — startup peers test · vllm_worker_async.py:838</a>
+</p>
+
+</div>
+</body>
+</html>

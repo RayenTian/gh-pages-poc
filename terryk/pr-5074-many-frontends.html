@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gym sessions, many frontends</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700;--purple:#8250df}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 18px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+.bg{border-left:3px solid var(--accent);background:var(--surface);padding:10px 14px;margin:0 0 16px;border-radius:0 8px 8px 0;font-size:14px}
+.hl{border-left:3px solid var(--green);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.scroll{overflow-x:auto}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .panel{fill:none;stroke:var(--border);stroke-width:1.2;stroke-dasharray:4 4}
+svg .same{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .new{fill:var(--surface);stroke:var(--orange);stroke-width:2}
+svg .t{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .d{fill:var(--dim);font:9.8px ui-monospace,Menlo,monospace}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .h{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .o{fill:var(--orange);font:bold 11px -apple-system,sans-serif}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .ahf{fill:var(--dim)}
+svg a text{text-decoration:underline;fill:var(--accent);font:10.5px ui-monospace,Menlo,monospace}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2.2}
+svg .r{fill:var(--red);font:bold 11px -apple-system,sans-serif}
+svg .colh{fill:var(--text);font:bold 14px -apple-system,sans-serif}
+svg .ret{stroke:var(--purple);stroke-width:1.6;fill:none;stroke-dasharray:6 4;marker-end:url(#ahr)}
+svg .ahr{fill:var(--purple)}
+svg .rl{fill:var(--purple);font:bold 10.5px -apple-system,sans-serif}
+svg .tqb{fill:var(--surface);stroke:var(--orange);stroke-width:1.6;stroke-dasharray:3 2}
+svg .tqr{stroke:var(--orange);stroke-width:1.5;fill:none;stroke-dasharray:4 3;marker-end:url(#ah)}
+svg .tqw{stroke:var(--green);stroke-width:1.8;fill:none;marker-end:url(#ah)}
+svg .tr{fill:var(--orange);font:bold 11px -apple-system,sans-serif}
+svg .tw{fill:var(--green);font:bold 11px -apple-system,sans-serif}
+svg .h,svg .n,svg .t{paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.ok{color:var(--green);font-weight:700}.warn{color:var(--orange);font-weight:700}.bug{color:var(--red);font-weight:700}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+
+<div class="wrap">
+<h1>Where a multi-turn Gym rollout lands: native vLLM, Dynamo, and several frontends per worker</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5074">#5074</a> (merged) · RL links pinned to <code>97a0d809</code> · vLLM 0.33.0 · Gym <code>5911d628</code> · the Dynamo column is <a href="https://github.com/NVIDIA-NeMo/RL/pull/4979">#4979</a> (still open), copied from the <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-one-chat-path.html">#4905 chat-path page</a> and pinned to <code>a2c74e6</code></p>
+
+<div class="status"><dl>
+  <dt>Before</dt><dd>Each vLLM worker has one HTTP frontend. Gym pins every turn of a rollout to one worker URL, so every turn reaches the same Python process and the same engine.</dd>
+  <dt>This PR</dt><dd><code>vllm_cfg.http_api_server_count: K</code> runs K frontend processes per worker. All K share the worker's one port and one engine core. Gym still sees one URL per worker.</dd>
+  <dt>Status</dt><dd><span class="verdict good">Merged 2026-11-14, off by default</span> (K = 1). Turns still reach the right engine. One bug is still open in the merged code: a failed read-only query can shut down the shared engine (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5074-failed-query.html">next page</a>).</dd>
+</dl></div>
+
+<nav class="chain">
+  <span class="here">three setups, one rollout</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5074-failed-query.html">a failed query</a>
+</nav>
+<p class="chainnote">Two pages on this PR, one question each. This one: what runs where, and how turn 2 of a rollout finds turn 1.</p>
+
+<div class="bg"><b>Background.</b> A <span class="tip" tabindex="0" data-tip="The Python process that takes OpenAI-style HTTP calls, applies the chat template, and hands token ids to the engine.">frontend</span> is the HTTP side of a vLLM worker. The <span class="tip" tabindex="0" data-tip="The process that holds the model on the GPU, schedules requests and keeps the KV cache. vLLM runs it as its own process even with one frontend.">engine core</span> runs the model and keeps the <span class="tip" tabindex="0" data-tip="Saved attention state for tokens already seen. If turn 2 starts with turn 1's tokens and they are still cached, the engine skips recomputing them.">KV prefix cache</span>. Turn 2 of a rollout starts with turn 1's tokens, so it runs fastest on the engine that already holds them. With <span class="tip" tabindex="0" data-tip="Gym records each call's exact token ids in TQ (TransferQueue, NeMo RL's data store). Turn 2 carries keys to turn 1's tokens, and the frontend reads them back so the prompt matches what the model really saw.">token capture</span> on, turn 2 also needs turn 1's exact token ids, which it reads from TQ. Dotted words have a short explanation: hover or tap them.</div>
+
+<p>Each column follows turn 2 of one rollout through seven steps: ① receive the call, ② apply the chat template, ③ read turn 1's tokens from TQ and put them in front, ④ pick an engine, ⑤ turn images into pixels, ⑥ run the model and write the call to TQ, ⑦ reply. In native vLLM, Gym does ④ itself: it hashes the rollout id to pick one worker URL (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/responses_api_models/vllm_model/app.py#L2258-L2291"><code>_resolve_client</code></a>). #5074 keeps that, then lets the OS pick a frontend inside the worker per connection (<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L117-L152"><code>create_engine</code></a>). In Dynamo, Gym can hit any frontend, and the KV router does ④ per call.</p>
+
+<h2>Three setups, turn 2 of one rollout</h2>
+<div class="scroll"><svg viewBox="0 0 1060 900" role="img" aria-label="Where turn 2 of a rollout runs in three setups">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahf" d="M0,0L10,5L0,10z"/></marker><marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahr" d="M0,0L10,5L0,10z"/></marker></defs>
+
+<!-- ===== Column A: native, K = 1 ===== -->
+<text class="colh" x="16" y="26">Native vLLM + Gym</text>
+<text class="n" x="16" y="43">K = 1, the default (main before #5074)</text>
+<rect class="box" x="28" y="58" width="286" height="40" rx="6"/>
+<text class="t" x="36" y="74">Gym process</text>
+<text class="d" x="36" y="89">turn 2 of rollout r7: POST /v1/chat/…</text>
+<path class="arr" d="M88,98 L88,166"/>
+<text class="n" x="96" y="112">④ hash(r7) → worker 2 of N,</text>
+<text class="n" x="96" y="125">the same worker every turn</text>
+<rect class="panel" x="16" y="136" width="328" height="586" rx="9"/>
+<text class="h" x="24" y="152">vLLM worker process (Ray actor) × N</text>
+<rect class="same" x="28" y="168" width="286" height="50" rx="6"/>
+<text class="t" x="36" y="184">FastAPI route (HTTP thread)</text>
+<text class="d" x="36" y="199">① receives the chat call</text>
+<text class="d" x="36" y="212">⑦ returns JSON: text + TQ coords</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2246"><text x="36" y="231">create_chat_completion · L2246</text></a>
+<path class="arr" d="M88,236 L88,246"/>
+<rect class="same" x="28" y="248" width="286" height="102" rx="6"/>
+<text class="t" x="36" y="264">NeMoRLOnlineRenderer.preprocess_chat</text>
+<text class="d" x="36" y="279">② vLLM renderer, checkpoint template</text>
+<text class="d" x="36" y="292">⑤ HF processor → pixels (this process)</text>
+<text class="d" x="36" y="305">③ splice turn 1's ids in front</text>
+<text class="d" x="36" y="318">   (asks the worker for the TQ prefix)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1620"><text x="36" y="337">preprocess_chat · L1620</text></a>
+<path class="arr" d="M88,350 L88,368"/>
+<rect class="same" x="28" y="370" width="286" height="88" rx="6"/>
+<text class="t" x="36" y="386">VllmAsyncGenerationWorkerImpl</text>
+<text class="d" x="36" y="401">③ ChainPrefixCache → TQ read on a miss</text>
+<text class="d" x="36" y="414">⑥ _begin_/_finish_request_capture</text>
+<text class="d" x="36" y="427">   → ONE TQ write (TQTokenSink)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1302"><text x="36" y="446">_finish_request_capture · L1302</text></a>
+<path class="arr" d="M88,458 L88,648"/>
+<text class="n" x="96" y="535">AsyncLLM client in this</text>
+<text class="n" x="96" y="548">process; one engine</text>
+<text class="n" x="96" y="561">core behind it</text>
+<rect class="same" x="28" y="650" width="286" height="62" rx="6"/>
+<text class="t" x="36" y="666">AsyncLLM → engine core → GPU</text>
+<text class="d" x="36" y="681">⑥ KV cache of every earlier turn</text>
+<text class="d" x="36" y="694">   that Gym pinned here</text>
+<path class="ret" d="M334,650 L334,104"/>
+<text class="rl" x="331" y="116" text-anchor="end">⑦ reply</text>
+<rect class="tqb" x="28" y="770" width="286" height="48" rx="6"/>
+<text class="t" x="36" y="786">TQ (data plane storage)</text>
+<text class="d" x="36" y="800">read by: ③ worker, in this process</text>
+<text class="d" x="36" y="812">written by: ⑥ worker, in this process</text>
+<path class="tqr" d="M28,790 L21,790 L21,400 L26,400"/>
+<text class="tr" x="20" y="396">R</text>
+<path class="tqw" d="M314,425 L323,425 L323,800 L316,800"/>
+<text class="tw" x="326" y="421">W</text>
+
+<!-- ===== Column B: Dynamo, from the #4905 page, shifted left ===== -->
+<g transform="translate(-350,0)">
+<text class="colh" x="716" y="26">Dynamo + Gym (#4979, open)</text>
+<text class="n" x="716" y="43">as drawn at a2c74e6 on the #4905 page</text>
+<rect class="box" x="728" y="58" width="286" height="40" rx="6"/>
+<text class="t" x="736" y="74">Gym process</text>
+<text class="d" x="736" y="89">turn 2 of rollout r7: POST /v1/chat/…</text>
+<path class="arr" d="M788,98 L788,166"/>
+<text class="n" x="796" y="112">any of N frontends; Gym does</text>
+<text class="n" x="796" y="125">not pick the engine here</text>
+<rect class="panel" x="716" y="136" width="328" height="326" rx="9"/>
+<text class="h" x="724" y="152">Dynamo frontend process × N</text>
+<rect class="box" x="728" y="168" width="286" height="50" rx="6"/>
+<text class="t" x="736" y="184">Rust HTTP server</text>
+<text class="d" x="736" y="199">① receives the chat call</text>
+<text class="d" x="736" y="212">⑦ returns JSON: text + TQ coords</text>
+<path class="arr" d="M788,218 L788,234"/>
+<rect class="same" x="728" y="236" width="286" height="142" rx="6"/>
+<text class="t" x="736" y="252">NeMo RL chat engine (Python)</text>
+<text class="d" x="736" y="267">set up through chat_engine_factory</text>
+<text class="d" x="736" y="280">② the native render code, shared</text>
+<text class="d" x="736" y="293">⑤ HF processor → pixels, once</text>
+<text class="d" x="736" y="306">③ splice turn 1's ids in front</text>
+<text class="d" x="736" y="319">   TQ read via TQTokenSource</text>
+<text class="d" x="736" y="332">⑦ turns engine output into the reply</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L448"><text x="736" y="351">ChatEngineFactory · chat_engine.py L448</text></a>
+<path class="arr" d="M788,378 L788,392"/>
+<rect class="new" x="728" y="394" width="286" height="52" rx="6"/>
+<text class="t" x="736" y="410">Rust KV router (same process)</text>
+<text class="d" x="736" y="425">④ picks the engine that already has</text>
+<text class="d" x="736" y="438">   most of these ids cached</text>
+<path class="arr" d="M788,462 L788,524"/>
+<text class="n" x="796" y="482">request plane (TCP): ids + capture plan</text>
+<rect class="panel" x="716" y="502" width="328" height="220" rx="9"/>
+<text class="h" x="724" y="518">vLLM worker process (Ray actor) × M</text>
+<rect class="box" x="728" y="526" width="286" height="40" rx="6"/>
+<text class="t" x="736" y="542">Dynamo Worker (Rust, inside the actor)</text>
+<text class="d" x="736" y="557">receives the call; streams the reply</text>
+<path class="arr" d="M788,566 L788,578"/>
+<rect class="same" x="728" y="580" width="286" height="60" rx="6"/>
+<text class="t" x="736" y="595">VllmAsyncGenerationWorkerImpl</text>
+<text class="d" x="736" y="608">same class as native, wrapped by</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L196-L205"><text x="736" y="621">DynamoVllmAdapter · adapter.py L196</text></a>
+<text class="d" x="736" y="634">⑥ begin capture → generate → ONE TQ write</text>
+<path class="arr" d="M788,640 L788,648"/>
+<rect class="same" x="728" y="650" width="286" height="62" rx="6"/>
+<text class="t" x="736" y="666">AsyncLLM → engine core → GPU</text>
+<text class="d" x="736" y="681">⑥ KV cache: turn 2 lands here when</text>
+<text class="d" x="736" y="694">   the router finds turn 1 cached</text>
+<path class="ret" d="M1034,650 L1034,104"/>
+<text class="rl" x="1031" y="116" text-anchor="end">⑦ reply</text>
+<rect class="tqb" x="728" y="770" width="286" height="48" rx="6"/>
+<text class="t" x="736" y="786">TQ (data plane storage)</text>
+<text class="d" x="736" y="800">read by: ③ chat engine, frontend process</text>
+<text class="d" x="736" y="812">written by: ⑥ adapter, worker process</text>
+<path class="tqr" d="M728,790 L721,790 L721,312 L726,312"/>
+<text class="tr" x="720" y="308">R</text>
+<path class="tqw" d="M1014,630 L1023,630 L1023,800 L1016,800"/>
+<text class="tw" x="1026" y="626">W</text>
+</g>
+
+<!-- ===== Column C: #5074, K frontends ===== -->
+<text class="colh" x="716" y="26">#5074: K frontends per worker</text>
+<text class="n" x="716" y="43">http_api_server_count: 3 (merged)</text>
+<rect class="box" x="728" y="58" width="286" height="40" rx="6"/>
+<text class="t" x="736" y="74">Gym process</text>
+<text class="d" x="736" y="89">turn 2 of rollout r7: POST /v1/chat/…</text>
+<path class="arr" d="M788,98 L788,164"/>
+<text class="n" x="796" y="112">④ hash(r7) → worker 2 of N,</text>
+<text class="n" x="796" y="125">unchanged: still one URL per worker</text>
+<rect class="panel" x="716" y="136" width="328" height="586" rx="9"/>
+<text class="h" x="724" y="152">vLLM worker = 1 URL, 1 port</text>
+<rect class="new" x="728" y="166" width="286" height="62" rx="6"/>
+<text class="t" x="736" y="182">1 listening socket, shared by all K</text>
+<text class="d" x="736" y="197">the OS hands each new connection to</text>
+<text class="d" x="736" y="210">whichever frontend accepts it first</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L141"><text x="736" y="223">listener passed to children · L141</text></a>
+<path class="arr" d="M788,228 L788,246"/>
+<rect class="box" x="732" y="240" width="282" height="200" rx="6"/>
+<rect class="box" x="730" y="244" width="284" height="200" rx="6"/>
+<rect class="new" x="728" y="248" width="286" height="200" rx="6"/>
+<text class="t" x="736" y="264">Frontend process × K</text>
+<text class="d" x="736" y="279">0 = the Ray actor; 1…K−1 = NRL-HTTP-i</text>
+<text class="d" x="736" y="292">①② route + renderer ⑤ processor: a copy</text>
+<text class="d" x="736" y="305">③ own ChainPrefixCache; a miss reads</text>
+<text class="d" x="736" y="318">   TQ, so any frontend gets turn 1's ids</text>
+<text class="d" x="736" y="331">⑥ capture → ONE TQ write, own TQ client</text>
+<text class="d" x="736" y="344">AsyncLLM client, client_index = i</text>
+<text class="d" x="736" y="357">control pipe from 0: start, capture,</text>
+<text class="d" x="736" y="370">   version, progress, snapshot, stop</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L32"><text x="736" y="389">MultiAPIServerPool · multi_api.py L32</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L284"><text x="736" y="407">run_api_process (child) · L284</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/data_plane/tq_token_sink.py#L842"><text x="736" y="425">ChainPrefixCache.fetch_chains · L842</text></a>
+<path class="arr" d="M788,448 L788,514"/>
+<text class="n" x="796" y="471">ZMQ: K clients, one engine</text>
+<text class="n" x="796" y="485">(each frontend has its own socket pair)</text>
+<rect class="same" x="728" y="516" width="286" height="64" rx="6"/>
+<text class="t" x="736" y="532">Engine core → GPU (1, shared)</text>
+<text class="d" x="736" y="547">⑥ ONE KV cache for all K frontends:</text>
+<text class="d" x="736" y="560">   turn 1's tokens are here no matter</text>
+<text class="d" x="736" y="573">   which frontend served turn 1</text>
+<rect class="box" x="728" y="598" width="286" height="112" rx="6"/>
+<text class="t" x="736" y="614">Example: K = 3, rollout r7</text>
+<text class="d" x="736" y="630">turn 1 → frontend 0 (writes TQ)</text>
+<text class="d" x="736" y="643">turn 2 → frontend 2</text>
+<text class="d" x="736" y="656">  ③ cache miss in frontend 2 → TQ read,</text>
+<text class="d" x="736" y="669">    same ids frontend 0 would have used</text>
+<text class="d" x="736" y="682">  ⑥ KV cache hit in the shared engine</text>
+<text class="o" x="736" y="700">refused when K &gt; 1: generation-prefix cuts</text>
+<path class="ret" d="M1036,440 L1036,104"/>
+<text class="rl" x="1033" y="116" text-anchor="end">⑦ reply</text>
+<rect class="tqb" x="728" y="770" width="286" height="48" rx="6"/>
+<text class="t" x="736" y="786">TQ (data plane storage)</text>
+<text class="d" x="736" y="800">read by: ③ whichever frontend got turn 2</text>
+<text class="d" x="736" y="812">written by: ⑥ that same frontend</text>
+<path class="tqr" d="M728,790 L721,790 L721,312 L726,312"/>
+<text class="tr" x="720" y="308">R</text>
+<path class="tqw" d="M1014,335 L1024,335 L1024,800 L1016,800"/>
+<text class="tw" x="1018" y="760">W</text>
+
+<!-- legend -->
+<rect class="same" x="16" y="846" width="18" height="12" rx="3"/>
+<text class="n" x="40" y="856">same as native</text>
+<rect class="new" x="150" y="846" width="18" height="12" rx="3"/>
+<text class="n" x="174" y="856">where the setup picks the frontend or engine</text>
+<rect class="panel" x="446" y="846" width="18" height="12" rx="3"/>
+<text class="n" x="470" y="856">dashed = OS process</text>
+<path class="ret" d="M620,852 L660,852"/>
+<text class="n" x="666" y="856">reply path</text>
+<path class="tqr" d="M750,852 L780,852"/>
+<text class="n" x="786" y="856">TQ read</text>
+<path class="tqw" d="M850,852 L880,852"/>
+<text class="n" x="886" y="856">TQ write</text>
+<text class="n" x="16" y="880">Circled numbers are the 7 steps of one Gym call. Orange boxes are where each setup decides where turn 2 goes.</text>
+</svg></div>
+
+<table>
+<tr><th>What turn 2 needs</th><th>Native (K = 1)</th><th>Dynamo (#4979)</th><th>#5074 (K &gt; 1)</th></tr>
+<tr><td>Reach the engine holding turn 1's KV cache</td><td>Gym's hash pins the rollout to one worker (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/responses_api_models/vllm_model/app.py#L2283-L2291"><code>_hashed_client</code></a>).</td><td>The KV router picks the engine with the most cached overlap, per call.</td><td>Same Gym hash to the worker. Inside it, any frontend works: all K feed one engine core (<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L112-L116"><code>launch_core_engines</code></a>).</td></tr>
+<tr><td>Read turn 1's exact token ids</td><td>The worker's <code>ChainPrefixCache</code>, TQ read on a miss.</td><td>The chat engine in the frontend reads TQ.</td><td>Each frontend has its own cache (256 entries, <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/data_plane/tq_token_sink.py#L842-L878">L842-L878</a>). Turn 2 on a different frontend means a miss and one extra TQ read. The ids are the same.</td></tr>
+<tr><td>Count running calls at a refit</td><td>One list in the worker.</td><td>In the worker, behind the adapter.</td><td>One list per frontend. Frontend 0 gathers them with the <code>progress</code> pipe command (<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1027-L1036">L1027-L1036</a>).</td></tr>
+<tr><td>Generation-prefix cuts</td><td>Supported.</td><td>Not covered on this page.</td><td>Refused at setup (<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L872-L875">L872-L875</a>). The cut state lives in one process, and the next turn may land on another.</td></tr>
+</table>
+
+<h2>The same thing as pseudocode</h2>
+<p class="pclbl">Picking where turn 2 runs: before (K = 1)</p>
+<pre class="pc"><span class="who"># Gym, per call</span>
+url = workers[<a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/responses_api_models/vllm_model/app.py#L2283">hash</a>(rollout_id) % N]    <span class="cm"># same worker every turn</span>
+<span class="who"># vLLM worker = Ray actor, at startup</span>
+sock = <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L500">reserve_port</a>(range)             <span class="cm"># listening socket, held open</span>
+llm = AsyncLLM.<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L606">from_engine_args</a>(args)  <span class="cm"># starts the engine core process</span>
+thread: <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2577">serve</a>(app, sockets=[sock])     <span class="cm"># uvicorn on its own thread</span></pre>
+<p class="pclbl">After (K = 3)</p>
+<pre class="pc"><span class="who"># Gym, per call (unchanged)</span>
+url = workers[<a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/responses_api_models/vllm_model/app.py#L2283">hash</a>(rollout_id) % N]             <span class="cm"># same worker every turn</span>
+<span class="who"># vLLM worker = Ray actor, at startup</span>
+sock = <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L500">reserve_port</a>(range)
+<span class="del">llm = AsyncLLM.from_engine_args(args)</span>
+<span class="add">pool = <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L32">MultiAPIServerPool</a>(self, K=3)</span>
+<span class="add">llm = pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L58">create_engine</a>(args)</span>                  <span class="cm"># 1 engine core, 3 client slots</span>
+<span class="add">  for i in 1, 2:</span>
+<span class="add">    spawn <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L284">run_api_process</a>(i, sock)</span>              <span class="cm"># child: own AsyncLLM(client_index=i)</span>
+<span class="add">  llm = <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L168">AsyncLLM</a>(client_index=0)</span>                <span class="cm"># frontend 0 stays in the actor</span>
+thread: <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2577">serve</a>(app, sockets=[sock])              <span class="cm"># frontend 0</span>
+<span class="add">pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L204">command</a>(&quot;start&quot;)</span>                           <span class="cm"># children serve on the SAME sock</span>
+<span class="who"># kernel, per new TCP connection</span>
+<span class="add">give it to one of the 3 waiting accept() calls</span>  <span class="cm"># no session id; any frontend</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/Gym/blob/5911d628c744d0bf43fe1d9ddf3bda72d59b0f9a/responses_api_models/vllm_model/app.py#L2258"><code>_resolve_client</code></a> (Gym), <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L500"><code>_reserve_port</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L58"><code>create_engine</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/multi_api.py#L284"><code>run_api_process</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2501"><code>_setup_vllm_server</code></a>.</p>
+<p class="pclbl">Reading turn 1's ids (each frontend runs this)</p>
+<pre class="pc"><span class="who"># serving event loop of whichever frontend got turn 2</span>
+keys = call.ng_capture.staging_chain   <span class="cm"># Gym sends keys to turn 1&#x27;s rows</span>
+with <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/data_plane/tq_token_sink.py#L848">cache_lock</a>:                       <span class="cm"># per-process dict, 256 entries</span>
+    hit = longest cached prefix of keys
+rows = <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/data_plane/tq_token_sink.py#L866">tq.read</a>(keys after hit)         <span class="cm"># outside the lock; new frontend: all keys</span>
+prompt = turn1_ids + rendered(turn 2)  <span class="cm"># same ids on any frontend</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1245"><code>_resolve_admission_prefix</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/97a0d8096c753a39bfee28f65526591778dbc8a4/nemo_rl/data_plane/tq_token_sink.py#L842"><code>ChainPrefixCache.fetch_chains</code></a>.</p>
+
+<div class="hl"><b>So what.</b> Session stickiness still works, at the level that matters. Gym still pins a rollout to one worker. Inside the worker, turns spread across the K frontends. That is fine, because the KV cache sits in the one shared engine and turn 1's ids sit in TQ. The cost is an extra TQ read when turn 2 lands on a different frontend, and no generation-prefix cuts when K &gt; 1. Dynamo gets the same result in a different way: its router chooses the engine by what is cached, call by call. The open risk is not routing: a failed metrics query can shut down the shared engine for all K frontends (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5074-failed-query.html">next page</a>).</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dead Frontend Detection</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);margin:0;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:25px;line-height:1.3;margin:0 0 6px}
+h2{font-size:19px;margin:30px 0 8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface2);padding:1px 5px;border-radius:4px}
+p.sub{color:var(--dim);font-size:13px;margin:0 0 16px}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.fig{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin:14px 0;overflow-x:auto}
+svg{display:block;width:100%;min-width:640px;height:auto}
+svg text{fill:var(--text);font:13px -apple-system,Helvetica,Arial,sans-serif}
+svg .mono{font:12px ui-monospace,Menlo,monospace}
+svg .dim{fill:var(--dim)}svg .red{fill:var(--red)}svg .green{fill:var(--green)}svg .acc{fill:var(--accent)}svg .or{fill:var(--orange)}
+svg .t{font-weight:700}
+svg a text{text-decoration:underline}
+svg .box{fill:var(--surface2);stroke:var(--border)}
+svg .proc{fill:none;stroke:var(--dim);stroke-dasharray:5 4}
+svg .ok{fill:none;stroke:var(--green);stroke-width:1.6}
+svg .bad{fill:none;stroke:var(--red);stroke-width:1.6}
+svg .line{stroke:var(--dim);stroke-width:1.3;fill:none}
+svg .lred{stroke:var(--red);stroke-width:1.6;fill:none}
+svg .lgreen{stroke:var(--green);stroke-width:1.6;fill:none}
+svg .dotg{fill:var(--green)}svg .dotr{fill:var(--red)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+ol.todo{padding-left:22px}ol.todo li{margin:0 0 10px}
+.cref{margin:2px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:3px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.warn{border:1px solid var(--orange);border-left-width:4px;background:var(--surface);border-radius:6px;padding:10px 14px;margin:22px 0 0;font-size:14.5px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How the health check learns that one HTTP frontend died</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5075">PR #5075</a> · builds on <a href="https://github.com/NVIDIA-NeMo/RL/pull/5074">#5074</a> (merged) ·
+PR code at <a href="https://github.com/NVIDIA-NeMo/RL/tree/abb86030f89331e59a9feee9f2e7bf5d1023e459"><code>abb8603</code></a>, main at <a href="https://github.com/NVIDIA-NeMo/RL/tree/9ec0986039c2289f2c5a87ef5985db1e41a64c31"><code>9ec0986</code></a> ·
+background: <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5074-many-frontends.html">how many frontends share one engine</a></p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>A frontend process could die while its vLLM worker lived on. The health check only asked the worker, which always said "alive", so the shard stayed in rotation. Because of that, main refuses to start with several frontends and fleet health both on.</dd>
+  <dt>This PR</dt>
+  <dd>The worker's <code>is_alive</code> also checks each frontend process and raises if one is gone. The health check counts that as a failed probe, and after 3 in a row the shard is marked dead and taken out of rotation.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict good">The fix works in the code.</span> <span class="verdict open">Open: not mergeable yet.</span> The branch is built on an old copy of #5074 and must be rebased. The review lists 4 things that must change during the rebase (below). Not run on GPUs yet.</dd>
+</dl>
+</div>
+
+<div class="bg"><b>Background.</b> With <code>http_api_server_count: 8</code>, each vLLM worker (a Ray actor that owns the GPU engine) serves HTTP through 8 frontends: 1 server thread inside the worker plus 7 child processes it <a href="https://github.com/NVIDIA-NeMo/RL/blob/abb86030f89331e59a9feee9f2e7bf5d1023e459/nemo_rl/models/generation/vllm/multi_api.py#L113-L132">spawns</a>, named <code>NRL-HTTP-1</code> … <code>NRL-HTTP-7</code>. They share one listening socket. Every 5 s the controller's <span class="tip" tabindex="0" data-tip="async_rl.generation_fleet_health: probes each generation shard, marks dead ones, and tells the NeMo-Gym router which shards may receive requests.">fleet health</span> check calls <code>is_alive</code> on each shard's lead worker. Dotted words have a short explanation: hover or tap them.</div>
+
+<div class="fig">
+<svg viewBox="0 0 940 360" role="img" aria-label="Before and after: probe results when frontend NRL-HTTP-1 dies">
+  <!-- left: process map -->
+  <text x="14" y="22" class="t">One shard, 8 frontends</text>
+  <rect x="14" y="34" width="300" height="300" rx="8" class="proc"/>
+  <text x="24" y="54" class="dim">vLLM worker process (Ray actor, GPU)</text>
+  <rect x="30" y="66" width="268" height="40" rx="6" class="box"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/abb86030f89331e59a9feee9f2e7bf5d1023e459/nemo_rl/models/generation/vllm/vllm_worker_async.py#L357-L361"><text x="42" y="91" class="mono acc">is_alive()</text></a>
+  <text x="140" y="91" class="dim">answers the probe</text>
+  <rect x="30" y="116" width="268" height="34" rx="6" class="box"/>
+  <text x="42" y="138">HTTP server thread (frontend #1)</text>
+  <text x="30" y="176" class="dim">7 child processes (each its own PID):</text>
+  <rect x="30" y="186" width="124" height="30" rx="5" class="bad"/>
+  <text x="40" y="206" class="mono red">NRL-HTTP-1 ✕</text>
+  <rect x="164" y="186" width="124" height="30" rx="5" class="ok"/>
+  <text x="174" y="206" class="mono">NRL-HTTP-2</text>
+  <rect x="30" y="224" width="124" height="30" rx="5" class="ok"/>
+  <text x="40" y="244" class="mono">NRL-HTTP-3</text>
+  <rect x="164" y="224" width="124" height="30" rx="5" class="ok"/>
+  <text x="174" y="244" class="mono">… NRL-HTTP-7</text>
+  <text x="30" y="282" class="red">kill -9 NRL-HTTP-1 at t = 0</text>
+  <text x="30" y="302" class="dim">the worker itself stays alive,</text>
+  <text x="30" y="320" class="dim">so Ray reports nothing</text>
+
+  <!-- right: timeline -->
+  <text x="350" y="22" class="t">What the health check sees (probe every 5 s)</text>
+  <text x="440" y="56" class="dim mono">t=5s</text><text x="530" y="56" class="dim mono">t=10s</text><text x="620" y="56" class="dim mono">t=15s</text><text x="710" y="56" class="dim mono">t=20s</text>
+
+  <text x="350" y="96" class="t">Before</text>
+  <text x="350" y="114" class="dim mono" style="font-size:11px">is_alive → True</text>
+  <circle cx="455" cy="100" r="9" class="dotg"/><circle cx="548" cy="100" r="9" class="dotg"/><circle cx="638" cy="100" r="9" class="dotg"/><circle cx="728" cy="100" r="9" class="dotg"/>
+  <text x="750" y="96" class="red">still HEALTHY</text>
+  <text x="750" y="114" class="dim" style="font-size:12px">router keeps sending work</text>
+  <text x="350" y="150" class="dim" style="font-size:12.5px">The next control command to the frontends finds the dead one and shuts the</text>
+  <text x="350" y="168" class="dim" style="font-size:12.5px">whole engine down — with requests still running on it.</text>
+
+  <line x1="350" y1="190" x2="926" y2="190" class="line"/>
+
+  <text x="350" y="226" class="t">After</text>
+  <text x="350" y="244" class="dim mono" style="font-size:11px">is_alive → raises</text>
+  <circle cx="455" cy="230" r="9" class="dotr"/><circle cx="548" cy="230" r="9" class="dotr"/><circle cx="638" cy="230" r="9" class="dotr"/>
+  <text x="440" y="262" class="mono red" style="font-size:11px">fail 1</text><text x="533" y="262" class="mono red" style="font-size:11px">fail 2</text><text x="623" y="262" class="mono red" style="font-size:11px">fail 3</text>
+  <text x="700" y="226" class="red t">DEAD at ~15 s</text>
+  <text x="700" y="244" class="dim" style="font-size:12px">removed from the router;</text>
+  <text x="700" y="260" class="dim" style="font-size:12px">left out of the next weight sync</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/nemo_rl/models/generation/fleet_health.py#L300-L301"><text x="350" y="298" class="mono acc" style="font-size:12px">record_probe: 3 failures in a row → DEAD</text></a>
+  <text x="350" y="318" class="dim" style="font-size:12.5px">Slower than a worker crash (marked dead at once), which is right:</text>
+  <text x="350" y="336" class="dim" style="font-size:12.5px">the worker is alive, so its weight-sync connection is still good.</text>
+  <circle cx="790" cy="300" r="6" class="dotg"/><text x="802" y="304" style="font-size:12px">probe ok</text>
+  <circle cx="790" cy="322" r="6" class="dotr"/><text x="802" y="326" style="font-size:12px">probe failed</text>
+</svg>
+</div>
+
+<h2>The fix, as pseudocode</h2>
+<p class="pclbl">Before (main today)</p>
+<pre class="pc"><span class="who"># vLLM worker actor, answering the controller's probe</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/nemo_rl/models/generation/vllm/vllm_worker.py#L841-L843">is_alive</a>():
+    return True                                   <span class="cm"># the actor answered, so "alive"</span></pre>
+<p class="pclbl">After (this PR)</p>
+<pre class="pc"><span class="who"># vLLM worker actor, answering the controller's probe</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/abb86030f89331e59a9feee9f2e7bf5d1023e459/nemo_rl/models/generation/vllm/vllm_worker_async.py#L357-L361">is_alive</a>():
+<span class="add">    if pool is not None:</span>
+<span class="add">        pool.<a href="https://github.com/NVIDIA-NeMo/RL/blob/abb86030f89331e59a9feee9f2e7bf5d1023e459/nemo_rl/models/generation/vllm/multi_api.py#L185-L191">check_health</a>()</span>                       <span class="cm"># C1: should reuse main's raise_if_unavailable()</span>
+    return True
+
+<span class="who"># the frontend pool, same actor, same event loop</span>
+<span class="add">def check_health():</span>
+<span class="add">    if failed: raise "pool failed"</span>                <span class="cm"># C1: main already keeps this as _failure</span>
+<span class="add">    for p in children:</span>
+<span class="add">        if not p.is_alive(): raise f"{p.name} exited"</span>
+
+<span class="who"># controller, every 5 s, all shards at once</span>
+try: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/nemo_rl/models/generation/vllm/vllm_generation.py#L1145-L1148">lead_worker.is_alive()</a>                       <span class="cm"># unchanged</span>
+except ActorDied: mark DEAD now
+except Exception: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/nemo_rl/algorithms/single_controller.py#L4136-L4139">record_probe(ok=False)</a>          <span class="cm"># the new raise lands here</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/abb86030f89331e59a9feee9f2e7bf5d1023e459/nemo_rl/models/generation/vllm/vllm_worker_async.py#L357-L361"><code>VllmAsyncGenerationWorkerImpl.is_alive</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/abb86030f89331e59a9feee9f2e7bf5d1023e459/nemo_rl/models/generation/vllm/multi_api.py#L185-L191"><code>MultiAPIServerPool.check_health</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/nemo_rl/algorithms/single_controller.py#L4096-L4141">the probe loop</a>.</p>
+
+<h2>What the rebase must change</h2>
+<p>Main now has the merged #5074, so the branch conflicts. Four items, all in this PR:</p>
+<ol class="todo">
+<li><b>One failure flag, and let "stop" finish.</b> Main already records a pool failure in <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/nemo_rl/models/generation/vllm/multi_api.py#L49-L56"><code>_failure</code> / <code>raise_if_unavailable()</code></a>; the new <code>_failed</code> would be a second copy. Also, at the end of a run with a dead frontend, <code>shutdown()</code> sends "stop", which raises on the dead child, so the worker's own cleanup is skipped. This PR makes that the normal way such a run ends.
+<p class="cref" data-c="C1">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5075#discussion_r4611013218">review comment C1 — multi_api.py:185</a></p></li>
+<li><b>Delete main's guard that blocks this setup.</b> Main <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/nemo_rl/algorithms/single_controller_utils/config.py#L1982-L1993">raises at setup</a> when there are several frontends and fleet health is on, and the message links this PR. Every failover test run sets both, so all 3 would fail. CI cannot see this, because the script skips itself on the 2-GPU runners. The <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/docs/design-docs/nemo-gym-integration.md#L70-L80">docs</a> state the same old rule.
+<p class="cref" data-c="C2">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5075#discussion_r4611013231">review comment C2 — grpo_sc_gym_router_failover.sh:140</a></p></li>
+<li><b>Move the new unit tests into a file CI runs.</b> No test lane picks up <code>test_multi_api.py</code>; main renamed it to <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/tests/unit/models/generation/test_vllm_multi_api.py"><code>test_vllm_multi_api.py</code></a>.
+<p class="cref" data-c="C3">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5075#discussion_r4611013236">review comment C3 — test_multi_api.py:183</a></p></li>
+<li><b>Turn off Ray's log de-duplication in the test.</b> The script finds which process to kill by reading the "NRL HTTP frontend ready" lines from the log. Ray ignores every word with a digit when it compares lines, so the two shards' lines look identical and one shard's lines are hidden. If that is the shard the script picked, the run fails, roughly half the time. One line, <code>export RAY_DEDUP_LOGS=0</code>, fixes it, as <a href="https://github.com/NVIDIA-NeMo/RL/blob/9ec0986039c2289f2c5a87ef5985db1e41a64c31/tests/functional/_sglang_grpo_chaos.py#L236">another chaos test already does</a>.
+<p class="cref" data-c="C4">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5075#discussion_r4611013241">review comment C4 — grpo_sc_gym_router_failover.sh:37</a></p></li>
+</ol>
+
+<div class="warn"><b>So what.</b> The idea is right and small: a dead frontend now takes its shard out of rotation in about 15 s, before the next control command shuts the engine down with requests still running on it. But the branch only makes sense after a rebase that removes main's guard. The only end-to-end proof is a 3-GPU test that CI skips, so after the rebase someone has to run it by hand.</div>
+
+</div>
+</body>
+</html>

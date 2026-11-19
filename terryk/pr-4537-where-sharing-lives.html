@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #4537 — where prefix sharing should live</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--orange:#9a6700;--red:#cf222e;--purple:#8250df}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700;color:var(--orange)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);color:var(--accent);font-size:12.5px;white-space:nowrap}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 16px}
+.bg{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:0 0 14px;font-size:14px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.hl{border-left:3px solid var(--green);background:var(--surface);padding:10px 16px;margin:18px 0;border-radius:0 8px 8px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:10px 0;display:block;overflow-x:auto}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+svg{max-width:100%;height:auto;display:block;margin:12px 0}
+svg .hdr{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .lane{fill:var(--text);font:bold 12.5px -apple-system,sans-serif;letter-spacing:.04em}
+svg .step{fill:var(--dim);font:bold 12px -apple-system,sans-serif}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .tot{fill:var(--text);font:bold 12px ui-monospace,Menlo,monospace}
+svg .sum{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .seglbl{fill:var(--bg);font:bold 10.5px ui-monospace,Menlo,monospace;pointer-events:none}
+svg .s-rep{fill:var(--orange);stroke:var(--bg);stroke-width:1}
+svg .s-once{fill:var(--accent);stroke:var(--bg);stroke-width:1}
+svg .s-gen{fill:var(--green);stroke:var(--bg);stroke-width:1}
+svg .s-ctx{fill:var(--dim);stroke:var(--bg);stroke-width:1}
+svg .s-sum{fill:var(--purple);stroke:var(--bg);stroke-width:1}
+svg .bad{fill:none;stroke:var(--red);stroke-width:1.5}
+svg .badt{fill:var(--red);font:bold 12.5px -apple-system,sans-serif}
+svg .b{fill:var(--surface);stroke:var(--border)}
+svg .b-new{fill:var(--surface);stroke:var(--green);stroke-width:1.6}
+svg .b-bad{fill:var(--surface);stroke:var(--orange);stroke-width:2.2}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+function wire(){var b=document.getElementById('theme-toggle');if(!b)return;b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Who should decide which training rows share a prefix: the rollout reassembler, or Megatron?</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4537">NVIDIA-NeMo/RL #4537</a> with its Megatron-LM halves,
+<a href="https://github.com/NVIDIA/Megatron-LM/pull/7914">#7914</a> (model forward) and <a href="https://github.com/NVIDIA/Megatron-LM/pull/8152">#8152</a> (<code>megatron.rl</code> packing library). Main links pin <code>defdaef4</code> (the PR's merge base); PR links pin <code>1110db98</code>.</p>
+
+<div class="status"><dl>
+<dt>Main</dt><dd>Gym records each model call. <code>call_selection</code> picks the calls that train, and the rollout reassembler turns them into rows: one per rollout, or several per rollout with forest training (compaction, branches), sharing one reward and advantage. No row knows it shares tokens with another.</dd>
+<dt>This PR</dt><dd>Adds one column, each row's first-prompt length, behind a flag on the same reassembler. Megatron then works out which rows share, from group id and prompt tokens, and shares only that first prompt. It refuses forest training.</dd>
+<dt>Status</dt><dd><span class="verdict">Proposed — draft only, not in #4537.</span> The third column below is a design ask raised in the review. A draft of it, on top of the PR's branch, is open for critique: <a href="https://github.com/terrykong/RL/pull/30">terrykong/RL#30</a>.</dd>
+</dl></div>
+
+<nav class="chain"><a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-batch-forming.html">how the batch is formed</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-vs-forge-qwengyre.html">vs Forge and QwenGyre</a>
+<span class="here">where sharing should live</span></nav>
+<p class="chainnote">Three pages on this PR — this one: which component should own the prefix tree.</p>
+
+<div class="bg"><b>Background.</b> In the single-controller GRPO path, Gym runs the agent and records every model call with a link to the call it continued. <span class="tip" tabindex="0" data-tip="nemo_rl/environments/call_selection.py. returned_history keeps the calls the agent returned (the main path); all_captured keeps every recorded call, including branches and retries.">call_selection</span> decides which calls train. The <span class="tip" tabindex="0" data-tip="RolloutReassembler: a Ray actor that fetches each selected call's tokens, logprobs and routes from the data plane, joins them into whole rows, and writes those rows back.">rollout reassembler</span> builds the rows. With <span class="tip" tabindex="0" data-tip="token_capture.forest_training=true. One rollout can own several rows: a new row starts after each compaction, and each branch is its own row. Shared calls keep their loss in one row only.">forest training</span>, one rollout can own several rows, and the advantage stage gives all of them that rollout's single advantage. Dotted words have a short explanation: hover or tap them.</div>
+
+<p><a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L834"><code>finalize_group</code></a> is the one place that sees the selected calls, their parent links, and the finished rows at the same time. #4537 leaves it almost untouched: it <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/experience/rollout_reassembler.py#L1346">adds a <code>shared_prefix_prompt_lengths</code> column</a> and nothing else. The Megatron worker then rebuilds the sharing from <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L916">the group id</a> and <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/megatron/data.py#L1038">the prompt tokens</a>, so it can only find one level: one prompt, many completions. And because <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/algorithms/single_controller_utils/setup.py#L1429">setup refuses forest training</a>, the runs whose rows share the most tokens (compaction and branches) cannot use the feature at all.</p>
+
+<h2>The same prompt group, three ways</h2>
+<svg viewBox="0 0 940 560" role="img" aria-label="One prompt group with two rollouts. Main builds 4 rows, 1425 tokens. This PR refuses this run at setup. The proposal shares the prompt P once: 825 tokens with today's Megatron stars, 785 with deeper trees.">
+<text class="hdr" x="16" y="20">One prompt group, 2 rollouts, forest training on (compaction + a branch)</text>
+<rect class="s-rep" x="16" y="32" width="13" height="11"/><text class="note" x="34" y="42">prompt P, copied into every row</text>
+<rect class="s-gen" x="242.20000000000002" y="32" width="13" height="11"/><text class="note" x="260.20000000000005" y="42">model call, trains (has loss)</text>
+<rect class="s-ctx" x="456.0" y="32" width="13" height="11"/><text class="note" x="474.0" y="42">copy of A, context only (no loss)</text>
+<rect class="s-sum" x="694.6" y="32" width="13" height="11"/><text class="note" x="712.6" y="42">compacted summary prompt</text>
+<text class="lane" x="16" y="72">THE CALLS GYM RECORDED</text>
+<text class="lbl" x="16" y="92">rollout 1:  P → A → B        (B and C both continue A's exact tokens)</text>
+<text class="lbl" x="16" y="110">                 └→ C</text>
+<text class="lbl" x="16" y="128">rollout 2:  P → D → E  ‖ compaction ‖  S → F</text>
+<text class="note" x="16" y="146">Each letter is one model call, plus the tool output before it. Numbers are token counts (made up, kept distinct).</text>
+<text class="lane" x="16" y="178">① MAIN — </text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/environments/call_selection.py#L284"><text x="88" y="178">select_all_captured</text></a>
+<text class="note" x="226" y="178">→</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L1569"><text x="240" y="178">RolloutReassembler._finalize_logical_rows</text></a>
+<text class="note" x="530" y="178">→ 4 rows, one reward + advantage per rollout</text>
+<text class="note" x="16" y="207">r0</text>
+<rect class="s-rep" x="40.0" y="192" width="255.0" height="22"/>
+<text class="seglbl" x="44.0" y="207">P 300</text>
+<rect class="s-gen" x="295.0" y="192" width="34.0" height="22"/>
+<text class="seglbl" x="299.0" y="207">A</text>
+<rect class="s-gen" x="329.0" y="192" width="51.0" height="22"/>
+<text class="seglbl" x="333.0" y="207">B 60</text>
+<text class="tot" x="388.0" y="207">400</text>
+<text class="note" x="424.0" y="207">rollout 1, path A→B</text>
+<text class="note" x="16" y="235">r1</text>
+<rect class="s-rep" x="40.0" y="220" width="255.0" height="22"/>
+<text class="seglbl" x="44.0" y="235">P 300</text>
+<rect class="s-ctx" x="295.0" y="220" width="34.0" height="22"/>
+<text class="seglbl" x="299.0" y="235">A</text>
+<rect class="s-gen" x="329.0" y="220" width="63.8" height="22"/>
+<text class="seglbl" x="333.0" y="235">C 75</text>
+<text class="tot" x="400.8" y="235">415</text>
+<text class="note" x="436.8" y="235">rollout 1, path A→C</text>
+<text class="note" x="16" y="263">r2</text>
+<rect class="s-rep" x="40.0" y="248" width="255.0" height="22"/>
+<text class="seglbl" x="44.0" y="263">P 300</text>
+<rect class="s-gen" x="295.0" y="248" width="38.2" height="22"/>
+<text class="seglbl" x="299.0" y="263">D</text>
+<rect class="s-gen" x="333.2" y="248" width="68.0" height="22"/>
+<text class="seglbl" x="337.2" y="263">E 80</text>
+<text class="tot" x="409.2" y="263">425</text>
+<text class="note" x="445.2" y="263">rollout 2, before compaction</text>
+<text class="note" x="16" y="291">r3</text>
+<rect class="s-sum" x="40.0" y="276" width="102.0" height="22"/>
+<text class="seglbl" x="44.0" y="291">S 120</text>
+<rect class="s-gen" x="142.0" y="276" width="55.2" height="22"/>
+<text class="seglbl" x="146.0" y="291">F 65</text>
+<text class="tot" x="205.2" y="291">185</text>
+<text class="note" x="241.2" y="291">rollout 2, after compaction</text>
+<text class="sum" x="40" y="316">Dense: 1425 tokens. P is computed 3 times, and A twice.</text>
+<text class="lane" x="16" y="340">② THIS PR</text>
+<rect class="bad" x="40" y="350" width="600" height="40" rx="6"/>
+<text class="badt" x="54" y="375">Setup stops: shared mode does not allow token_capture.forest_training</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/algorithms/single_controller_utils/setup.py#L1429"><text x="656" y="375">setup.py:1429</text></a>
+<text class="note" x="40" y="408">With forest training off, a rollout is one row and only P is shared, as a star (rows that branch right after P).</text>
+<text class="lane" x="16" y="440">③ PROPOSED — the reassembler says who shares what; Megatron packs it</text>
+<rect class="s-once" x="40.0" y="452" width="255.0" height="22"/>
+<text class="seglbl" x="44.0" y="467">P 300</text>
+<rect class="s-gen" x="295.0" y="452" width="85.0" height="22"/>
+<text class="seglbl" x="299.0" y="467">A B 100</text>
+<rect class="s-gen" x="380.0" y="452" width="97.8" height="22"/>
+<text class="seglbl" x="384.0" y="467">A C 115</text>
+<rect class="s-gen" x="477.8" y="452" width="106.2" height="22"/>
+<text class="seglbl" x="481.8" y="467">D E 125</text>
+<rect class="s-sum" x="594.0" y="452" width="157.2" height="22"/>
+<text class="seglbl" x="598.0" y="467">S F 185</text>
+<text class="tot" x="759.2" y="467">825</text>
+<text class="note" x="40" y="490">Stars, which Megatron already runs: P once, three branches. The compacted row has nothing to share, so it runs dense.</text>
+<rect class="s-once" x="40.0" y="504" width="255.0" height="22"/>
+<text class="seglbl" x="44.0" y="519">P 300</text>
+<rect class="s-once" x="295.0" y="504" width="34.0" height="22"/>
+<text class="seglbl" x="299.0" y="519">A</text>
+<rect class="s-gen" x="329.0" y="504" width="51.0" height="22"/>
+<text class="seglbl" x="333.0" y="519">B 60</text>
+<rect class="s-gen" x="380.0" y="504" width="63.8" height="22"/>
+<text class="seglbl" x="384.0" y="519">C 75</text>
+<rect class="s-gen" x="443.8" y="504" width="106.2" height="22"/>
+<text class="seglbl" x="447.8" y="519">D E 125</text>
+<rect class="s-sum" x="560.0" y="504" width="157.2" height="22"/>
+<text class="seglbl" x="564.0" y="519">S F 185</text>
+<text class="tot" x="725.2" y="519">785</text>
+<text class="note" x="40" y="542">Deeper tree (P → A → B, C): A is stored once too. Megatron's layout can describe this, but its model code rejects it today.</text>
+</svg>
+
+<h2>Where each step lives</h2>
+<svg viewBox="0 0 940 600" role="img" aria-label="Where each step lives, in main, this PR and the proposal.">
+<text class="lane" x="16" y="20">① MAIN</text>
+<text class="lane" x="324" y="20">② THIS PR</text>
+<text class="lane" x="632" y="20">③ PROPOSED (not built)</text>
+<rect class="b-new" x="560" y="30" width="13" height="11"/><text class="note" x="578" y="40">new in that column</text>
+<rect class="b-bad" x="700" y="30" width="13" height="11"/><text class="note" x="718" y="40">where "who shares" is decided</text>
+<text class="step" x="16" y="56">Gym: calls with parent links</text>
+<rect class="b" x="16" y="62" width="292" height="62" rx="6"/>
+<text class="lbl" x="26" y="80">P→A→B, A→C; P→D→E, S→F</text>
+<rect class="b" x="324" y="62" width="292" height="62" rx="6"/>
+<text class="lbl" x="334" y="80">same</text>
+<rect class="b" x="632" y="62" width="292" height="62" rx="6"/>
+<text class="lbl" x="642" y="80">same</text>
+<text class="step" x="16" y="140">call_selection: which calls train</text>
+<rect class="b" x="16" y="146" width="292" height="62" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/environments/call_selection.py#L325"><text x="26" y="164">all_captured: all 6 calls</text></a>
+<text class="lbl" x="26" y="180">returned_history: what came back</text>
+<rect class="b" x="324" y="146" width="292" height="62" rx="6"/>
+<text class="lbl" x="334" y="164">same</text>
+<rect class="b" x="632" y="146" width="292" height="62" rx="6"/>
+<text class="lbl" x="642" y="164">same</text>
+<text class="step" x="16" y="224">Rollout reassembler: calls → rows</text>
+<rect class="b" x="16" y="230" width="292" height="62" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L373"><text x="26" y="248">RolloutReassembler</text></a>
+<text class="lbl" x="26" y="264">4 rows + owner tags</text>
+<text class="lbl" x="26" y="280">(+ padding rows)</text>
+<rect class="b-new" x="324" y="230" width="292" height="62" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/experience/rollout_reassembler.py#L1346"><text x="334" y="248">same class + a flag</text></a>
+<text class="lbl" x="334" y="264">+ prompt_lengths [300,300,300]</text>
+<text class="lbl" x="334" y="280">forest training refused</text>
+<rect class="b-bad" x="632" y="230" width="292" height="62" rx="6"/>
+<text class="lbl" x="642" y="248">SharedPrefixRolloutReassembler</text>
+<text class="lbl" x="642" y="264">+ prefix_row [-1,0,0,-1]</text>
+<text class="lbl" x="642" y="280">+ prefix_len [0,340,300,0]</text>
+<text class="step" x="16" y="308">Advantage: one per rollout</text>
+<rect class="b" x="16" y="314" width="292" height="62" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/algorithms/single_controller_utils/logical_advantage.py#L122"><text x="26" y="332">logical owner → 2 advantages</text></a>
+<rect class="b" x="324" y="314" width="292" height="62" rx="6"/>
+<text class="lbl" x="334" y="332">same (forest off: per row)</text>
+<rect class="b" x="632" y="314" width="292" height="62" rx="6"/>
+<text class="lbl" x="642" y="332">same: hints don&#x27;t touch it</text>
+<text class="step" x="16" y="392">Driver: split the batch over DP ranks</text>
+<rect class="b" x="16" y="398" width="292" height="62" rx="6"/>
+<text class="lbl" x="26" y="416">by length</text>
+<rect class="b-new" x="324" y="398" width="292" height="62" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/data_plane/preshard.py#L155"><text x="334" y="416">whole groups to one rank</text></a>
+<text class="lbl" x="334" y="432">all groups the same size</text>
+<text class="lbl" x="334" y="448">work from prompt_lengths</text>
+<rect class="b-new" x="632" y="398" width="292" height="62" rx="6"/>
+<text class="lbl" x="642" y="416">whole groups to one rank</text>
+<text class="lbl" x="642" y="432">groups may differ in size</text>
+<text class="lbl" x="642" y="448">work from prefix_len</text>
+<text class="step" x="16" y="476">Megatron worker: build forwards</text>
+<rect class="b" x="16" y="482" width="292" height="62" rx="6"/>
+<text class="lbl" x="26" y="500">dense packing</text>
+<rect class="b-bad" x="324" y="482" width="292" height="62" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/megatron/data.py#L1038"><text x="334" y="500">group id + prompt tokens</text></a>
+<text class="lbl" x="334" y="516">→ stars (megatron.rl)</text>
+<text class="lbl" x="334" y="532">+ budget, TP/CP, DP align</text>
+<rect class="b-new" x="632" y="482" width="292" height="62" rx="6"/>
+<text class="lbl" x="642" y="500">columns → tree</text>
+<text class="lbl" x="642" y="516">+ the PR&#x27;s budget,</text>
+<text class="lbl" x="642" y="532">TP/CP and DP code</text>
+<text class="step" x="16" y="560">DTensor / Automodel worker</text>
+<rect class="b" x="16" y="566" width="292" height="62" rx="6"/>
+<text class="lbl" x="26" y="584">dense packing</text>
+<rect class="b" x="324" y="566" width="292" height="62" rx="6"/>
+<text class="lbl" x="334" y="584">dense only; cannot</text>
+<text class="lbl" x="334" y="600">read any sharing info</text>
+<rect class="b-new" x="632" y="566" width="292" height="62" rx="6"/>
+<text class="lbl" x="642" y="584">can read the same columns;</text>
+<text class="lbl" x="642" y="600">dense until it does</text>
+</svg>
+<p class="pclbl">Main</p>
+<pre class="pc"><span class="who"># reassembler actor, one call per finished prompt group</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L834">finalize_group</a>(group, receipts, selections):
+    if forest_training:                                     <span class="cm"># compaction / branches</span>
+        paths = <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L1432">_plan_selected_calls</a>(receipts, selections)  <span class="cm"># call_selection&#x27;s picks → paths</span>
+        rows = <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L1569">_finalize_logical_rows</a>(paths)                <span class="cm"># 1+ rows per rollout, owner tags</span>
+        rows += <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L1175">padding rows</a>                                <span class="cm"># up to execution_row_multiple</span>
+    else:
+        rows = [finalize_rollout(r) for r in receipts]      <span class="cm"># 1 row per rollout</span>
+    tq.put(<a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L1341">pack_payload</a>(rows))                              <span class="cm"># the trainer reads only these rows</span></pre>
+<p class="pclbl">This PR</p>
+<pre class="pc"><span class="who"># reassembler actor (same class, one new flag)</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L834">finalize_group</a>(group, receipts, selections):
+    ...same as main...
+<span class="add">    if self.<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/experience/rollout_reassembler.py#L1346">_include_shared_prefix_metadata</a>:</span>                                          <span class="cm"># set when shared mode is on</span>
+<span class="add">        batch["shared_prefix_prompt_lengths"] = [r.prompt_len if r.valid else 0 ...]</span>  <span class="cm"># [300, 300, 300] in the vanilla case</span>
+    tq.put(pack_payload(rows))
+<span class="who"></span>
+<span class="who"># driver setup</span>
+<span class="add">if shared_mode and token_capture.forest_training:</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/algorithms/single_controller_utils/setup.py#L1429">raise ValueError</a>("forest segment ... rows are not shared-prefix completions")</span>
+<span class="who"></span>
+<span class="who"># Megatron worker, every logprob and train call</span>
+<span class="add">data["shared_prefix_group_id"] = <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L916">row_group_ids</a>(meta)</span>                                  <span class="cm"># from the row&#x27;s group tag</span>
+<span class="add">rows = <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/megatron/data.py#L1038">build_shared_prefix_rows</a>(ids, lengths, prompt_lengths, group_ids)</span>              <span class="cm"># megatron.rl: same group + same prompt tokens</span>
+<span class="add">units = <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1603">plan_shared_prefix_execution_units</a>(rows, budget, M)</span>                           <span class="cm"># stars, forests of stars, dense bins</span></pre>
+<p class="pclbl">Proposed — drafted in <a href="https://github.com/terrykong/RL/pull/30">terrykong/RL#30</a>, not in #4537</p>
+<pre class="pc"><span class="who"># reassembler actor: a subclass, picked by config (like selection_policy)</span>
+<span class="add">class SharedPrefixRolloutReassembler(RolloutReassembler):</span>
+<span class="add">    def row_extras(self, rows, selected_calls):</span>                               <span class="cm"># new hook on the base class</span>
+<span class="add">        # compare token IDs of the group's rows; parent links say where branches split</span>
+<span class="add">        prefix_row, prefix_len = longest_shared_prefix(rows, selected_calls)</span>  <span class="cm"># r1 → (r0, 340), r2 → (r0, 300)</span>
+<span class="add">        return {"prefix_row": prefix_row, "prefix_len": prefix_len}</span>           <span class="cm"># [-1, 0, 0, -1], [0, 340, 300, 0]</span>
+<span class="who"></span>
+<span class="who"># Megatron worker: reads the columns, keeps all of the PR's physical packing</span>
+<span class="add">tree = tree_from_prefix_columns(prefix_row, prefix_len)</span>                       <span class="cm"># replaces group id + prompt length</span>
+units = plan_shared_prefix_execution_units(tree, budget, M)                   <span class="cm"># unchanged: budget, TP/CP, 16 branches, DP</span>
+<span class="who"></span>
+<span class="who"># DTensor / Automodel worker</span>
+<span class="add">ignore prefix columns  → dense rows</span>                                           <span class="cm"># always correct; a mask can come later</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/environments/call_selection.py#L325"><code>SELECTION_POLICIES</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L834"><code>finalize_group</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/data_plane/schema.py#L219"><code>LogicalRowTag</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/algorithms/single_controller_utils/logical_advantage.py#L122"><code>build_logical_owner_batch</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/experience/rollout_reassembler.py#L1346">PR column</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/megatron/data.py#L1038"><code>_build_shared_prefix_rows</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1603"><code>_plan_shared_prefix_execution_units</code></a>.</p>
+
+<h2>What moves, what stays, and what to watch</h2>
+<table>
+<tr><th>Piece</th><th>Main</th><th>This PR</th><th>Proposed</th></tr>
+<tr><td>Which calls train</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/environments/call_selection.py#L325"><code>call_selection</code></a></td><td>same</td><td>same — no change</td></tr>
+<tr><td>Which rows share which tokens</td><td>nobody</td><td>Megatron worker + <code>megatron.rl</code>, from group id + first-prompt length</td><td>reassembler subclass, from the call tree; any backend can read it</td></tr>
+<tr><td>Packing under the token budget, TP/CP padding, 16-branch cap, DP alignment, logprob scatter-back</td><td>dense packing</td><td>Megatron worker</td><td>Megatron worker — stays where the PR put it</td></tr>
+<tr><td>Rows and advantages</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/data_plane/schema.py#L219">owner tags</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/algorithms/single_controller_utils/logical_advantage.py#L122">one advantage per rollout</a></td><td>unchanged; forest refused</td><td>unchanged: the new columns are hints, and rows stay rows</td></tr>
+<tr><td>Rows per group and per DP rank</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L1175">forest adds ownerless padding rows</a>; rollouts own different numbers of rows</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/data_plane/preshard.py#L155">whole groups per rank</a>, and every group in a chunk must have the same row count; never adds rows</td><td>accept groups of different sizes; run padding rows dense with zero loss</td></tr>
+<tr><td>Size</td><td colspan="3">The "who shares with whom" decision is about 20–40 lines today, all in Megatron-LM's <code>megatron.rl</code>. The PR's ~2,170 lines of Megatron worker code (packing, TP/CP, DP agreement, scatter-back) stay either way. The move changes the contract, not the amount of code.</td></tr>
+</table>
+<p>Three things need care. <b>Loss:</b> in r1 the copy of A is context only, because r0 owns A's loss. When A becomes one shared node, its loss mask must come from r0. <b>Advantages:</b> the advantage stage reads <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/data_plane/schema.py#L219"><code>LogicalRowTag</code></a> per row, so the shared path must hand logprobs back to the original rows. It already does, by source-row index, and the new columns don't change that. <b>DP sharding:</b> forest groups differ in row count, so the equal-size rule in the group sharding has to go. Lifting the setup refusal alone is not enough.</p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4611142845">review comment — rollout_reassembler.py:1346 (build the tree here)</a></p><p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4611143923">review comment — setup.py:1429 (support forest training)</a></p>
+<div class="hl"><b>So what.</b> The tree is already known when rows are built: the reassembler has every call's parent. Building it there, as a reassembler subclass, gives every backend the same explicit tree instead of one prompt length. That is what forest runs (compaction and branches) need, and what Automodel would read later. It saves little code: Megatron keeps its packing. Forest runs also need group sharding that accepts uneven groups, and deeper trees need Megatron's model code to run them.</div>
+
+</div>
+</body>
+</html>

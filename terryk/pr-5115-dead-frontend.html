@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dead Dynamo frontend</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700;--purple:#8250df}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 18px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--orange)}.verdict.good{color:var(--green)}
+.bg{border-left:3px solid var(--accent);background:var(--surface);padding:10px 14px;margin:0 0 16px;border-radius:0 8px 8px 0;font-size:14px}
+.hl{border-left:3px solid var(--green);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.scroll{overflow-x:auto}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .panel{fill:none;stroke:var(--border);stroke-width:1.2;stroke-dasharray:4 4}
+svg .proc{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:6 4}
+svg .same{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .new{fill:var(--surface);stroke:var(--orange);stroke-width:2}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2.2}
+svg .t{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .d{fill:var(--dim);font:10px ui-monospace,Menlo,monospace}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .h{fill:var(--accent);font:bold 12.5px -apple-system,sans-serif}
+svg .colh{fill:var(--text);font:bold 14px -apple-system,sans-serif}
+svg .r{fill:var(--red);font:bold 11px -apple-system,sans-serif}
+svg .g{fill:var(--green);font:bold 11px -apple-system,sans-serif}
+svg .o{fill:var(--orange);font:bold 11px -apple-system,sans-serif}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .cut{stroke:var(--purple);stroke-width:1.6;fill:none;stroke-dasharray:5 3;marker-end:url(#ahp)}
+svg .mk{stroke:var(--orange);stroke-width:1.3;fill:none;stroke-dasharray:2 3;marker-end:url(#aho)}
+svg .ahf{fill:var(--dim)}svg .ahpf{fill:var(--purple)}svg .ahof{fill:var(--orange)}
+svg .mesh{stroke:var(--accent);stroke-width:1;fill:none;opacity:.55}
+svg .lbl{fill:var(--bg);stroke:var(--border);stroke-width:1}
+svg .p{fill:var(--purple);font:bold 11px -apple-system,sans-serif}
+svg a text{text-decoration:underline;fill:var(--accent);font:10px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.ok{color:var(--green);font-weight:700}.warn{color:var(--orange);font-weight:700}.bug{color:var(--red);font-weight:700}
+svg .arrr{stroke:var(--red);stroke-width:1.6;fill:none;marker-end:url(#ahr)}
+svg .ahrf{fill:var(--red)}svg .ahgf{fill:var(--green)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+
+<div class="wrap">
+
+<h1>When one Dynamo frontend dies, its Gym sessions retry it forever and training stops</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5115">#5115</a>. RL links are pinned to <code>9d420a14</code>, Gym links to the pinned Gym <code>9e2e5d0a</code>. Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5115#discussion_r4610213492">C21 comment</a> and <a href="https://github.com/NVIDIA-NeMo/RL/pull/5115#discussion_r4610213620">C22 comment</a>.</p>
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-dynamo-native-worker.html">what the PR replaces</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-request-paths.html">how requests reach vLLM</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-shared-or-copied.html">shared or copied</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-one-chat-path.html">one chat path</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-gym-through-dynamo.html">Gym through Dynamo (#4979)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-one-call-three-steps.html">one call, three steps</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-reasoning-ended.html">finished thinking? (C84)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5115-frontends-across-nodes.html">frontends across nodes (#5115)</a>
+  <span class="here">when a frontend dies (C21, C22)</span>
+</nav>
+<p class="chainnote">Nine pages on this stack (#4905, #4979 and #5115), one question each. This one: what happens when one Dynamo frontend dies mid-run.</p>
+<div class="status"><dl>
+<dt>Before</dt><dd>One frontend (#4979). If it died, every Gym session retried it forever and the run stopped with no error. RL never checked it after startup.</dd>
+<dt>This PR</dt><dd>Several frontends, each able to reach every engine. Each one still fails alone the same way: only its own sessions hang, but the step waits on them, so the run still stops. (With forest training, Gym gives up after 3 tries and those rollouts fail instead.)</dd>
+<dt>Status</dt><dd><span class="verdict open">Open, not fixed in this PR.</span> Raised as C21 (RL turns on two options Gym already has: route around a failing URL, and a time limit on retries) and C22 (optional: restart a dead frontend), in a review that is still pending.</dd>
+</dl></div>
+<div class="bg"><b>Background.</b> A Dynamo <span class="tip" tabindex="0" data-tip="A CPU process that takes OpenAI-style HTTP calls, renders chat, and picks an engine with its own router.">frontend</span> takes Gym's chat calls and passes each one to any of the vLLM engines. With <code>num_frontends: 3</code>, Gym gets 3 URLs and keeps each <span class="tip" tabindex="0" data-tip="One Gym rollout: all its turns. Gym sends every turn of a session to the same URL.">session</span> on one of them. The engines run on GPUs and hold the calls; a frontend holds nothing the run needs to keep. Dotted words have a short explanation: hover or tap them.</div>
+<p>Gym picks a URL per session by hashing the session id (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2803-L2826"><code>_resolve_client</code></a>). When that URL refuses the connection, Gym's HTTP client waits 0.5 s and tries the same URL again (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L818">http_client.py L818</a>). It has no limit, because RL leaves Gym's limits off: <code>route_around_failing_endpoints</code> and <code>endpoint_connection_retry_timeout_s</code> both exist and default to off (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L1166-L1170">app.py L1166-L1170</a>); Gym's own comment says "a client retries a refused connection forever" (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L714-L717">L714-L717</a>). On the RL side, the driver reads the frontends' exit codes only while it waits for them at startup (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L669">L669</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L715-L730"><code>_assert_services_alive</code></a>), and nothing restarts a frontend.</p>
+
+<h2>One frontend dies: this PR, and the proposed fix</h2>
+<div class="scroll"><svg viewBox="0 0 1060 560" role="img" aria-label="One frontend dies: what happens in this PR and with the proposed fix">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahf" d="M0,0L10,5L0,10z"/></marker>
+<marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahrf" d="M0,0L10,5L0,10z"/></marker>
+<marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahgf" d="M0,0L10,5L0,10z"/></marker>
+</defs>
+
+<!-- ================= LEFT: THIS PR ================= -->
+<text class="colh" x="16" y="24">This PR, when F1 dies</text>
+<text class="n" x="16" y="41">3 frontends · 4 engines · 6 Gym sessions, 2 per frontend</text>
+<rect class="box" x="28" y="54" width="476" height="48" rx="6"/>
+<text class="t" x="38" y="72">NeMo-Gym</text>
+<text class="d" x="38" y="90">s1 s4 → F0    s2 s5 → F1    s3 s6 → F2   (hash of session id)</text>
+<path class="arr" d="M103,102 L103,150"/><text class="d" x="109" y="132">s1 s4</text>
+<path class="arrr" d="M265,102 L265,150"/><path class="arrr" d="M279,150 L279,102"/>
+<text class="r" x="287" y="122">② refused → retry</text>
+<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L818"><text x="287" y="136">every 0.5 s, no limit</text></a>
+<path class="arr" d="M427,102 L427,150"/><text class="d" x="433" y="132">s3 s6</text>
+
+<rect class="same" x="28" y="152" width="150" height="62" rx="8"/>
+<text class="t" x="38" y="172">F0</text><text class="d" x="38" y="190">serving s1 s4</text>
+<rect class="bad" x="190" y="152" width="150" height="62" rx="8"/>
+<text class="r" x="200" y="172">F1 · process exited</text><text class="d" x="200" y="190">port refuses calls</text>
+<text class="d" x="200" y="205">① its in-flight calls lost</text>
+<rect class="same" x="352" y="152" width="150" height="62" rx="8"/>
+<text class="t" x="362" y="172">F2</text><text class="d" x="362" y="190">serving s3 s6</text>
+
+<path class="mesh" d="M103,214 L84,262"/><path class="mesh" d="M103,214 L205,262"/><path class="mesh" d="M103,214 L326,262"/><path class="mesh" d="M103,214 L447,262"/>
+<path class="mesh" d="M427,214 L84,262"/><path class="mesh" d="M427,214 L205,262"/><path class="mesh" d="M427,214 L326,262"/><path class="mesh" d="M427,214 L447,262"/>
+<rect class="same" x="28" y="264" width="113" height="40" rx="6"/><text class="t" x="38" y="289">e0 · fine</text>
+<rect class="same" x="149" y="264" width="113" height="40" rx="6"/><text class="t" x="159" y="289">e1 · fine</text>
+<rect class="same" x="270" y="264" width="113" height="40" rx="6"/><text class="t" x="280" y="289">e2 · fine</text>
+<rect class="same" x="391" y="264" width="113" height="40" rx="6"/><text class="t" x="401" y="289">e3 · fine</text>
+<text class="n" x="28" y="324">F0 and F2 can still reach all 4 engines.</text>
+
+<rect class="box" x="28" y="336" width="476" height="52" rx="6"/>
+<text class="t" x="38" y="355">v2 driver</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L669"><text x="38" y="372">reads frontend exit codes only at startup · L669</text></a>
+<text class="r" x="38" y="384">never sees F1 die, never restarts it</text>
+
+<rect class="bad" x="28" y="400" width="476" height="62" rx="6"/>
+<text class="r" x="38" y="419">Result: s2 and s5 never finish.</text>
+<text class="n" x="38" y="437">The step waits on all 6, so training stops, with no error.</text>
+<text class="n" x="38" y="453">✂ A cut for s2 s5 sent to F1 fails; they regenerate after restore (safe).</text>
+
+<!-- ================= RIGHT: PROPOSED ================= -->
+<text class="colh" x="544" y="24">Proposed: C21 (+ optional C22), not implemented</text>
+<text class="n" x="544" y="41">Same 3 frontends, 4 engines and 6 sessions</text>
+<rect class="box" x="556" y="54" width="476" height="48" rx="6"/>
+<text class="t" x="566" y="72">NeMo-Gym</text>
+<text class="d" x="566" y="90">route_around_failing_endpoints: true   (C21)</text>
+<path class="arr" d="M631,102 L631,150"/><text class="d" x="637" y="132">s1 s4 s2</text>
+<path class="arrr" d="M793,102 L793,150"/><text class="r" x="801" y="122">② 8 tries, then fail</text>
+<text class="o" x="801" y="136">③ 3 fails: skip F1</text>
+<path class="arr" d="M955,102 L955,150"/><text class="d" x="961" y="132">s3 s6 s5</text>
+
+<rect class="same" x="556" y="152" width="150" height="62" rx="8"/>
+<text class="t" x="566" y="172">F0</text><text class="d" x="566" y="190">serving s1 s4 s2</text>
+<rect class="new" x="718" y="152" width="150" height="62" rx="8"/>
+<text class="o" x="728" y="172">F1 · skipped by Gym</text><text class="d" x="728" y="190">one trial call / 60 s</text>
+<text class="d" x="728" y="205">④ C22: restart it</text>
+<rect class="same" x="880" y="152" width="150" height="62" rx="8"/>
+<text class="t" x="890" y="172">F2</text><text class="d" x="890" y="190">serving s3 s6 s5</text>
+
+<path class="mesh" d="M631,214 L612,262"/><path class="mesh" d="M631,214 L733,262"/><path class="mesh" d="M631,214 L854,262"/><path class="mesh" d="M631,214 L975,262"/>
+<path class="mesh" d="M955,214 L612,262"/><path class="mesh" d="M955,214 L733,262"/><path class="mesh" d="M955,214 L854,262"/><path class="mesh" d="M955,214 L975,262"/>
+<rect class="same" x="556" y="264" width="113" height="40" rx="6"/><text class="t" x="566" y="289">e0 · fine</text>
+<rect class="same" x="677" y="264" width="113" height="40" rx="6"/><text class="t" x="687" y="289">e1 · fine</text>
+<rect class="same" x="798" y="264" width="113" height="40" rx="6"/><text class="t" x="808" y="289">e2 · fine</text>
+<rect class="same" x="919" y="264" width="113" height="40" rx="6"/><text class="t" x="929" y="289">e3 · fine</text>
+<text class="n" x="556" y="324">s2 and s5 restart from their prompt on another frontend.</text>
+
+<rect class="same" x="556" y="336" width="476" height="52" rx="6"/>
+<text class="t" x="566" y="355">v2 driver</text>
+<text class="g" x="566" y="372">⑤ re-sends the prompts whose calls failed (already in v2)</text>
+<text class="d" x="566" y="384">max_infra_attempts_per_prompt: 5 · by then Gym skips F1</text>
+
+<rect class="same" x="556" y="400" width="476" height="62" rx="6"/>
+<text class="g" x="566" y="419">Result: all 6 sessions finish.</text>
+<text class="n" x="566" y="437">If F1 comes back (C22), Gym's trial call gives it sessions again.</text>
+<text class="n" x="566" y="453">If every frontend dies, prompts drop and the run stops with an error.</text>
+
+<!-- legend -->
+<rect class="same" x="28" y="488" width="14" height="14" rx="3"/><text class="n" x="48" y="500">working</text>
+<rect class="bad" x="128" y="488" width="14" height="14" rx="3"/><text class="n" x="148" y="500">the problem</text>
+<rect class="new" x="250" y="488" width="14" height="14" rx="3"/><text class="n" x="270" y="500">proposed change</text>
+<text class="n" x="28" y="526">① F1's in-flight calls are lost: their replies have nowhere to go. ② Gym's next call to F1 is refused.</text>
+<text class="n" x="28" y="544">③ C21: RL turns on Gym's existing route-around. ④ C22 (optional): FrontendHost restarts F1. ⑤ v2's existing prompt retry.</text>
+</svg></div>
+<div class="scroll"><table>
+<tr><th>When F1 dies</th><th>What happens</th></tr>
+<tr><td>The 4 engines</td><td>Keep running. The calls F1 had in flight are lost, since their replies have nowhere to go.</td></tr>
+<tr><td>Gym's sessions on F1 (s2, s5)</td><td>Retry F1's URL every 0.5 s, with no limit. With forest training (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L1391"><code>source_history</code></a>), Gym tries only 3 times (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/openai_client.py#L485-L486">openai_client.py L485-L486</a>), so those rollouts fail instead of hanging. Either way, nobody tries F0 or F2.</td></tr>
+<tr><td>The other frontends</td><td>Keep serving their own sessions, and could reach all 4 engines for s2 and s5 too. Nobody sends those calls to them.</td></tr>
+<tr><td>The v2 driver</td><td>Does not notice. It checks the frontends only at startup, and nothing restarts one.</td></tr>
+<tr><td>A checkpoint cut</td><td>Gym sends the cut for s2 and s5 to F1 (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/models/_checkpoint.py#L531-L540"><code>_cut_all</code></a>). It fails, so those calls are generated again after a restore (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/models/_checkpoint.py#L542-L569"><code>_cut</code></a>). That loses work but never gives wrong tokens.</td></tr>
+</table></div>
+
+<h2>Is the native vLLM path the same?</h2>
+<p>Gym's side is the same: the same client retries a dead URL forever. What differs is what can die.</p>
+<div class="scroll"><table>
+<tr><th></th><th>Native vLLM</th><th>Dynamo (this PR)</th></tr>
+<tr><td>What a Gym URL points at</td><td>An HTTP server thread inside one GPU worker (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1563"><code>_setup_vllm_server</code></a>)</td><td>A frontend: its own CPU process, started by a <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L365"><code>FrontendHost</code></a> actor</td></tr>
+<tr><td>Can it die while the engines live?</td><td>In practice no: it dies with its GPU worker, so the run has lost an engine anyway</td><td>Yes: the frontend can crash or run out of memory while every engine is fine</td></tr>
+<tr><td>Can another URL take the call?</td><td>Not without that engine</td><td>Yes: every frontend reaches every engine</td></tr>
+<tr><td>Restart cost</td><td>A GPU worker and its weights</td><td>One CPU process; it has no state the run needs</td></tr>
+</table></div>
+<p>So the hang is not new in this PR, and #4979 had it with one frontend. What this PR changes is that the fix is now cheap: there are other frontends to fall back on, and Gym already knows how to fall back. C21's two settings apply whenever Gym gets more than one URL, so they cover the native path too.</p>
+
+<h2>The fix, as pseudocode (proposed, not implemented)</h2>
+<p class="where"><b>Where the fix lands: RL only, one function.</b> C21: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3084"><code>_build_gym_actor_config</code></a> sets two defaults on Gym's <code>vllm_model</code> block. <b>No Gym change:</b> the pinned Gym already has both options. C22 (optional): <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L275-L362"><code>FrontendHost</code></a>.</p>
+<p class="pclbl">Gym today (options off): a call to a dead URL</p>
+<pre class="pc"><span class="who"># Gym vllm_model · serving event loop, one task per call</span>
+def chat(session, call):
+    url = pinned[session] or urls[hash(session) % 3]  <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2803-L2826">_resolve_client</a></span>
+    ticket.backend = url                              <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/models/_checkpoint.py#L320-L324">note_generation_backend</a></span>
+    while True:                                       <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L1166-L1170">max_connection_retries=None</a></span>
+        try: return await post(url, call)
+        except ConnectionRefused: await <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L818">sleep(0.5)</a>    <span class="cm"># same url, no limit</span></pre>
+<p class="pclbl">Gym with route_around_failing_endpoints: true (existing Gym code, no change)</p>
+<pre class="pc"><span class="who"># Gym vllm_model with route_around_failing_endpoints: true (already in Gym)</span>
+def chat(session, call):
+    url = pinned[session]
+    if url failed and not due its 60 s trial: url = a working url  <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2854-L2868">_endpoint_serves</a></span>
+    ticket.backend = url                                           <span class="cm"># the cut follows the session</span>
+    for try in 1..8:                                               <span class="cm"># endpoint_connection_retries</span>
+        try: return await post(url, call)
+        except ConnectionRefused: await <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L818">sleep(0.5)</a>
+    count failure on url; 3 in a row: mark url failed              <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2889-L2908">_note_endpoint_failure</a></span>
+    raise                                                          <span class="cm"># v2 sends the prompt again</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2803-L2826"><code>_resolve_client</code></a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2839-L2852"><code>_assign_client</code></a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2854-L2868"><code>_endpoint_serves</code></a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/responses_api_models/vllm_model/app.py#L2889-L2908"><code>_note_endpoint_failure</code></a>, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/client/http_client.py#L755-L890">the retry loop</a>.</p>
+<p class="pclbl">C21 · RL's Gym config, before</p>
+<pre class="pc"><span class="who"># v2 driver · building each Gym actor&#x27;s config</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3084">_build_gym_actor_config</a>(cfg, base_urls):
+    if dynamo: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3132">_apply_dynamo_dialect</a>(cfg)  <span class="cm"># sets dynamo_frontend, reasoning_field</span>
+    ...                                    <span class="cm"># nothing about failover</span></pre>
+<p class="pclbl">C21 · RL's Gym config, after</p>
+<pre class="pc"><span class="who"># v2 driver · building each Gym actor&#x27;s config</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3084">_build_gym_actor_config</a>(cfg, base_urls):
+    if dynamo: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3132">_apply_dynamo_dialect</a>(cfg)
+<span class="add">    if len(base_urls) &gt; 1:                                                  <span class="cm"># native and Dynamo alike</span></span>
+<span class="add">        vllm_model.setdefault(&quot;route_around_failing_endpoints&quot;, True)       <span class="cm"># 8 tries, then skip the url</span></span>
+<span class="add">        vllm_model.setdefault(&quot;endpoint_connection_retry_timeout_s&quot;, 60.0)  <span class="cm"># time cap per call</span></span>
+    ...</pre>
+<p class="pcref"><code>setdefault</code> keeps any value a recipe sets itself. Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3054-L3081"><code>_apply_dynamo_dialect</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/environments/nemo_gym.py#L3084"><code>_build_gym_actor_config</code></a>.</p>
+<p class="pclbl">C22 (optional) · a frontend, before</p>
+<pre class="pc"><span class="who"># FrontendHost actor · one per frontend, 0 CPU, pinned to its node</span>
+def start(cmd):
+    port = free_port()
+    proc = launch(cmd, port)  <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L326">_ServiceProcess</a></span>
+    return url(port)          <span class="cm"># nothing watches proc after this</span></pre>
+<p class="pclbl">C22 (optional) · a frontend, after</p>
+<pre class="pc"><span class="who"># FrontendHost actor · one per frontend, 0 CPU, pinned to its node</span>
+def start(cmd):
+    port = free_port()
+    proc = launch(cmd, port)
+<span class="add">    start_thread(watch, cmd, port)  <span class="cm"># new watcher thread in the actor</span></span>
+    return url(port)
+<span class="add">def watch(cmd, port):               <span class="cm"># watcher thread</span></span>
+<span class="add">    while True:</span>
+<span class="add">        code = proc.wait()</span>
+<span class="add">        log(url(port), code)</span>
+<span class="add">        if restarts_in(10 min) &gt;= 5: log(&quot;giving up&quot;); return</span>
+<span class="add">        proc = launch(cmd, port)    <span class="cm"># same port, same chat files</span></span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L288-L329"><code>FrontendHost.start</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/models/generation/dynamo/managed_runtime.py#L569-L604"><code>_start_frontends</code></a>.</p>
+<p>The few calls that fail before Gym switches are re-sent by v2 (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/algorithms/single_controller_utils/config.py#L163"><code>max_infra_attempts_per_prompt: 5</code></a>). If every frontend dies, every call fails, prompts are dropped, and the run stops with an error (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9d420a1440120c62ee56c54213fa680fdf231c45/nemo_rl/algorithms/single_controller_utils/config.py#L190"><code>max_consecutive_dropped_prompts: 0</code></a>). C22 is only about getting the dead frontend's capacity back.</p>
+<div class="hl"><b>So what.</b> Today, one frontend crash stops training with no error, even though the GPUs and the other frontends are fine. Gym can already route around a dead URL and cap its retries; RL just has to turn that on when Gym gets more than one URL (C21). Restarting the dead frontend (C22) is a nice-to-have.</div>
+</div>
+</body>
+</html>

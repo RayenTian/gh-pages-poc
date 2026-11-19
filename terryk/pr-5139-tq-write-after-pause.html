@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NVIDIA-NeMo/RL #5139 — checkpoints write TQ to disk after the pause</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 12px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+.why{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:0 0 18px;border-radius:0 8px 8px 0;font-size:14px}
+.why p{margin:6px 0}
+.bg{border:1px dashed var(--border);border-radius:8px;padding:6px 14px;margin:0 0 16px;font-size:14px;color:var(--dim)}
+.bg p{margin:6px 0}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lblb{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:12px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13.5px -apple-system,sans-serif}
+svg .seq{fill:var(--orange);fill-opacity:.35;stroke:var(--orange)}
+svg .big{fill:var(--accent);fill-opacity:.3;stroke:var(--accent)}
+svg .ok{fill:var(--green);fill-opacity:.35;stroke:var(--green)}
+svg .lane{fill:none;stroke:var(--border);stroke-dasharray:4 3}
+svg .hold{stroke:var(--red);stroke-width:2.5}
+svg .holdt{fill:var(--red);font:bold 13px -apple-system,sans-serif}
+svg a text{text-decoration:underline}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.hl{border-left:4px solid var(--green);background:var(--surface);padding:8px 14px;margin:18px 0 0;border-radius:0 8px 8px 0;font-size:14px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+svg .old{fill:var(--red);fill-opacity:.22;stroke:var(--red)}
+svg .new{fill:var(--green);fill-opacity:.18;stroke:var(--green);stroke-width:2}
+svg .same{fill:var(--surface2);stroke:var(--border)}
+svg .go{stroke:var(--green);stroke-width:2.5}
+svg .got{fill:var(--green);font:bold 12.5px -apple-system,sans-serif}
+svg .bx{fill:var(--text);font:12px -apple-system,sans-serif}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+table.t{border-collapse:collapse;font-size:13.5px;margin:8px 0}
+table.t td,table.t th{border:1px solid var(--border);padding:4px 9px;text-align:left;vertical-align:top}
+table.t th{background:var(--surface);font-weight:600}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head><body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+function wire(){var b=document.getElementById('theme-toggle');if(!b)return;b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+<h1>How a rollout snapshot now writes the data plane to disk after rollouts resume</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5139">NVIDIA-NeMo/RL #5139</a> · builds on the merged capture API from <a href="https://github.com/NVIDIA-NeMo/RL/pull/5137">#5137</a> · links pinned to head <code>c98a1322fb</code> (base <code>8f3595a112</code>)</p>
+
+<div class="status"><dl>
+<dt>Before</dt><dd>A rollout snapshot did every step while holding the data-plane barrier: no TQ writes, Gym parked. That included writing every TQ shard to disk and pickling the recovery state.</dd>
+<dt>This PR</dt><dd>With <code>data_plane.simple.async_checkpoint: true</code> (default off), the barrier only covers a cheap capture of the TQ data. Rollouts resume, and the disk write and pickling run after. Trainer checkpoints get the same split.</dd>
+<dt>Status</dt><dd><span class="verdict good">In review.</span> No crash or data-loss bug found. Open asks: a main-vs-PR timing number, two tests and a metric-name fix (see the review).</dd>
+</dl></div>
+
+<div class="bg">
+<p><b>Background.</b> TQ (<span class="tip" tabindex="0" data-tip="TransferQueue: the store that holds rollout data between generation and training. A controller keeps the index; storage units hold the rows.">TransferQueue</span>) holds finished rollouts until training reads them. A <span class="tip" tabindex="0" data-tip="A periodic save of the rollout side (TQ rows, the recovery ledger, Gym state) so a restart can resume in-flight work instead of regenerating it.">rollout snapshot</span> must save TQ and the controller's recovery state as one consistent picture. To get that, it takes the <span class="tip" tabindex="0" data-tip="DataPlaneCheckpointBarrier: while the snapshot holds it, every code path that changes TQ waits, and Gym sessions are parked.">data-plane barrier</span>, which stops every TQ change while held. Dotted words have a short explanation: hover or tap them.</p>
+</div>
+
+<div class="why">
+<p><b>Why it should be faster.</b> The barrier no longer waits for disk. Writing every shard and pickling the recovery state move to after the barrier. Under the barrier, TQ only keeps references to its shards and turns the controller's index into bytes. The listing of replay and staging keys and the ledger copy stay inside, so they set the new floor.</p>
+<p><b>Measured.</b> On the PR's CPU script (131k rollouts), moving only the pickling cut the hold from 22.82 s to 15.21 s; the pickling now takes 6.57 s after the barrier. There is <b>no number yet for main versus this PR</b>, which is the main change. <b>Cost:</b> the pickling thread competes with the controller's event loop for the GIL after resume (the PR measured 5 ms median loop lag, one 0.37 s stall). Backends without the capture API keep the old path.</p>
+<!--CREF-C3-->
+</div>
+
+<h2>What moved out of the pause</h2>
+<p>Both rows are the same function, <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L753"><code>save_snapshot</code></a>. The red bar is the time the barrier is held. Red boxes are the steps that move after it; green boxes are new.</p>
+<svg viewBox="0 0 960 400" role="img" aria-label="Rollout snapshot timeline before and after">
+<line class="hold" x1="20" y1="18" x2="60" y2="18"/><text class="note" x="66" y="22">barrier held: TQ writes wait, Gym parked</text>
+<rect class="old" x="320" y="10" width="22" height="14"/><text class="note" x="348" y="22">moves out of the pause</text>
+<rect class="new" x="510" y="10" width="22" height="14"/><text class="note" x="538" y="22">new step</text>
+<rect class="same" x="610" y="10" width="22" height="14"/><text class="note" x="638" y="22">same as before</text>
+<text class="hdr" x="20" y="62">main: everything under the barrier</text>
+<line class="hold" x1="20" y1="76" x2="760" y2="76"/><text class="holdt" x="24" y="72" dx="330">hold: not measured on main (review C3)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L394"><rect class="same" x="20" y="84" width="118" height="44" rx="5"/><text class="bx" x="27" y="102">list replay</text><text class="bx" x="27" y="118">keys</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L402"><rect class="same" x="142" y="84" width="124" height="44" rx="5"/><text class="bx" x="149" y="102">build recovery</text><text class="bx" x="149" y="118">state</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L417"><rect class="old" x="270" y="84" width="124" height="44" rx="5"/><text class="bx" x="277" y="102">torch.save +</text><text class="bx" x="277" y="118">sha256</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L423"><rect class="same" x="398" y="84" width="118" height="44" rx="5"/><text class="bx" x="405" y="102">list staging</text><text class="bx" x="405" y="118">keys</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L433"><rect class="old" x="520" y="84" width="240" height="44" rx="5"/><text class="bx" x="527" y="102">write TQ: controller metadata</text><text class="bx" x="527" y="118">+ every shard, to disk</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L580"><rect class="same" x="770" y="84" width="170" height="44" rx="5"/><text class="bx" x="777" y="102">sidecars, then</text><text class="bx" x="777" y="118">publish</text></a>
+<text class="hdr" x="20" y="182">this PR, with data_plane.simple.async_checkpoint: true</text>
+<line class="hold" x1="20" y1="196" x2="576" y2="196"/><text class="holdt" x="24" y="192" dx="250">hold: 15.21 s (CPU, synthetic)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L494"><rect class="same" x="20" y="204" width="118" height="44" rx="5"/><text class="bx" x="27" y="222">list replay</text><text class="bx" x="27" y="238">keys</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L503"><rect class="same" x="142" y="204" width="124" height="44" rx="5"/><text class="bx" x="149" y="222">build recovery</text><text class="bx" x="149" y="238">state</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L524"><rect class="same" x="270" y="204" width="118" height="44" rx="5"/><text class="bx" x="277" y="222">list staging</text><text class="bx" x="277" y="238">keys</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L544"><rect class="new" x="392" y="204" width="184" height="44" rx="5"/><text class="bx" x="399" y="222">capture: keep shard</text><text class="bx" x="399" y="238">views, metadata to bytes</text></a>
+<line class="go" x1="586" y1="186" x2="586" y2="260"/><text class="got" x="592" y="192">Gym + dispatch resume</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L157"><rect class="old" x="592" y="204" width="112" height="44" rx="5"/><text class="bx" x="599" y="222">torch.save +</text><text class="bx" x="599" y="238">sha256: 6.57 s</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/data_plane/adapters/tq_simple_checkpoint.py#L245"><rect class="old" x="708" y="204" width="124" height="44" rx="5"/><text class="bx" x="715" y="222">write TQ, then</text><text class="bx" x="715" y="238">metadata.json</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L903"><rect class="new" x="836" y="204" width="104" height="44" rx="5"/><text class="bx" x="843" y="222">release views,</text><text class="bx" x="843" y="238">then publish</text></a>
+<text class="note" x="392" y="272">holds: shard views (no copy) +</text>
+<text class="note" x="392" y="287">controller metadata as bytes (1.9–2.3 s here)</text>
+<text class="note" x="708" y="272">metadata.json gets the</text>
+<text class="note" x="708" y="287">recovery file's sha256</text>
+<text class="hdr" x="20" y="326">trainer checkpoint (checkpointing.save_data_plane: true)</text>
+<text class="note" x="20" y="346">Same capture under the barrier, then persist + release right after it, before the model weights are saved.</text>
+<text class="note" x="20" y="362">Gym is never parked here; the trainer save still waits for the write. Source: </text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/single_controller.py#L4859"><text class="note" x="468" y="362">_save_checkpoint_impl</text></a>
+<text class="note" x="20" y="390">Box widths show order, not time. Numbers: the PR's CPU script, 131k rollouts, 2 storage units.</text>
+</svg>
+
+<h2>The same change as pseudocode</h2>
+<p class="pclbl">Rollout snapshot, before</p>
+<pre class="pc"><span class="who"># controller event loop, RolloutSnapshotter.save_snapshot (main)</span>
+with <a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L705">barrier.checkpoint()</a>:                        <span class="cm"># TQ writes wait, Gym parked</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L394">validate_replay_inventory</a>()                   <span class="cm"># list replay keys</span>
+    state = <a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L402">build_rollout_recovery_state</a>(ledger)  <span class="cm"># copy of the ledger</span>
+    payload = <a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L417">torch.save</a>(state); sha = sha256(payload)
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L423">validate_rollout_recovery_inventory</a>()         <span class="cm"># list staging keys</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L433">save_data_plane_checkpoint</a>(meta + sha)        <span class="cm"># writes every shard to disk</span>
+# barrier released, Gym resumes
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/8f3595a11254758add51c92f4ec6156802898145/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L580">write_controller_sidecars</a>(payload); publish()</pre>
+<p class="pclbl">Rollout snapshot, after</p>
+<pre class="pc"><span class="who"># controller event loop, same function, data_plane.simple.async_checkpoint: true</span>
+with <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L847">barrier.checkpoint()</a>:
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L494">validate_replay_inventory</a>()
+    state = <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L503">build_rollout_recovery_state</a>(ledger)     <span class="cm"># shares nothing with the live ledger</span>
+<span class="del">    payload = torch.save(state); sha = sha256(payload)</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L524">validate_rollout_recovery_inventory</a>()
+<span class="del">    save_data_plane_checkpoint(meta + sha)</span>
+<span class="add">    view = <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L544">capture_checkpoint</a>(meta)</span>                  <span class="cm"># keep shard views; controller -&gt; bytes</span>
+<span class="add">    dataloader, reserve = <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L566">deepcopy</a>(...)</span>              <span class="cm"># they outlive the barrier</span>
+# barrier released, Gym and dispatch resume
+<span class="add">payload, sha = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L157">to_thread</a>(torch.save + sha256)</span>  <span class="cm"># competes with the loop for the GIL</span>
+<span class="add">await <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L896">view.persist</a>(extra_metadata=sha)</span>               <span class="cm"># shards, then metadata.json last</span>
+<span class="add">await <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L903">view.release</a>()</span>                                 <span class="cm"># on failure: release, or stop if unsure</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L718">write_controller_sidecars</a>(payload); publish()</pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L436"><code>capture</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L149"><code>SnapshotCapture.persist</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/data_plane/adapters/tq_simple_checkpoint.py#L207"><code>SimpleCheckpointCapture.persist</code></a>, trainer path <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/single_controller.py#L4859"><code>_save_checkpoint_impl</code></a>.</p>
+<p>Two paths now save TQ, and each picks one by asking the backend: <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L544"><code>capture_checkpoint</code></a> returns <code>None</code> when the backend cannot keep a view, and the code falls back to the old in-barrier save. The recovery hash reaches <code>metadata.json</code> the same way on both: one helper, <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L129"><code>_serialize_recovery_state</code></a>, builds it.</p>
+
+<h2>What to check before merging</h2>
+<table class="t">
+<tr><th>Ask</th><th>Why</th></tr>
+<tr><td>A test that a deferred trainer save writes <code>rollout_recovery.pt</code> and its hash<!--CREF-C1--></td><td>The trainer only gets the recovery payload from the value <a href="https://github.com/NVIDIA-NeMo/RL/blob/c98a1322fb9d5cec9097cd2a06fd0fca1aaf7b91/nemo_rl/algorithms/single_controller.py#L4871"><code>persist()</code></a> returns. Dropping it passes every current test, and restore then rejects the checkpoint.</td></tr>
+<tr><td>Fix the README metric names<!--CREF-C2--></td><td>It says to compare with <code>environment_paused_seconds</code>, which is never logged (the key is <code>gym_parked_seconds</code>), and <code>tq_capture_seconds</code> holds the whole save on the old path.</td></tr>
+<tr><td>A test for the deferred-path timing metrics<!--CREF-C4--></td><td>The existing metric test only runs the old path, so <code>tq_persist_seconds</code> or <code>tq_release_seconds</code> could log 0 unnoticed.</td></tr>
+</table>
+<div class="hl">The barrier holds the same picture as before. Only the disk work moves, and the save still finishes, with hash and sidecars, before the snapshot is published. What is missing is the number that shows how much of the pause that saves against main.</div>
+</div></body></html>

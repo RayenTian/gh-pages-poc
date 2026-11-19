@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #4905 + #4979 — refit, token capture and the prefix splice: shared or copied?</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700;--purple:#8250df}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 18px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--orange)}
+.hl{border-left:3px solid var(--orange);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+td.bad{color:var(--red);font-weight:600}td.drift{color:var(--orange);font-weight:600}td.good{color:var(--green);font-weight:600}
+.scroll{overflow-x:auto}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .same{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .new{fill:var(--surface);stroke:var(--orange);stroke-width:2}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2.2}
+svg .none{fill:none;stroke:var(--border);stroke-width:1.2;stroke-dasharray:4 4}
+svg .twice{fill:none;stroke:var(--orange);stroke-width:1.6;stroke-dasharray:6 4}
+svg .t{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .d{fill:var(--dim);font:10.5px ui-monospace,Menlo,monospace}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .h{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .o{fill:var(--orange);font:bold 11.5px -apple-system,sans-serif}
+svg .r{fill:var(--red);font:bold 12.5px -apple-system,sans-serif}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .ahf{fill:var(--dim)}
+svg a text{text-decoration:underline;fill:var(--accent);font:10.5px ui-monospace,Menlo,monospace}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)}.diff .del{color:var(--red)}.diff .hunk{color:var(--accent)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.ok{color:var(--green);font-weight:700}.warn{color:var(--orange);font-weight:700}.bug{color:var(--red);font-weight:700}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+<h1>Refit, token capture and the prefix splice: does the Dynamo path reuse them or copy them?</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4979">#4979</a> at <code>a2c74e6</code>, which has merged <a href="https://github.com/NVIDIA-NeMo/RL/pull/4905">#4905</a> (at <code>c6a4c66b</code>). All links are pinned to <code>a2c74e6</code>; links to deleted code use the SHA it lived at. First written against #4905 at <code>44671d3b</code> and #4979 at <code>c4fe2bd5</code>.</p>
+<div class="status"><dl>
+<dt>Before</dt><dd>At <code>c4fe2bd5</code>, #4979's Dynamo engine re-ran its own copy of the native chat server's capture steps on token ids alone. The copy skipped the forest-training "candidate" step, so those calls failed. It called the prefix splice with different inputs (explained below), and it never ran the retained-media check.</dd>
+<dt>This PR</dt><dd>Three commits (<code>790feb77</code>, <code>0b7894a4</code>, <code>43efaba3</code>) moved the render, the capture decision, the TQ read and the splice into NeMo RL's own chat engine inside Dynamo's frontend. It runs the native render code and passes the splice the same inputs. The engine side keeps only the steps after the render.</dd>
+<dt>Status</dt><dd><span class="verdict good">Fixed in #4979: forest training, the splice inputs and the media check.</span> <span class="verdict open">Still open: four pieces are written twice, and one check runs only on the native path.</span> A <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/tests/unit/models/generation/test_gym_chat_path.py#L627-L836">parity test</a> sends 24 calls through both paths and checks they match.</dd>
+</dl></div>
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-dynamo-native-worker.html">what the PR replaces</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-request-paths.html">how requests reach vLLM</a>
+  <span class="here">shared or copied</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-one-chat-path.html">one chat path</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-gym-through-dynamo.html">Gym through Dynamo (#4979)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-one-call-three-steps.html">one call, three steps</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4979-reasoning-ended.html">finished thinking? (C84)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5115-frontends-across-nodes.html">frontends across nodes (#5115)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5115-dead-frontend.html">when a frontend dies (C21, C22)</a>
+</nav>
+<p class="chainnote">Nine pages on this stack (#4905, #4979 and #5115), one question each. This one: does the Dynamo path reuse NCCL refit, TQ token capture and the prefix splice, or copy them?</p>
+
+<h2>What both paths share now, and what is still written twice</h2>
+<p>Gym's chat calls reach vLLM one of two ways. <b>Natively</b>, each vLLM worker runs its own chat server (<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py"><code>chat_server.py</code></a>). <b>Through Dynamo</b>, NeMo RL's <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L215">chat engine</a> runs in Dynamo's frontend process, and an <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L291">engine adapter</a> runs inside the vLLM worker. <span class="tip" tabindex="0" data-tip="Each Gym call's prompt tokens, output tokens, log-probs and routed experts are written to TransferQueue (TQ), NeMo RL's data store, so training reads exactly what the model saw and produced.">Token capture</span> and the <span class="tip" tabindex="0" data-tip="On turn 2 and later, the re-rendered history is swapped for the exact tokens the model produced earlier, so training sees what the model really generated.">prefix splice</span> run on both. Dotted words have a short explanation: hover or tap them.</p>
+<div class="scroll"><table>
+<tr><th>Piece</th><th>Shared or copied at <code>a2c74e6</code></th></tr>
+<tr><td><b>NCCL refit</b></td><td class="good">Shared. Dynamo serves the worker's own vLLM engine, so refit is the worker's <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1573"><code>update_weights_from_collective_async</code></a>. #4905 deleted the old Dynamo refit.</td></tr>
+<tr><td><b>Rollouts</b> (token ids in)</td><td class="good">Shared. The adapter calls the worker's <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L218"><code>_serve_rollout</code></a>, the same function the Ray path uses.</td></tr>
+<tr><td><b>Capture core</b></td><td class="good">Shared. Begin, media snapshot, TQ write and abort are the worker's own methods (<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/vllm_worker_async.py#L809-L1135"><code>vllm_worker_async.py</code> L809-L1135</a>). So are the TQ prefix read, <code>splice_prefix_tokens</code>, the turn-end ids, the candidate decision, the chat render, the on-policy sampling check and vLLM's tool and reasoning parsers.</td></tr>
+<tr><td><b>Post-render step order</b></td><td class="drift">Written twice. TQ read → splice → fit <code>max_tokens</code> → media snapshot → move image placeholders → begin capture: native <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L339-L436">chat_server.py L339-L436</a>; Dynamo <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L286-L306">chat_engine.py L286-L306</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L361-L383">L361-L383</a> and <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L319-L360">adapter.py L319-L360</a>.</td></tr>
+<tr><td><b>The staged message</b></td><td class="drift">Written twice. Native builds it from vLLM's reply (<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L597-L621">L597-L621</a>); the adapter builds it by hand (<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L487-L520"><code>_stage</code> L487-L520</a>).</td></tr>
+<tr><td><b>SamplingParams</b></td><td class="drift">Copied from vLLM's chat server into <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L406-L445"><code>adapter._generate</code> L406-L445</a>.</td></tr>
+<tr><td><b>Errors and aborts</b></td><td class="drift">Mapped by hand on each side: native routes <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L799-L948">L799-L948</a>; Dynamo <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L231-L255">chat_engine.py L231-L255</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L263-L289">adapter.py L263-L289</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L396-L404">L396-L404</a>. Dynamo never records the <code>context_length</code> abort reason; an overflow there is recorded as <code>engine_error</code>.</td></tr>
+<tr><td><b>"top_logprobs must be set"</b></td><td class="bad">Native only (<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L539-L544">L539-L544</a>). Through Dynamo the check never runs, and the parity test always sets <code>top_logprobs</code>, so it does not notice.</td></tr>
+</table></div>
+
+<h2>One Gym call, step by step: native server vs Dynamo</h2>
+<p>Each row is one step. The middle column is the shared code both sides call. The example is turn 2 of a chat on a checkpoint whose turns end on <code>&lt;|im_end|&gt;</code> (151645) but whose tokenizer's EOS is <code>&lt;|endoftext|&gt;</code> (151643), the shape the parity test builds for its <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/tests/unit/models/generation/test_gym_chat_path.py#L638-L644"><code>turn_end_not_eos</code></a> case.</p>
+<div class="scroll">
+<svg viewBox="0 0 1100 870" role="img" aria-label="Native chat server and Dynamo chat path, step by step, against the shared code each calls">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahf" d="M0,0L10,5L0,10z"/></marker></defs>
+<text class="h" x="16" y="22">Native chat server</text>
+<text class="n" x="16" y="38">chat_server.py, in the vLLM worker</text>
+<text class="h" x="386" y="22">Shared code — one copy</text>
+<text class="n" x="386" y="38">called by both sides</text>
+<text class="h" x="756" y="22">Dynamo path</text>
+<text class="n" x="756" y="38">chat_engine.py (frontend) + adapter.py (worker)</text>
+
+<rect class="same" x="16" y="54" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="72">1 · Render, decide a Gym candidate</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L320"><text x="26" y="88">preprocess_chat → _render_chat_call · L320</text></a>
+<text class="d" x="26" y="104">→ token_in, history […1001, 151645]</text>
+<rect class="same" x="386" y="54" width="330" height="60" rx="7"/>
+<text class="t" x="396" y="72">_render_chat_call</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L202-L279"><text x="396" y="88">chat_server.py · L202-L279</text></a>
+<text class="d" x="396" y="104">checkpoint template, candidate check</text>
+<rect class="same" x="756" y="54" width="330" height="60" rx="7"/>
+<text class="t" x="766" y="72">1 · Render, decide a Gym candidate</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L479-L509"><text x="766" y="88">render pool → FrontendRenderer · L479</text></a>
+<text class="d" x="766" y="104">→ token_in, history […1001, 151645]</text>
+<path class="arr" d="M346 84 H383"/><path class="arr" d="M756 84 H719"/>
+
+<text class="o" x="16" y="134">Steps 2–6: the helpers are shared, but each side writes the order that calls them</text>
+<rect class="twice" x="9" y="140" width="344" height="342" rx="10"/>
+<rect class="twice" x="749" y="140" width="344" height="342" rx="10"/>
+
+<rect class="box" x="16" y="146" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="164">2 · Read earlier turns from TQ</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L347"><text x="26" y="180">host._resolve_admission_prefix · L347</text></a>
+<text class="d" x="26" y="196">→ prefix […220, 17, 151645]</text>
+<rect class="same" x="386" y="146" width="330" height="60" rx="7"/>
+<text class="t" x="396" y="164">resolve_admission_prefix</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/data_plane/tq_token_sink.py#L804"><text x="396" y="180">tq_token_sink.py · L804</text></a>
+<text class="d" x="396" y="196">staging chain → cached TQ read</text>
+<rect class="box" x="756" y="146" width="330" height="60" rx="7"/>
+<text class="t" x="766" y="164">2 · Read earlier turns from TQ</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L369"><text x="766" y="180">_capture.resolve_prefix · L369</text></a>
+<text class="d" x="766" y="196">→ prefix […220, 17, 151645]</text>
+<path class="arr" d="M346 176 H383"/><path class="arr" d="M756 176 H719"/>
+
+<rect class="box" x="16" y="214" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="232">3 · Splice in the model's own tokens</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L381-L389"><text x="26" y="248">splice_prefix_tokens(...) · L381</text></a>
+<text class="d" x="26" y="264">turn ends {151643, 151645} → cut found</text>
+<rect class="same" x="386" y="214" width="330" height="60" rx="7"/>
+<text class="t" x="396" y="232">splice_prefix_tokens, turn_end_token_ids</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/openai_server_utils.py#L74"><text x="396" y="248">openai_server_utils.py · L74, L30</text></a>
+<text class="d" x="396" y="264">same render, history and turn-end ids</text>
+<rect class="box" x="756" y="214" width="330" height="60" rx="7"/>
+<text class="t" x="766" y="232">3 · Splice in the model's own tokens</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L376-L382"><text x="766" y="248">chat_engine._splice · L376</text></a>
+<text class="d" x="766" y="264">turn ends {151643, 151645} → cut found</text>
+<path class="arr" d="M346 244 H383"/><path class="arr" d="M756 244 H719"/>
+
+<rect class="box" x="16" y="282" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="300">4 · Fit max_tokens to the window</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L393"><text x="26" y="316">_clamp_max_tokens · L393</text></a>
+<text class="d" x="26" y="332">on the spliced prompt</text>
+<rect class="same" x="386" y="282" width="330" height="60" rx="7"/>
+<text class="t" x="396" y="300">clamp_max_tokens</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L166"><text x="396" y="316">chat_server.py · L166</text></a>
+<text class="d" x="396" y="332">prompt + output ≤ max_model_len</text>
+<rect class="box" x="756" y="282" width="330" height="60" rx="7"/>
+<text class="t" x="766" y="300">4 · Fit max_tokens to the window</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L300"><text x="766" y="316">clamp_max_tokens(...) · L300</text></a>
+<text class="d" x="766" y="332">on the spliced prompt</text>
+<path class="arr" d="M346 312 H383"/><path class="arr" d="M756 312 H719"/>
+
+<rect class="box" x="16" y="350" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="368">5 · Images: snapshot, move placeholders</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L399-L415"><text x="26" y="384">media · L400, remap · L412</text></a>
+<text class="d" x="26" y="400">same process as the render</text>
+<rect class="same" x="386" y="350" width="330" height="60" rx="7"/>
+<text class="t" x="396" y="368">_capture_request_media + remap</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/vllm_worker_async.py#L868"><text x="396" y="384">vllm_worker_async.py · L868</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/utils.py#L163"><text x="396" y="400">remap_multimodal_placeholders · utils.py L163</text></a>
+<rect class="box" x="756" y="350" width="330" height="60" rx="7"/>
+<text class="t" x="766" y="368">5 · Images: snapshot, move placeholders</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L332-L351"><text x="766" y="384">adapter.py · media L335, remap L344</text></a>
+<text class="d" x="766" y="400">in the worker, after the network hop</text>
+<path class="arr" d="M346 380 H383"/><path class="arr" d="M756 380 H719"/>
+
+<rect class="box" x="16" y="418" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="436">6 · Open the capture call</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L424-L435"><text x="26" y="452">_begin_request_capture · L424</text></a>
+<text class="d" x="26" y="468">admission = token_in</text>
+<rect class="same" x="386" y="418" width="330" height="60" rx="7"/>
+<text class="t" x="396" y="436">_begin_request_capture</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/vllm_worker_async.py#L827"><text x="396" y="452">vllm_worker_async.py · L827</text></a>
+<text class="d" x="396" y="468">→ Gym begin_call</text>
+<rect class="box" x="756" y="418" width="330" height="60" rx="7"/>
+<text class="t" x="766" y="436">6 · Open the capture call</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L354-L360"><text x="766" y="452">adapter.py · L354</text></a>
+<text class="d" x="766" y="468">a leftover candidate is refused (L311)</text>
+<path class="arr" d="M346 448 H383"/><path class="arr" d="M756 448 H719"/>
+
+<rect class="same" x="16" y="494" width="1070" height="34" rx="7"/>
+<text class="t" x="26" y="516">7 · AsyncLLM.generate in the vLLM worker: the same engine object for both, so the same weights and the same refit</text>
+
+<rect class="box" x="16" y="542" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="560">8 · Build vLLM SamplingParams</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L838"><text x="26" y="576">vLLM's OpenAIServingChat · L838</text></a>
+<text class="d" x="26" y="592">vLLM's own chat server does it</text>
+<rect class="none" x="386" y="542" width="330" height="60" rx="7"/>
+<text class="n" x="396" y="568">no shared NeMo RL code</text>
+<text class="d" x="396" y="588">vLLM's server code, copied</text>
+<rect class="new" x="756" y="542" width="330" height="60" rx="7"/>
+<text class="t" x="766" y="560">8 · Build vLLM SamplingParams</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L406-L445"><text x="766" y="576">adapter._generate · L406-L445</text></a>
+<text class="d" x="766" y="592">copied from vLLM's chat server</text>
+
+<rect class="box" x="16" y="610" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="628">9 · Stage tokens + logprobs to TQ</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L597-L621"><text x="26" y="644">attach_* · L597-L621</text></a>
+<text class="d" x="26" y="660">message built from vLLM's reply</text>
+<rect class="same" x="386" y="610" width="330" height="60" rx="7"/>
+<text class="t" x="396" y="628">_finish_request_capture</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1046"><text x="396" y="644">vllm_worker_async.py · L1046</text></a>
+<text class="d" x="396" y="660">one TQ write</text>
+<rect class="new" x="756" y="610" width="330" height="60" rx="7"/>
+<text class="t" x="766" y="628">9 · Stage tokens + logprobs to TQ</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L487-L520"><text x="766" y="644">adapter._stage · L487-L520</text></a>
+<text class="d" x="766" y="660">builds the same message by hand</text>
+<path class="arr" d="M346 640 H383"/><path class="arr" d="M756 640 H719"/>
+
+<rect class="box" x="16" y="678" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="696">10 · Map errors, abort capture</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L799-L948"><text x="26" y="712">route · L799-L948</text></a>
+<text class="d" x="26" y="728">reasons: context_length, engine_error…</text>
+<rect class="same" x="386" y="678" width="330" height="60" rx="7"/>
+<text class="t" x="396" y="696">_abort_request_capture</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1131"><text x="396" y="712">vllm_worker_async.py · L1131</text></a>
+<text class="d" x="396" y="728">statuses and reasons are not shared</text>
+<rect class="new" x="756" y="678" width="330" height="60" rx="7"/>
+<text class="t" x="766" y="696">10 · Map errors, abort capture</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/adapter.py#L263-L289"><text x="766" y="712">chat_engine L231 · adapter L263, L396</text></a>
+<text class="d" x="766" y="728">never records context_length</text>
+<path class="arr" d="M346 708 H383"/><path class="arr" d="M756 708 H719"/>
+
+<rect class="box" x="16" y="746" width="330" height="60" rx="7"/>
+<text class="t" x="26" y="764">11 · Refuse logprobs without top_logprobs</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L539-L544"><text x="26" y="780">chat_server.py · L539-L544</text></a>
+<text class="d" x="26" y="796">→ 400</text>
+<rect class="none" x="386" y="746" width="330" height="60" rx="7"/>
+<text class="n" x="396" y="780">no shared code</text>
+<rect class="bad" x="756" y="746" width="330" height="60" rx="7"/>
+<text class="r" x="766" y="764">11 · Not checked</text>
+<text class="d" x="766" y="780">the call goes on to the engine</text>
+
+<rect class="same" x="16" y="826" width="22" height="14" rx="7"/>
+<text class="n" x="46" y="838">one copy, same inputs on both sides</text>
+<rect class="new" x="306" y="826" width="22" height="14" rx="7"/>
+<text class="n" x="336" y="838">written twice: can drift</text>
+<rect class="twice" x="526" y="826" width="22" height="14" rx="4"/>
+<text class="n" x="556" y="838">call order written twice</text>
+<rect class="bad" x="746" y="826" width="22" height="14" rx="7"/>
+<text class="n" x="776" y="838">only one side has it</text>
+<text class="n" x="16" y="862">Token ids: 151645 = &lt;|im_end|&gt; (ends each turn), 151643 = this tokenizer's EOS, [220, 17] = the model's turn-1 answer, 1001 = the template's re-render of it.</text>
+</svg>
+</div>
+
+<h2>"Same function, different inputs": what it meant, and how it was fixed</h2>
+<p>The earlier version of this page said the splice on the two paths was "same function, different inputs". It meant this. At <code>c4fe2bd5</code> both paths called <a href="https://github.com/NVIDIA-NeMo/RL/blob/c4fe2bd540cb1be02daf82f6f2961a80ab4f3d59/nemo_rl/models/generation/openai_server_utils.py#L61"><code>splice_prefix_tokens</code></a>. It counts how many turn-end tokens the old history holds (N), then cuts the new prompt at its N-th turn end and puts the model's own tokens before the cut. The native server called it at <a href="https://github.com/NVIDIA-NeMo/RL/blob/c4fe2bd540cb1be02daf82f6f2961a80ab4f3d59/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1432-L1441">vllm_worker_async.py L1432</a>, the Dynamo engine at <a href="https://github.com/NVIDIA-NeMo/RL/blob/c4fe2bd540cb1be02daf82f6f2961a80ab4f3d59/nemo_rl/models/generation/dynamo/native_engine.py#L559-L564">native_engine.py L559</a>. Only the model's own tokens from TQ were the same on both. The other three inputs came from different places:</p>
+<div class="scroll"><table>
+<tr><th>Argument</th><th>Native at <code>c4fe2bd5</code></th><th>Dynamo at <code>c4fe2bd5</code></th></tr>
+<tr><td><code>eos_token_id</code><br>which ids end a turn</td><td>configured <code>stop_token_ids</code> + the generation config's EOS list + the tokenizer's EOS (<a href="https://github.com/NVIDIA-NeMo/RL/blob/c4fe2bd540cb1be02daf82f6f2961a80ab4f3d59/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1188-L1194">L1188-L1194</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/c4fe2bd540cb1be02daf82f6f2961a80ab4f3d59/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1439-L1440">L1439</a>)</td><td>not passed, so the <a href="https://github.com/NVIDIA-NeMo/RL/blob/c4fe2bd540cb1be02daf82f6f2961a80ab4f3d59/nemo_rl/models/generation/openai_server_utils.py#L147-L148">tokenizer's EOS only</a></td></tr>
+<tr><td><code>template_prefix_token_ids</code><br>where to count N</td><td>the history re-rendered up to the last assistant message (<a href="https://github.com/NVIDIA-NeMo/RL/blob/c4fe2bd540cb1be02daf82f6f2961a80ab4f3d59/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1416-L1427">L1416</a>)</td><td><code>None</code>: the engine had no messages, so N was counted in the model's own prefix, plus one EOS if it did not end on one (<a href="https://github.com/NVIDIA-NeMo/RL/blob/c4fe2bd540cb1be02daf82f6f2961a80ab4f3d59/nemo_rl/models/generation/openai_server_utils.py#L163-L168">L163-L168</a>)</td></tr>
+<tr><td><code>template_token_ids</code><br>the new prompt</td><td>vLLM's renderer with the checkpoint's template</td><td>Dynamo's Rust renderer in the frontend, then vLLM's processor (<a href="https://github.com/NVIDIA-NeMo/RL/blob/c4fe2bd540cb1be02daf82f6f2961a80ab4f3d59/nemo_rl/models/generation/dynamo/native_engine.py#L741-L748">L741-L748</a>)</td></tr>
+</table></div>
+<p><b>The turn-end ids are the input that broke.</b> Same turn-2 call as the figure, run through the old function (shortened to the tokens that matter):</p>
+<div class="scroll"><table>
+<tr><th></th><th>Native: turn ends = {151643, 151645}</th><th>Dynamo: turn ends = {151643}</th></tr>
+<tr><td>model's prefix from TQ</td><td colspan="2"><code>[user … 151645, assistant 220, 17, 151645]</code>, same on both</td></tr>
+<tr><td>N, the turn ends to skip</td><td>2 (in the history render)</td><td>1 (no 151643 in the prefix, plus the one it adds)</td></tr>
+<tr><td>the new prompt holds</td><td>151645 three times; the 2nd closes turn 1</td><td>no 151643 at all: Qwen's template never writes it</td></tr>
+<tr><td>result</td><td class="good"><code>[… 220, 17, 151645, user 21, 22, 151645, assistant]</code></td><td class="bad"><code>AssertionError: EOS token #1 not found</code>: the call fails</td></tr>
+</table></div>
+<p>So every turn-2 call with a prefix failed through Dynamo on such a model, while the native path served it. gpt-oss has the same shape: a tool-call turn ends on <code>&lt;|call|&gt;</code>, which is not its tokenizer's EOS. That was review comment C16. The other two inputs did not break this example, but they could make the two paths cut in different places: counting in the model's prefix goes wrong if the model wrote an EOS id as ordinary text, and the Rust renderer is a different program from the checkpoint's own template.</p>
+<p class="where"><b>Fixed at <code>a2c74e6</code>, in #4979, RL only.</b> <code>0b7894a4</code> added <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/openai_server_utils.py#L30-L41"><code>turn_end_token_ids</code></a> (stop ids + generation-config EOS + tokenizer EOS) and made <code>eos_token_id</code> required. <code>43efaba3</code> moved Dynamo's splice into the frontend, where the render pool runs the same <code>_render_chat_call</code> as native, so both get the same new prompt and the same history render. <code>53d7c9df</code> deleted the <code>None</code> mode. The <code>turn_end_not_eos</code> parity case now checks the prompt matches.</p>
+<pre class="diff"><span class="hunk">@@ Dynamo's splice call · native_engine.py L559-L564 at c4fe2bd5 → chat_engine.py L376-L382 at a2c74e6</span>
+         splice = splice_prefix_tokens(
+<span class="del">-            tokenizer=self._llm.tokenizer,
+-            model_prefix_token_ids=prefix_token_ids,
+-            template_prefix_token_ids=None,
+-            template_token_ids=template_token_ids,
+</span><span class="add">+            tokenizer=None,
++            model_prefix_token_ids=prefix,
++            template_prefix_token_ids=rendered.history_token_ids,
++            template_token_ids=rendered.template_token_ids,
++            eos_token_id=turn_end_token_ids,
+</span>         )</pre>
+<p><code>history_token_ids</code> and <code>template_token_ids</code> come from <code>_render_chat_call</code>, and <code>turn_end_token_ids</code> from the <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/dynamo/vllm/render_pool.py#L177-L181">render pool</a>, built with the same two functions the native server uses at <a href="https://github.com/NVIDIA-NeMo/RL/blob/a2c74e630bd9faa1ac5c5b9ba79c14528b80609c/nemo_rl/models/generation/vllm/chat_server.py#L386-L388">L386</a>. One difference is left: Dynamo passes <code>tokenizer=None</code>, which only drops the decoded text from the error message.</p>
+<p class="cref">✅ <a href="https://github.com/NVIDIA-NeMo/RL/pull/4979#discussion_r4484475956">review comment C16 — resolved</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4979#discussion_r4497298899">C26 forest training — resolved</a></p>
+
+<div class="hl"><b>So what.</b> The splice and the capture core are now one copy, so the bug above cannot come back on one path only. The risk that is left is drift in what is still written twice: the order of steps 2–6, the staged message, the error mapping, and the native-only <code>top_logprobs</code> check. The next change to land there is <a href="https://github.com/NVIDIA-NeMo/RL/pull/4506">#4506</a> (prefix recovery). It adds restore steps between the TQ read and the splice, but only in the native chat path (<a href="https://github.com/NVIDIA-NeMo/RL/blob/7d7569682c43614a63ef385f9aa761e11a87b6a4/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1568-L1600">vllm_worker_async.py L1568-L1600 at <code>7d75696</code></a>). Moving steps 2–6 into one shared method before #4506 lands would give it one place to go.</div>
+</div>
+</body>
+</html>

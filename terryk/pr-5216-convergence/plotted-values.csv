@@ -1,0 +1,161 @@
+run,training_step,policy_update,reward,grad_norm,chunks
+Full batch · normalization on,1,0,0.5158730158730159,,1
+Full batch · normalization on,2,0,0.5219123505976095,,1
+Full batch · normalization on,3,0,0.5714285714285714,,1
+Full batch · normalization on,4,0,0.5317460317460317,,1
+Full batch · normalization on,5,0,0.52,,1
+Full batch · normalization on,6,0,0.5338645418326693,,1
+Full batch · normalization on,7,0,0.5810276679841897,,1
+Full batch · normalization on,8,0,0.5296442687747036,,1
+Full batch · normalization on,9,0,0.5275590551181102,,1
+Full batch · normalization on,10,0,0.56,,1
+Full batch · normalization on,11,1,0.544,0.7258710265159607,1
+Full batch · normalization on,12,2,0.5634920634920635,0.6974097490310669,1
+Full batch · normalization on,13,3,0.5,0.7619652152061462,1
+Full batch · normalization on,14,4,0.5515873015873016,0.758521318435669,1
+Full batch · normalization on,15,5,0.5059288537549407,0.7466157078742981,1
+Full batch · normalization on,16,6,0.5461847389558233,0.7382547855377197,1
+Full batch · normalization on,17,7,0.5447154471544715,0.7010789513587952,1
+Full batch · normalization on,18,8,0.5357142857142857,0.7251781821250916,1
+Full batch · normalization on,19,9,0.556,0.7544931173324585,1
+Full batch · normalization on,20,10,0.5816733067729084,0.8287932276725769,1
+Full batch · normalization on,21,11,0.6374501992031872,0.6572383046150208,1
+Full batch · normalization on,22,12,0.624,0.6438415050506592,1
+Full batch · normalization on,23,13,0.6465863453815262,0.6767008900642395,1
+Full batch · normalization on,24,14,0.676,0.6779583096504211,1
+Full batch · normalization on,25,15,0.6963562753036437,0.6750596165657043,1
+Full batch · normalization on,26,16,0.6613545816733067,0.691799521446228,1
+Full batch · normalization on,27,17,0.6814516129032258,0.624029278755188,1
+Full batch · normalization on,28,18,0.688,0.5490449070930481,1
+Full batch · normalization on,29,19,0.6907630522088354,0.6044154763221741,1
+Full batch · normalization on,30,20,0.717741935483871,0.5733270049095154,1
+Full batch · normalization on,31,21,0.664,0.5839114189147949,1
+Full batch · normalization on,32,22,0.749003984063745,0.6184606552124023,1
+Full batch · normalization on,33,23,0.7362204724409449,0.5627655386924744,1
+Full batch · normalization on,34,24,0.7204724409448819,0.5904727578163147,1
+Full batch · normalization on,35,25,0.804,0.6011579036712646,1
+Full batch · normalization on,36,26,0.7529880478087649,0.5341522693634033,1
+Full batch · normalization on,37,27,0.6771653543307087,0.5771121978759766,1
+Full batch · normalization on,38,28,0.752,0.549591064453125,1
+Full batch · normalization on,39,29,0.772,0.5798031687736511,1
+Full batch · normalization on,40,30,0.7346938775510204,0.5746800899505615,1
+Full batch · normalization off,1,0,0.546875,,1
+Full batch · normalization off,2,0,0.5537848605577689,,1
+Full batch · normalization off,3,0,0.5753968253968254,,1
+Full batch · normalization off,4,0,0.55078125,,1
+Full batch · normalization off,5,0,0.5158730158730159,,1
+Full batch · normalization off,6,0,0.5277777777777778,,1
+Full batch · normalization off,7,0,0.5928853754940712,,1
+Full batch · normalization off,8,0,0.541501976284585,,1
+Full batch · normalization off,9,0,0.5357142857142857,,1
+Full batch · normalization off,10,0,0.5120967741935484,,1
+Full batch · normalization off,11,1,0.556,0.34073543548583984,1
+Full batch · normalization off,12,2,0.5590551181102362,0.33059754967689514,1
+Full batch · normalization off,13,3,0.4820717131474104,0.32326486706733704,1
+Full batch · normalization off,14,4,0.5219123505976095,0.32211175560951233,1
+Full batch · normalization off,15,5,0.5298804780876494,0.3234042823314667,1
+Full batch · normalization off,16,6,0.544,0.3722991645336151,1
+Full batch · normalization off,17,7,0.5425101214574899,0.3593866527080536,1
+Full batch · normalization off,18,8,0.5714285714285714,0.31375160813331604,1
+Full batch · normalization off,19,9,0.512,0.35726621747016907,1
+Full batch · normalization off,20,10,0.6374501992031872,0.34152600169181824,1
+Full batch · normalization off,21,11,0.6414342629482072,0.3473248779773712,1
+Full batch · normalization off,22,12,0.6370967741935484,0.26613542437553406,1
+Full batch · normalization off,23,13,0.632,0.2816372811794281,1
+Full batch · normalization off,24,14,0.7086614173228346,0.34990108013153076,1
+Full batch · normalization off,25,15,0.678714859437751,0.33624619245529175,1
+Full batch · normalization off,26,16,0.6706349206349206,0.3079347610473633,1
+Full batch · normalization off,27,17,0.6639676113360324,0.2912417948246002,1
+Full batch · normalization off,28,18,0.6895161290322581,0.27652326226234436,1
+Full batch · normalization off,29,19,0.7131474103585658,0.2772921323776245,1
+Full batch · normalization off,30,20,0.6762295081967213,0.35705724358558655,1
+Full batch · normalization off,31,21,0.7317073170731707,0.2893065810203552,1
+Full batch · normalization off,32,22,0.7228915662650602,0.2992769777774811,1
+Full batch · normalization off,33,23,0.7628458498023716,0.2739122211933136,1
+Full batch · normalization off,34,24,0.7165354330708661,0.27774757146835327,1
+Full batch · normalization off,35,25,0.782608695652174,0.2631508409976959,1
+Full batch · normalization off,36,26,0.7808764940239044,0.2716232240200043,1
+Full batch · normalization off,37,27,0.77734375,0.2653467357158661,1
+Full batch · normalization off,38,28,0.7233201581027668,0.30546507239341736,1
+Full batch · normalization off,39,29,0.746031746031746,0.2813386917114258,1
+Full batch · normalization off,40,30,0.728744939271255,0.36246204376220703,1
+Minimum 32 · normalization off,1,0,0.5078740157480315,,2
+Minimum 32 · normalization off,2,0,0.552,,1
+Minimum 32 · normalization off,3,0,0.5674603174603174,,1
+Minimum 32 · normalization off,4,0,0.531496062992126,,1
+Minimum 32 · normalization off,5,0,0.5241935483870968,,1
+Minimum 32 · normalization off,6,0,0.544,,1
+Minimum 32 · normalization off,7,0,0.5816733067729084,,1
+Minimum 32 · normalization off,8,0,0.5607843137254902,,1
+Minimum 32 · normalization off,9,0,0.54296875,,1
+Minimum 32 · normalization off,10,0,0.5511811023622047,,1
+Minimum 32 · normalization off,11,1,0.5140562248995983,0.3341592848300934,1
+Minimum 32 · normalization off,12,2,0.545816733067729,0.39423200488090515,1
+Minimum 32 · normalization off,13,3,0.516,0.31430119276046753,1
+Minimum 32 · normalization off,14,4,0.524,0.3451794981956482,1
+Minimum 32 · normalization off,15,5,0.5,0.3553604185581207,1
+Minimum 32 · normalization off,16,6,0.49193548387096775,0.321731835603714,1
+Minimum 32 · normalization off,17,7,0.4980237154150198,0.31905797123908997,1
+Minimum 32 · normalization off,18,8,0.5019607843137255,0.30077895522117615,1
+Minimum 32 · normalization off,19,9,0.5483870967741935,0.30734747648239136,1
+Minimum 32 · normalization off,20,10,0.564,0.2954353392124176,1
+Minimum 32 · normalization off,21,11,0.604,0.32012197375297546,1
+Minimum 32 · normalization off,22,12,0.6437246963562753,0.25958746671676636,1
+Minimum 32 · normalization off,23,13,0.610236220472441,0.3056788146495819,1
+Minimum 32 · normalization off,24,14,0.6626506024096386,0.3173277676105499,1
+Minimum 32 · normalization off,25,15,0.6072874493927125,0.35560691356658936,1
+Minimum 32 · normalization off,26,16,0.6356275303643725,0.35281652212142944,1
+Minimum 32 · normalization off,27,17,0.6666666666666666,0.3112674951553345,1
+Minimum 32 · normalization off,28,18,0.668,0.2952396869659424,1
+Minimum 32 · normalization off,29,19,0.6587301587301587,0.3194482922554016,1
+Minimum 32 · normalization off,30,20,0.6532258064516129,0.35168346762657166,1
+Minimum 32 · normalization off,31,21,0.6370967741935484,0.2820245027542114,1
+Minimum 32 · normalization off,32,22,0.7047244094488189,0.30443891882896423,1
+Minimum 32 · normalization off,33,23,0.7103174603174603,0.2851843535900116,1
+Minimum 32 · normalization off,34,24,0.7023809523809523,0.2682762145996094,1
+Minimum 32 · normalization off,35,25,0.7569721115537849,0.30645260214805603,1
+Minimum 32 · normalization off,36,26,0.7419354838709677,0.2843610346317291,1
+Minimum 32 · normalization off,37,27,0.7370517928286853,0.2784430682659149,1
+Minimum 32 · normalization off,38,28,0.7228915662650602,0.2909156382083893,1
+Minimum 32 · normalization off,39,29,0.7420634920634921,0.2823247015476227,1
+Minimum 32 · normalization off,40,30,0.7183673469387755,0.27299344539642334,1
+Minimum 32 · normalization off · split critic,1,0,0.4900398406374502,,2
+Minimum 32 · normalization off · split critic,2,0,0.5524193548387096,,1
+Minimum 32 · normalization off · split critic,3,0,0.5433070866141733,,1
+Minimum 32 · normalization off · split critic,4,0,0.5196850393700787,,1
+Minimum 32 · normalization off · split critic,5,0,0.545816733067729,,1
+Minimum 32 · normalization off · split critic,6,0,0.5357142857142857,,1
+Minimum 32 · normalization off · split critic,7,0,0.5889328063241107,,1
+Minimum 32 · normalization off · split critic,8,0,0.549800796812749,,1
+Minimum 32 · normalization off · split critic,9,0,0.5590551181102362,,1
+Minimum 32 · normalization off · split critic,10,0,0.5577689243027888,,1
+Minimum 32 · normalization off · split critic,11,1,0.5261044176706827,0.35829657316207886,1
+Minimum 32 · normalization off · split critic,12,2,0.5275590551181102,0.3152776062488556,1
+Minimum 32 · normalization off · split critic,13,3,0.5019762845849802,0.3264346718788147,1
+Minimum 32 · normalization off · split critic,14,4,0.5662650602409639,0.33340635895729065,1
+Minimum 32 · normalization off · split critic,15,5,0.4980237154150198,0.39734411239624023,1
+Minimum 32 · normalization off · split critic,16,6,0.5282258064516129,0.3223990499973297,1
+Minimum 32 · normalization off · split critic,17,7,0.5645161290322581,0.31976747512817383,1
+Minimum 32 · normalization off · split critic,18,8,0.5277777777777778,0.33529552817344666,1
+Minimum 32 · normalization off · split critic,19,9,0.5421686746987951,0.4005008637905121,1
+Minimum 32 · normalization off · split critic,20,10,0.584,0.3346045911312103,1
+Minimum 32 · normalization off · split critic,21,11,0.616600790513834,0.3337072730064392,1
+Minimum 32 · normalization off · split critic,22,12,0.626984126984127,0.2786281108856201,1
+Minimum 32 · normalization off · split critic,23,13,0.6487603305785123,0.2963307797908783,1
+Minimum 32 · normalization off · split critic,24,14,0.6772908366533864,0.27250346541404724,1
+Minimum 32 · normalization off · split critic,25,15,0.7004048582995951,0.3276870846748352,1
+Minimum 32 · normalization off · split critic,26,16,0.6482213438735178,0.3253626525402069,1
+Minimum 32 · normalization off · split critic,27,17,0.6428571428571429,0.2829681932926178,1
+Minimum 32 · normalization off · split critic,28,18,0.6747967479674797,0.2901567220687866,1
+Minimum 32 · normalization off · split critic,29,19,0.6477732793522267,0.26344364881515503,1
+Minimum 32 · normalization off · split critic,30,20,0.7137096774193549,0.29731252789497375,1
+Minimum 32 · normalization off · split critic,31,21,0.7056451612903226,0.277449369430542,1
+Minimum 32 · normalization off · split critic,32,22,0.7063492063492064,0.30844834446907043,1
+Minimum 32 · normalization off · split critic,33,23,0.7370517928286853,0.26668721437454224,1
+Minimum 32 · normalization off · split critic,34,24,0.6852589641434262,0.28674471378326416,1
+Minimum 32 · normalization off · split critic,35,25,0.76,0.30451929569244385,1
+Minimum 32 · normalization off · split critic,36,26,0.752,0.2379141002893448,1
+Minimum 32 · normalization off · split critic,37,27,0.758893280632411,0.25362300872802734,1
+Minimum 32 · normalization off · split critic,38,28,0.7047244094488189,0.2882237732410431,1
+Minimum 32 · normalization off · split critic,39,29,0.748,0.2821250259876251,1
+Minimum 32 · normalization off · split critic,40,30,0.6963562753036437,0.3258606493473053,1
