@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5154 — setup waits for the slowest step, not the sum</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}
+.why{border-left:4px solid var(--green);background:var(--surface);padding:8px 14px;margin:0 0 16px;border-radius:0 8px 8px 0;font-size:14.5px}
+.why p{margin:4px 0}
+.hl{border-left:4px solid var(--accent);background:var(--surface);padding:10px 14px;margin:16px 0;border-radius:0 8px 8px 0}
+svg{max-width:100%;height:auto;display:block;margin:12px 0}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .bt{fill:var(--bg);font:bold 11px -apple-system,sans-serif}
+svg .gray{fill:var(--dim);opacity:.35}
+svg .comm{fill:var(--orange)}
+svg .reas{fill:var(--accent)}
+svg .adv{fill:var(--green)}
+svg .mark{stroke:var(--text);stroke-width:1.5;stroke-dasharray:4 3}
+svg .save{stroke:var(--green);stroke-width:2;fill:none}
+svg .savet{fill:var(--green);font:bold 12px -apple-system,sans-serif}
+svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.cref{margin:4px 0 12px;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+ol li{margin:0 0 8px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Setup now waits for the slowest of three steps, not their sum</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5154">NVIDIA-NeMo/RL #5154</a>
+· perf(single-controller): overlap refit init with actor pools · permalinks pin head <code>6dac75f</code> (base <code>047d885</code>)</p>
+
+<div class="status"><dl>
+  <dt>Before</dt>
+  <dd>At the end of single-controller setup, three unrelated steps ran one after another: connect the trainer to the
+  inference engines for weight updates, start the rollout reassembler actors, start the advantage actors. Setup paid the sum, ~40 s.</dd>
+  <dt>This PR</dt>
+  <dd>Runs the three at the same time and waits for the slowest. With non-colocated vLLM and no OPD teachers, the weight-update
+  connection starts even earlier, as soon as the trainer and the inference engines are built.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict good">Works as described; safe to land after small fixes.</span>
+  The review found no bug. It asks for two test fixes and an update to the PR description (3 comments, none blocking).</dd>
+</dl></div>
+
+<div class="why">
+<p><b>Why it should be faster.</b> The three steps share no state, and none of them is busy on the driver. One waits on a
+network handshake between GPUs, the other two wait for Ray to start CPU actors. So they can wait at the same time. Nothing
+gets cheaper: each step takes as long as before (16.1 / 10.5 / 13.2 s in the author's run, then 15.3 / 10.3 / 11.0 s).</p>
+<p><b>Measured</b> (author's multi-node async GRPO run, vLLM + NeMo-Gym): time on these steps 40.1 s and 38.0 s (two runs before) → 15.7 s, so 22–25 s saved.
+Total setup 341 / 344 s → 315 s. <b>Most it can save:</b> the two shortest steps; the longest one (usually the
+weight-update connection) is still paid in full, unless the early start hides it behind other work. <b>Never slower</b> except for three short-lived threads.
+That run seems to predate the early start (its timing line still lists the connection as a tail step), so the early start itself is not measured yet.</p>
+</div>
+
+<p>The weight-update connection is the <b>refit communicator</b>: the trainer GPUs and the vLLM GPUs join one NCCL group, so later
+steps can copy new weights into vLLM (<a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L2130-L2162"><code>_init_communicator</code></a>).
+The two actor pools (<a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L2447"><code>_create_finalizers</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L2504"><code>_create_advantage</code></a>)
+only need the data plane. The PR submits all three to one thread pool and joins them before the rollout manager is built
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L2527-L2538">L2527-L2538</a>), so both pools still exist before any checkpoint restore.</p>
+
+<h2>Before and after, on the author's numbers</h2>
+
+<svg viewBox="0 0 960 330" role="img" aria-label="Three timelines. Before: communicator, reassemblers and advantage actors run one after another for 40.1 s. After, measured: they run side by side and setup waits 15.7 s. At head: the communicator starts earlier, beside other setup work.">
+  <text class="note" x="150" y="18">bars to scale (1 s = 14 px); the gray block (Gym finish, restore, token capture) is not</text>
+
+  <text class="lbl-b" x="10" y="54">Before</text>
+  <text class="note" x="10" y="70">one after another</text>
+  <rect class="gray" x="150" y="40" width="160" height="26" rx="4"/>
+  <text class="note" x="160" y="57">rest of setup …</text>
+  <rect class="comm" x="310" y="40" width="225" height="26" rx="4"/><text class="bt" x="318" y="57">communicator 16.1 s</text>
+  <rect class="reas" x="535" y="40" width="147" height="26" rx="4"/><text class="bt" x="541" y="57">reassemblers 10.5</text>
+  <rect class="adv" x="682" y="40" width="185" height="26" rx="4"/><text class="bt" x="688" y="57">advantage 13.2</text>
+  <text class="lbl-b" x="875" y="57">40.1 s</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/047d885acf13f3aa42af0ef9940948e384dfa2a4/nemo_rl/algorithms/single_controller_utils/setup.py#L2329-L2342"><text x="310" y="84">base L2329: init_communicator()</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/047d885acf13f3aa42af0ef9940948e384dfa2a4/nemo_rl/algorithms/single_controller_utils/setup.py#L2391"><text x="560" y="84">L2391 · L2434 pools</text></a>
+
+  <text class="lbl-b" x="10" y="124">After</text>
+  <text class="note" x="10" y="140">measured run</text>
+  <rect class="gray" x="150" y="106" width="160" height="62" rx="4"/>
+  <text class="note" x="160" y="140">rest of setup …</text>
+  <rect class="comm" x="310" y="106" width="214" height="18" rx="4"/><text class="bt" x="316" y="119">communicator 15.3</text>
+  <rect class="reas" x="310" y="128" width="144" height="18" rx="4"/><text class="bt" x="316" y="141">reassemblers 10.3</text>
+  <rect class="adv" x="310" y="150" width="154" height="18" rx="4"/><text class="bt" x="316" y="163">advantage 11.0</text>
+  <line class="mark" x1="530" y1="100" x2="530" y2="174"/>
+  <text class="lbl-b" x="538" y="141">15.7 s</text>
+  <path class="save" d="M534 186 L865 186 M534 181 L534 191 M865 181 L865 191"/>
+  <text class="savet" x="620" y="204">~24 s saved: three bars on top of each other</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L2528-L2538"><text x="600" y="128">head L2528: tail thread pool, join all three</text></a>
+
+  <text class="lbl-b" x="10" y="246">At head</text>
+  <text class="note" x="10" y="262">vLLM, not colocated,</text>
+  <text class="note" x="10" y="276">no OPD teachers</text>
+  <rect class="gray" x="150" y="228" width="160" height="62" rx="4"/>
+  <rect class="comm" x="150" y="228" width="214" height="18" rx="4"/><text class="bt" x="156" y="241">communicator (starts early)</text>
+  <text class="note" x="160" y="276">rest of setup …</text>
+  <rect class="reas" x="310" y="250" width="144" height="18" rx="4"/><text class="bt" x="316" y="263">reassemblers</text>
+  <rect class="adv" x="310" y="272" width="154" height="18" rx="4"/><text class="bt" x="316" y="285">advantage</text>
+  <line class="mark" x1="468" y1="222" x2="468" y2="296"/>
+  <text class="note" x="476" y="262">tail waits for whichever ends last;</text>
+  <text class="note" x="476" y="277">not measured yet</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L2245-L2248"><text x="150" y="314">head L2245: start on a daemon thread when the builds return</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L1131-L1139"><text x="590" y="314">L1131 _start_communicator_early()</text></a>
+</svg>
+
+<h2>The code, as pseudocode</h2>
+
+<p class="pclbl">Before · driver main thread</p>
+<pre class="pc"><span class="who"># setup_single_controller, driver main thread</span>
+trainer, generation = build_in_parallel()
+finish_gym(); restore_data_plane(); setup_token_capture()
+sync = <a href="https://github.com/NVIDIA-NeMo/RL/blob/047d885acf13f3aa42af0ef9940948e384dfa2a4/nemo_rl/algorithms/single_controller_utils/setup.py#L2329-L2342">init_communicator</a>(trainer, generation)  <span class="cm"># 16 s, NCCL handshake</span>
+finalizers = <a href="https://github.com/NVIDIA-NeMo/RL/blob/047d885acf13f3aa42af0ef9940948e384dfa2a4/nemo_rl/algorithms/single_controller_utils/setup.py#L2391">create_reassemblers</a>()            <span class="cm"># 10 s, Ray actor start</span>
+advantage = <a href="https://github.com/NVIDIA-NeMo/RL/blob/047d885acf13f3aa42af0ef9940948e384dfa2a4/nemo_rl/algorithms/single_controller_utils/setup.py#L2434">create_advantage_actors</a>()         <span class="cm"># 13 s, Ray actor start</span>
+build_rollout_manager(sync, finalizers, advantage)</pre>
+
+<p class="pclbl">After</p>
+<pre class="pc"><span class="who"># setup_single_controller, driver main thread</span>
+<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L1444-L1452">check_router_replay_config</a>()</span>                  <span class="cm"># moved: now fails before any build</span>
+trainer, generation = build_in_parallel()
+<span class="add">comm = None</span>
+<span class="add">if <a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L1131-L1139">early</a>(vllm and not colocated and not teachers):</span>
+<span class="add">    comm = <a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L1110-L1128">start_on_daemon_thread</a>(init_communicator)</span>  <span class="cm"># runs beside the next line</span>
+finish_gym(); restore_data_plane(); setup_token_capture()  <span class="cm"># driver-side or async vLLM calls</span>
+<span class="add">with ThreadPool(3) as tail:</span>                        <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L2528-L2535">tail pool</a>, one thread per step</span>
+<span class="add">    fin = tail.submit(create_reassemblers)</span>
+<span class="add">    adv = tail.submit(create_advantage_actors)</span>
+<span class="add">    comm = comm or tail.submit(init_communicator)</span>
+<span class="add">sync, finalizers, advantage = comm.result(), fin.result(), adv.result()</span>  <span class="cm"># fixed order</span>
+<span class="del">sync = init_communicator(); finalizers = ...; advantage = ...</span>
+build_rollout_manager(sync, finalizers, advantage)</pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L2130-L2162"><code>_init_communicator</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L1110-L1128"><code>_start_on_daemon_thread</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/algorithms/single_controller_utils/setup.py#L2527-L2546">tail join</a>.</p>
+
+<p><b>Why the early start is safe.</b> While the connection is being set up, the main thread calls the same workers. The data-plane restore
+runs on the driver (<a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/models/policy/tq_policy.py#L203-L205"><code>load_data_plane_checkpoint</code></a>),
+and the vLLM calls (<a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/models/generation/vllm/vllm_worker_async.py#L876"><code>setup_token_capture</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6dac75f84ede662770c2a09fbe470db04ec5bd5f/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1056-L1060"><code>set_rollout_weight_version</code></a>)
+are async and run no NCCL work on the engine. So at worst a call waits; it cannot deadlock. OPD teachers are left out because loading the teacher's
+output layer runs NCCL work on the trainer workers, which must not mix with the connection setup.</p>
+
+<h2>What the review asks for</h2>
+<ol>
+<li><b>C1 · a test that can't fail.</b> The pool-failure test's fake communicator finishes the moment the pool fails, so a setup that
+raised the pool error without waiting would still pass (tried: 6 of 6 passes). Fix: keep the fake communicator running 0.5 s longer.
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5154/files">review comment — test_setup.py:2951</a></p></li>
+<li><b>C2 · the moved config check has no test.</b> Nothing checks that the router-replay error now comes before any build.
+The nearby test that looks like it covers it hits a different error. Fix: one more case in the invalid-config table.
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5154/files">review comment — test_setup.py:1945</a></p></li>
+<li><b>C3 · the PR description is out of date.</b> It still says the process waits for a stuck connection at exit (fixed since the daemon thread),
+that all three steps use one pool, and that setup raises "the first error" (it raises in a fixed order).
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5154/files">review comment — setup.py:1110</a></p></li>
+</ol>
+
+<div class="hl"><b>So what.</b> Setup gets ~24 s faster today, and more on larger clusters, where all three steps take longer. The change is safe
+to land. The two test fixes make sure the safety promises in it ("waits for the others before raising", "checks the config before building") stay true.</div>
+
+</div>
+</body>
+</html>
