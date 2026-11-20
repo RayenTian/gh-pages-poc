@@ -95,8 +95,9 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-vs-forge-qwengyre.html">vs Forge and QwenGyre</a>
 <span class="here">where sharing should live</span>
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-what-rl-imports.html">what RL imports</a>
-<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-who-calls-what.html">who calls what</a></nav>
-<p class="chainnote">Five pages on this PR — this one: which component should own the prefix tree.</p>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-who-calls-what.html">who calls what</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-row-order.html">row order fix</a></nav>
+<p class="chainnote">Six pages on this PR — this one: which component should own the prefix tree.</p>
 
 <div class="bg"><b>Background.</b> In the single-controller GRPO path, Gym runs the agent and records every model call with a link to the call it continued. <span class="tip" tabindex="0" data-tip="nemo_rl/environments/call_selection.py. returned_history keeps the calls the agent returned (the main path); all_captured keeps every recorded call, including branches and retries.">call_selection</span> decides which calls train. The <span class="tip" tabindex="0" data-tip="RolloutReassembler: a Ray actor that fetches each selected call's tokens, logprobs and routes from the data plane, joins them into whole rows, and writes those rows back.">rollout reassembler</span> builds the rows. With <span class="tip" tabindex="0" data-tip="token_capture.forest_training=true. One rollout can own several rows: a new row starts after each compaction, and each branch is its own row. Shared calls keep their loss in one row only.">forest training</span>, one rollout can own several rows, and the advantage stage gives all of them that rollout's single advantage. Dotted words have a short explanation: hover or tap them.</div>
 

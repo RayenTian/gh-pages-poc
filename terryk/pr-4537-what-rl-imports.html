@@ -107,8 +107,9 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-vs-forge-qwengyre.html">vs Forge and QwenGyre</a>
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-where-sharing-lives.html">where sharing should live</a>
 <span class="here">what RL imports</span>
-<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-who-calls-what.html">who calls what</a></nav>
-<p class="chainnote">Five pages on this PR — this one: the Megatron-LM code RL depends on, and where it should live.</p>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-who-calls-what.html">who calls what</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-row-order.html">row order fix</a></nav>
+<p class="chainnote">Six pages on this PR — this one: the Megatron-LM code RL depends on, and where it should live.</p>
 
 <p>The shared-prefix forward needs one input that ordinary packing doesn't: which tokens are the prompt and which are each completion.
 #8156 defines that input as a small dataclass in <code>megatron.core</code>. Everything that builds it lives in #8152, under <code>megatron.rl</code>:

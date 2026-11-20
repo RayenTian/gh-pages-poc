@@ -67,6 +67,7 @@ svg .b{fill:var(--surface);stroke:var(--border)}
 svg .b-new{fill:var(--surface);stroke:var(--green);stroke-width:1.6}
 svg .b-bad{fill:var(--surface);stroke:var(--orange);stroke-width:2.2}
 svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:6px 0 14px;font-size:14px}
 
 
 .scroll{overflow-x:auto}
@@ -117,10 +118,15 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-vs-forge-qwengyre.html">vs Forge and QwenGyre</a>
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-where-sharing-lives.html">where sharing should live</a>
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-what-rl-imports.html">what RL imports</a>
-<span class="here">who calls what</span></nav>
-<p class="chainnote">Five pages on this PR — this one: which process and class does each step, and what crosses between them.</p>
+<span class="here">who calls what</span>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-row-order.html">row order fix</a></nav>
+<p class="chainnote">Six pages on this PR — this one: which process and class does each step, and what crosses between them.</p>
 
 <div class="bg"><b>Background.</b> In single-controller GRPO, Gym runs the agent and records each model call. The <span class="tip" tabindex="0" data-tip="A Ray actor that joins the selected calls into whole training rows and writes them to TQ.">rollout reassembler</span> joins the calls into training rows and writes them to <span class="tip" tabindex="0" data-tip="TransferQueue: the data plane. Rows are written once, then each worker fetches only its own rows by key.">TQ</span>. The driver splits the batch across <span class="tip" tabindex="0" data-tip="Data-parallel ranks: copies of the model that each process a slice of the batch.">data-parallel ranks</span>, and each Megatron worker fetches its rows and runs the model. Dotted words have a short explanation: hover or tap them.</div>
+
+<div class="where"><b>Two different things, built in two places.</b>
+<b>(1) Which rows share which tokens</b> is a few numbers per row. This PR writes one, the prompt length, in the reassembler. The proposal writes four, the tree, also in the reassembler (C11).
+<b>(2) The packed shared forward</b>, meaning the <code>SharedPrefixLayout</code> plus the gathered token, position and scatter tensors, is built in the <b>Megatron policy worker</b>, in memory, for every forward pass (steps ⑤–⑥). It depends on what only the worker knows: its rows, the token budget, and TP/CP. Neither version stores it in TQ.</div>
 
 <p>The figure follows one group (prompt A, 120 tokens, completions 50, 30 and 20) through each process. Rows in TQ stay dense in both columns, so the value model and the teachers, which read the same rows, never see a different structure. What changes is who decides the sharing, and where its code lives.</p>
 

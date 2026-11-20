@@ -77,8 +77,9 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <span class="here">vs Forge and QwenGyre</span>
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-where-sharing-lives.html">where sharing should live</a>
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-what-rl-imports.html">what RL imports</a>
-<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-who-calls-what.html">who calls what</a></nav>
-<p class="chainnote">Five pages on this PR — this one: what each system shares, and where the work is saved.</p>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-who-calls-what.html">who calls what</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-row-order.html">row order fix</a></nav>
+<p class="chainnote">Six pages on this PR — this one: what each system shares, and where the work is saved.</p>
 
 <p>All three avoid repeated work on text that many training rows have in common. They differ in <b>what</b> they treat as common and <b>where</b> they save the work. This PR shares only the GRPO prompt and saves forward compute. Forge shares multi-turn agent history and also saves forward compute. QwenGyre stores agent runs as trees but trains ordinary rows; it saves by not training the same target tokens twice.</p>
 
