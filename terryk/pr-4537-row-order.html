@@ -182,7 +182,10 @@ return per_rank_rows, <span class="add">src</span>  <span class="cm"># the form 
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/teacher_worker_group.py#L376">teacher_worker_group.py#L376</a>.
 On the TQ path, each worker writes its results back under each row's own key, so order never matters there.</p>
 
-<div class="hl"><b>So what.</b> This is a correct fix to a value nobody reads, so it can't change training. It isn't about shared prefixes, so the PR description should mention it. The simpler fix is to stop returning a value that nobody reads.</div>
+<p>Where the value came from: the first TransferQueue integration (<a href="https://github.com/NVIDIA-NeMo/RL/pull/2439">#2439</a>) copied the return shape of the older path, where <a href="https://github.com/NVIDIA-NeMo/RL/blob/1fcd48de48da70bd26125e1bc20821a913686019/nemo_rl/models/policy/lm_policy.py#L823-L824">lm_policy.py#L824</a> really does reorder gathered logprobs. The TQ path never needed it.</p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4638941649">review comment C20 — preshard.py:244 (delete the unused value)</a></p>
+
+<div class="hl"><b>So what.</b> This is a correct fix to a value nobody reads, so it can't change training. The review asks to delete the value instead: seven callers change from <code>metas, _ =</code> to <code>metas =</code>, and nothing else reads it. If a TQ path ever needs to restore order, it can add the value back with a test that uses it.</div>
 
 </div>
 </body>
