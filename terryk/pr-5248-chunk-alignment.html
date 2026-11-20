@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5248 — why a GRPO training chunk now takes 20 of 21 ready groups</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 14px;font-size:14px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .ok{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .red{fill:var(--red);font:bold 12px ui-monospace,Menlo,monospace}
+svg .grn{fill:var(--green);font:bold 12px ui-monospace,Menlo,monospace}
+svg .g-ok{fill:var(--green);opacity:.55}
+svg .g-bad{fill:var(--red);opacity:.5}
+svg .g-wait{fill:var(--dim);opacity:.35}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px;font-size:14px}
+.hl{border-left:3px solid var(--orange);background:var(--surface);padding:12px 16px;margin:18px 0;border-radius:0 8px 8px 0}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Why a GRPO training chunk now takes 20 of 21 ready groups</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">NVIDIA-NeMo/RL #5248</a>
+· issue <a href="https://github.com/NVIDIA-NeMo/RL/issues/5240">#5240</a> (item 1)
+· permalinks pin head <code>21f8a78</code></p>
+
+<div class="status"><dl>
+  <dt>Before</dt>
+  <dd>A streaming GRPO chunk was as many prompt groups as happened to be ready. A count that the training ranks could not split evenly crashed the step.</dd>
+  <dt>This PR</dt>
+  <dd>Setup works out the smallest group count that always splits evenly, and the sampler takes only whole multiples of it. The rest wait for the next chunk.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict good">Fixed by this PR</span> for the normal case. One end-of-data case is still open — see the second page.</dd>
+</dl></div>
+
+<nav class="chain">
+  <span class="here">1 · how chunks are aligned</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-end-of-data.html">2 · end-of-data crash (open)</a>
+</nav>
+<p class="chainnote">Two pages on this PR, one question each — this one: what the PR fixes and how.</p>
+
+<div class="bg"><b>Background.</b> In streaming GRPO the trainer does not wait for the whole step. It trains on
+<span class="tip" tabindex="0" data-tip="A group is one prompt plus all its sampled answers. With 16 generations per prompt, one group = 16 samples.">prompt groups</span>
+in <b>chunks</b> as they finish generating. Each chunk is split evenly across the
+<span class="tip" tabindex="0" data-tip="Data-parallel ranks: copies of the policy that each train on their own slice of the chunk.">data-parallel (DP) ranks</span>,
+and that split does not allow one rank to get more samples than another. Dotted words have a short explanation: hover or tap them.</div>
+
+<p>The trainer splits each chunk with
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/distributed/batched_data_dict.py#L603"><code>shard_by_batch_size</code></a>,
+which raises if the sample count is not a multiple of the DP size. Before this PR, GRPO gave the sampler no size rule, so with
+<b>16 answers per prompt</b> on <b>32 DP ranks</b>, a moment with <b>21 ready groups</b> made a chunk of 21 × 16 = <b>336</b> samples — 10.5 per rank.
+The PR adds
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/config.py#L1917"><code>resolve_grpo_group_multiple</code></a>:
+the smallest group count whose samples always split evenly. Here that is 32 ÷ gcd(32, 16) = <b>2 groups</b>, so every chunk is an even number of groups.</p>
+
+<h2>Same 21 ready groups, before and after</h2>
+
+<svg viewBox="0 0 900 400" role="img" aria-label="Before: the sampler takes all 21 groups, 336 samples, which cannot split over 32 ranks. After: it takes 20 groups, 320 samples, 10 per rank, and 1 group waits.">
+  <text class="hdr" x="14" y="22">16 answers per prompt · 32 DP ranks · 21 groups ready</text>
+  <!-- legend -->
+  <rect class="g-ok" x="560" y="10" width="14" height="14"/><text class="note" x="580" y="22">trained</text>
+  <rect class="g-bad" x="640" y="10" width="14" height="14"/><text class="note" x="660" y="22">crashes</text>
+  <rect class="g-wait" x="725" y="10" width="14" height="14"/><text class="note" x="745" y="22">waits for next chunk</text>
+
+  <text class="lbl-b" x="14" y="62">Before</text>
+  <text class="note" x="14" y="78">no size rule</text>
+  <g>
+    <rect class="g-bad" x="110" y="48" width="22" height="22"/><rect class="g-bad" x="135" y="48" width="22" height="22"/><rect class="g-bad" x="160" y="48" width="22" height="22"/><rect class="g-bad" x="185" y="48" width="22" height="22"/><rect class="g-bad" x="210" y="48" width="22" height="22"/><rect class="g-bad" x="235" y="48" width="22" height="22"/><rect class="g-bad" x="260" y="48" width="22" height="22"/><rect class="g-bad" x="285" y="48" width="22" height="22"/><rect class="g-bad" x="310" y="48" width="22" height="22"/><rect class="g-bad" x="335" y="48" width="22" height="22"/><rect class="g-bad" x="360" y="48" width="22" height="22"/>
+    <rect class="g-bad" x="110" y="73" width="22" height="22"/><rect class="g-bad" x="135" y="73" width="22" height="22"/><rect class="g-bad" x="160" y="73" width="22" height="22"/><rect class="g-bad" x="185" y="73" width="22" height="22"/><rect class="g-bad" x="210" y="73" width="22" height="22"/><rect class="g-bad" x="235" y="73" width="22" height="22"/><rect class="g-bad" x="260" y="73" width="22" height="22"/><rect class="g-bad" x="285" y="73" width="22" height="22"/><rect class="g-bad" x="310" y="73" width="22" height="22"/><rect class="g-bad" x="335" y="73" width="22" height="22"/>
+  </g>
+  <path class="arr" d="M392 72 L432 72 M426 67 L432 72 L426 77"/>
+  <text class="note" x="394" y="42">select()</text>
+  <rect class="bad" x="438" y="48" width="200" height="48" rx="6"/>
+  <text class="lbl" x="450" y="68">chunk = 21 groups</text>
+  <text class="lbl" x="450" y="86">= 336 samples</text>
+  <path class="arr" d="M644 72 L684 72 M678 67 L684 72 L678 77"/>
+  <rect class="bad" x="690" y="48" width="196" height="48" rx="6"/>
+  <text class="lbl" x="700" y="68">336 ÷ 32 = 10.5</text>
+  <text class="red" x="700" y="86">✗ crash</text>
+  <text class="note" x="438" y="118">ValueError: Batch size (336) is not a multiple of shards (32)</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/distributed/batched_data_dict.py#L603"><text x="438" y="134">batched_data_dict.py:603</text></a>
+
+  <line x1="14" y1="160" x2="886" y2="160" style="stroke:var(--border)"/>
+
+  <text class="lbl-b" x="14" y="200">After</text>
+  <text class="note" x="14" y="216">multiple = 2</text>
+  <g>
+    <rect class="g-ok" x="110" y="186" width="22" height="22"/><rect class="g-ok" x="135" y="186" width="22" height="22"/><rect class="g-ok" x="160" y="186" width="22" height="22"/><rect class="g-ok" x="185" y="186" width="22" height="22"/><rect class="g-ok" x="210" y="186" width="22" height="22"/><rect class="g-ok" x="235" y="186" width="22" height="22"/><rect class="g-ok" x="260" y="186" width="22" height="22"/><rect class="g-ok" x="285" y="186" width="22" height="22"/><rect class="g-ok" x="310" y="186" width="22" height="22"/><rect class="g-ok" x="335" y="186" width="22" height="22"/><rect class="g-ok" x="360" y="186" width="22" height="22"/>
+    <rect class="g-ok" x="110" y="211" width="22" height="22"/><rect class="g-ok" x="135" y="211" width="22" height="22"/><rect class="g-ok" x="160" y="211" width="22" height="22"/><rect class="g-ok" x="185" y="211" width="22" height="22"/><rect class="g-ok" x="210" y="211" width="22" height="22"/><rect class="g-ok" x="235" y="211" width="22" height="22"/><rect class="g-ok" x="260" y="211" width="22" height="22"/><rect class="g-ok" x="285" y="211" width="22" height="22"/><rect class="g-ok" x="310" y="211" width="22" height="22"/><rect class="g-wait" x="335" y="211" width="22" height="22"/>
+  </g>
+  <path class="arr" d="M392 210 L432 210 M426 205 L432 210 L426 215"/>
+  <text class="note" x="394" y="180">select(group_multiple=2)</text>
+  <rect class="ok" x="438" y="186" width="200" height="48" rx="6"/>
+  <text class="lbl" x="450" y="206">chunk = 20 groups</text>
+  <text class="lbl" x="450" y="224">= 320 samples</text>
+  <path class="arr" d="M644 210 L684 210 M678 205 L684 210 L678 215"/>
+  <rect class="ok" x="690" y="186" width="196" height="48" rx="6"/>
+  <text class="lbl" x="700" y="206">320 ÷ 32 = 10</text>
+  <text class="grn" x="700" y="224">✓ trains</text>
+  <text class="note" x="110" y="256">1 group stays in the buffer and joins the next chunk</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/async_utils/staleness_sampler.py#L367"><text x="438" y="256">rounding: staleness_sampler.py _finalize_selection</text></a>
+
+  <rect class="box" x="110" y="282" width="776" height="102" rx="8"/>
+  <text class="lbl-b" x="124" y="304">Where the 2 comes from (computed once, at setup)</text>
+  <text class="lbl" x="124" y="326">samples per chunk must divide by  32 DP ranks  (× microbatch size under static batching)</text>
+  <text class="lbl" x="124" y="346">one group = 16 samples  →  groups needed = 32 ÷ gcd(32, 16) = 2</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/config.py#L1917"><text x="124" y="370">resolve_grpo_group_multiple</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/config.py#L1836"><text x="340" y="370">sample_multiple</text></a>
+  <text class="note" x="470" y="370">Forest training is exempt: it pads each group itself.</text>
+</svg>
+
+<h2>The change, as pseudocode</h2>
+
+<p class="pclbl">Before (base <code>9a7640c</code>)</p>
+<pre class="pc"><span class="who"># setup, when the trainer is built</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9a7640c71cf4832596261fcf9810e20867c4eeb1/nemo_rl/algorithms/single_controller_utils/config.py#L1910">validate_grpo_chunk_cap_alignment</a>(cfg, dp)  <span class="cm"># checks only a full chunk at the cap</span>
+
+<span class="who"># train pump (async loop on the controller)</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9a7640c71cf4832596261fcf9810e20867c4eeb1/nemo_rl/algorithms/single_controller.py#L2795">kwargs</a> = {}                                  <span class="cm"># GRPO: no group_multiple</span>
+chunk = sampler.select(min=floor, max=left, **kwargs)  <span class="cm"># any size: 21 groups</span>
+trainer.train(chunk)                         <span class="cm"># 336 samples → split raises</span></pre>
+
+<p class="pclbl">After (head <code>21f8a78</code>)</p>
+<pre class="pc"><span class="who"># setup, when the trainer is built</span>
+<span class="del">validate_grpo_chunk_cap_alignment(cfg, dp)</span>
+<span class="add">m = <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/config.py#L1946">resolve_grpo_chunk_alignment</a>(cfg, dp)</span>    <span class="cm"># m = 2; raises if step size or cap % m != 0</span>
+<span class="add">                                              </span><span class="cm"># warns if drop budgets &gt; 0</span>
+
+<span class="who"># train pump (async loop on the controller)</span>
+kwargs = {}
+<span class="add">if m &gt; 1: <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2804">kwargs["group_multiple"] = m</a></span>
+chunk = sampler.select(min=floor, max=left, **kwargs)  <span class="cm"># 21 ready → 20; 1 waits</span>
+trainer.train(chunk)                         <span class="cm"># 320 samples → 10 per rank</span>
+
+<span class="who"># same pump, when no chunk can be selected</span>
+<span class="add">if <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2993">data_exhausted and len(buffer) &lt; m</a>: return</span>  <span class="cm"># tail below m is not trained</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/setup.py#L1997-L1999"><code>setup.py</code> L1997-1999</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2796-L2805"><code>_train_pump</code> L2796-2805</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L3753-L3756"><code>is_last_step</code> L3753-3756</a>.</p>
+
+<p class="where"><b>Where the fix lands: RL only.</b> Setup (<code>config.py</code>, <code>setup.py</code>) computes the multiple once; the train pump passes it to the sampler, which already knew how to round down (PPO used it first).</p>
+
+<h2>What is still open</h2>
+<p>The review found two cases the fix does not cover yet. Both are comments on the review.</p>
+<ul>
+  <li><b>End of data with dynamic sampling.</b> A step whose target shrinks to an odd number still crashes with <code>No multiple of 2 fits selection bounds</code>. The second page shows it and the one-line fix.
+  <span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">review comment C1</a></span></li>
+  <li><b><code>weight_fifo</code> streaming can now hang.</b> That sampler only reads groups from the oldest weight version. If one group is left there, it can never make a pair, and the step never closes. Before the PR this failed at once; now it waits until the stall watchdog fires. The fix is to reject this setup at startup.
+  <span class="cref" data-c="C2"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">review comment C2</a></span></li>
+</ul>
+
+<div class="hl"><b>So what.</b> A streaming GRPO run can no longer crash mid-step because "too many" groups happened to be ready at once. A config that can never split evenly is now rejected at setup, not partway through a run. What you give up: up to <code>m − 1</code> ready groups wait one more chunk, and at data exhaustion a tail smaller than <code>m</code> is not trained.</div>
+
+</div>
+</body>
+</html>
