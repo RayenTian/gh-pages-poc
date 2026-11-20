@@ -71,7 +71,7 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace
 
 <h1>What a rollout-only simulator run keeps from a training run, and what it fakes</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4914">NVIDIA-NeMo/RL #4914</a>
-(part of <a href="https://github.com/NVIDIA-NeMo/RL/issues/4860">#4860</a>). All permalinks pin the PR head <code>503e652c</code>.</p>
+(part of <a href="https://github.com/NVIDIA-NeMo/RL/issues/4860">#4860</a>). All permalinks pin the PR head <code>f5020a6f</code>.</p>
 
 <div class="status"><dl>
   <dt>Before</dt><dd>Measuring the rollout side of a SingleController recipe meant a full training run, with GPUs set aside for the trainer.</dd>
@@ -89,28 +89,28 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace
 <span class="tip" tabindex="0" data-tip="After each train step, the new weights are copied from the trainer GPUs to the vLLM engines. Generation is paused while that happens.">refit</span> that copies new weights to vLLM after each step. Dotted words have a short explanation: hover or tap them.</div>
 
 <p>Both commands go through the same launcher,
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L188"><code>run_single_controller</code></a>, and the same
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller.py#L2807"><code>_train_pump</code></a>.
-Setup makes one choice, <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/setup.py#L1265"><code>cpu_trainer</code></a>, and uses it to pick three things:
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L212"><code>run_single_controller</code></a>, and the same
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller.py#L2770"><code>_train_pump</code></a>.
+Setup makes one choice, <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/setup.py#L1312"><code>no_op_trainer</code></a>, and uses it to pick three things:
 which GPUs exist, which trainer object is built, and which weight transfer is built.
-The vLLM engines, NeMo-Gym, the sampler, the data plane and the advantage step are the real ones.</p>
+The vLLM engines, NeMo-Gym, the sampler and the data plane are the real ones. The trainer-side steps (logprobs, advantages, training) are skipped or replaced by a timer.</p>
 
 <h2>One step, side by side (4 prompts × 2 answers = 8 rows)</h2>
 
-<svg viewBox="0 0 940 610" role="img" aria-label="Six steps of one RL step in a training run and a simulator run. Steps 2 and 4 are identical; steps 1, 3, 5 and 6 use stand-ins in the simulator.">
+<svg viewBox="0 0 940 610" role="img" aria-label="Six steps of one RL step in a training run and a simulator run. Step 2 is identical; steps 1 and 3 to 6 are skipped or use stand-ins in the simulator.">
   <text class="hdr" x="150" y="22">Training run</text>
   <text class="hdr" x="550" y="22">Simulator run (mode: rollout_only)</text>
 
   <!-- 1 setup -->
   <text class="num" x="10" y="54">①</text><text class="lbl-b" x="30" y="54">setup</text>
   <rect class="box" x="140" y="34" width="390" height="70" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/setup.py#L534"><text x="152" y="54">_build_clusters</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/setup.py#L533"><text x="152" y="54">_build_clusters</text></a>
   <text class="lbl" x="152" y="72">train GPUs + vLLM GPUs</text>
   <text class="data" x="152" y="92">vLLM load_format: dummy → 1st refit fills</text>
   <rect class="stub" x="545" y="34" width="390" height="70" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/setup.py#L464"><text x="557" y="54">_build_inference_only_cluster</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/setup.py#L466"><text x="557" y="54">_build_inference_only_cluster</text></a>
   <text class="lbl" x="557" y="72">vLLM GPUs only, no train cluster</text>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/simulator.py#L186"><text x="557" y="92">load_format: auto (reads the checkpoint)</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/simulator.py#L145"><text x="557" y="92">load_format: auto (reads the checkpoint)</text></a>
 
   <!-- 2 rollouts -->
   <text class="num" x="10" y="138">②</text><text class="lbl-b" x="30" y="138">rollouts</text>
@@ -121,57 +121,59 @@ The vLLM engines, NeMo-Gym, the sampler, the data plane and the advantage step a
   <!-- 3 logprobs -->
   <text class="num" x="10" y="204">③</text><text class="lbl-b" x="30" y="204">logprobs</text>
   <rect class="box" x="140" y="184" width="390" height="70" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/models/policy/tq_policy.py#L491"><text x="152" y="204">TQPolicy.get_logprobs_from_meta</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/models/policy/tq_policy.py#L488"><text x="152" y="204">TQPolicy.get_logprobs_from_meta</text></a>
   <text class="lbl" x="152" y="222">GPU forward pass on the 8 rows</text>
   <text class="data" x="152" y="242">prev_logprobs ≈ generation_logprobs</text>
   <rect class="stub" x="545" y="184" width="390" height="70" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/simulator.py#L541"><text x="557" y="204">CpuTrainer._copy_column</text></a>
-  <text class="lbl" x="557" y="222">no forward; copies a data-plane column</text>
-  <text class="data-o" x="557" y="242">prev_logprobs = generation_logprobs (ratio 1.0)</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller.py#L3185-L3187"><text x="557" y="204">skipped: if not no_op_trainer</text></a>
+  <text class="lbl" x="557" y="222">no forward pass, nothing written</text>
+  <text class="data-o" x="557" y="242">no prev_logprobs column</text>
 
   <!-- 4 advantage -->
   <text class="num" x="10" y="288">④</text><text class="lbl-b" x="30" y="288">advantage</text>
-  <rect class="same" x="140" y="268" width="795" height="52" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller.py#L5403"><text x="152" y="288">_advantage_stage</text></a>
-  <text class="lbl" x="290" y="288">on the controller   (same code in both runs)</text>
-  <text class="data" x="152" y="308">8 rows get advantages from their rewards</text>
+  <rect class="box" x="140" y="268" width="390" height="52" rx="6"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller.py#L5436"><text x="152" y="288">_advantage_stage</text></a>
+  <text class="data" x="152" y="308">8 rows get advantages from rewards</text>
+  <rect class="stub" x="545" y="268" width="390" height="52" rx="6"/>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller.py#L3224-L3226"><text x="557" y="288">skipped: groups consumed as-is</text></a>
+  <text class="data-o" x="557" y="308">8 rows released, no advantages</text>
 
   <!-- 5 train -->
   <text class="num" x="10" y="354">⑤</text><text class="lbl-b" x="30" y="354">train step</text>
   <rect class="box" x="140" y="334" width="390" height="88" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/models/policy/tq_policy.py#L848"><text x="152" y="354">TQPolicy.finish_train_step</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/models/policy/tq_policy.py#L845"><text x="152" y="354">TQPolicy.finish_train_step</text></a>
   <text class="lbl" x="152" y="372">Megatron forward + backward + optimizer</text>
   <text class="lbl" x="152" y="390">rollouts for the next step keep running</text>
   <text class="data" x="152" y="410">metrics: loss, grad_norm, …</text>
   <rect class="stub" x="545" y="334" width="390" height="88" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller.py#L2775"><text x="557" y="354">_simulate_training</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/simulator.py#L295"><text x="557" y="354">simulate_train_step</text></a>
   <text class="lbl" x="557" y="372">waits train_time_s = 15 s, or less once</text>
   <text class="lbl" x="557" y="390">no rollout is in flight</text>
-  <text class="data-o" x="557" y="410">metrics: {} + held_s, idle_skipped_s</text>
+  <text class="data-o" x="557" y="410">metrics: held_s, idle_skipped_s only</text>
 
   <!-- 6 refit -->
   <text class="num" x="10" y="456">⑥</text><text class="lbl-b" x="30" y="456">refit</text>
   <rect class="box" x="140" y="436" width="390" height="70" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/setup.py#L2482"><text x="152" y="456">create_weight_synchronizer</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/setup.py#L2406"><text x="152" y="456">create_weight_synchronizer</text></a>
   <text class="lbl" x="152" y="474">pause vLLM, copy new weights, resume</text>
   <text class="data" x="152" y="494">version 0 → 1, vLLM serves new weights</text>
   <rect class="stub" x="545" y="436" width="390" height="70" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/simulator.py#L309"><text x="557" y="456">NoOpWeightSynchronizer</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/simulator.py#L329"><text x="557" y="456">NoOpWeightSynchronizer</text></a>
   <text class="lbl" x="557" y="474">same pause/resume; sleeps refit_time_s = 3 s</text>
   <text class="data-o" x="557" y="494">version 0 → 1, vLLM keeps starting weights</text>
 
   <!-- legend -->
   <rect class="same" x="140" y="530" width="22" height="14" rx="3"/><text class="note" x="170" y="542">same code in both runs</text>
-  <rect class="stub" x="340" y="530" width="22" height="14" rx="3"/><text class="note" x="370" y="542">stand-in: no GPU work, holds a set time instead</text>
-  <text class="note" x="140" y="572">Green values: real data. Orange values: what the stand-in writes or reports in place of the real one.</text>
+  <rect class="stub" x="340" y="530" width="22" height="14" rx="3"/><text class="note" x="370" y="542">simulator: skipped, or a stand-in that holds a set time</text>
+  <text class="note" x="140" y="572">Green values: real data. Orange values: what the simulator does or reports instead.</text>
   <text class="note" x="140" y="592">Both runs log timing/train/* the same way, so step times can be compared directly.</text>
 </svg>
 
 <table>
 <tr><th>Question</th><th>Answer</th></tr>
-<tr><td>Where do the two runs split?</td><td>Only in setup (<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/setup.py#L1870">clusters</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/setup.py#L2043">trainer</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/setup.py#L2474">weight transfer</a>) and at one call in the train pump (<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller.py#L3636-L3644">the hold</a>).</td></tr>
+<tr><td>Where do the two runs split?</td><td>Only in setup (<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/setup.py#L1918">clusters</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/setup.py#L2090">trainer</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/setup.py#L2280">weight transfer</a>) and at the <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller.py#L2823-L2825"><code>no_op_trainer</code></a> branches in the train pump: logprobs, advantages and the train step.</td></tr>
 <tr><td>What still differs after that?</td><td>The vLLM engines never get new weights, so every step samples from the starting checkpoint. The train step's GPU time is a fixed number you choose (<code>train_time_s</code>), not a measurement.</td></tr>
-<tr><td>Which settings does it refuse?</td><td>Anything that needs a real trainer: PPO, checkpointing, on-policy distillation, refit-time quantization and more (<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/simulator.py#L226"><code>validate_simulator_config</code></a>). Setup stops before any engine starts.</td></tr>
+<tr><td>Which settings does it refuse?</td><td>Anything that needs a real trainer: PPO, checkpointing, on-policy distillation, refit-time quantization and more (<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/simulator.py#L185"><code>validate_simulator_config</code></a>). Setup stops before any engine starts.</td></tr>
 <tr><td>Why keep both runs?</td><td>The training run is the real thing. The simulator gives rollout timing (exposed generation, refit pauses) on only the vLLM GPUs, with the trainer's time set by hand.</td></tr>
 </table>
 

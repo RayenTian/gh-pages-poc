@@ -74,7 +74,7 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace
 <div class="wrap">
 
 <h1>Why <code>simulator.num_nodes=4</code> still builds a 48-node data plane</h1>
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4914">NVIDIA-NeMo/RL #4914</a>. All permalinks pin the PR head <code>503e652c</code>.</p>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4914">NVIDIA-NeMo/RL #4914</a>. All permalinks pin the PR head <code>f5020a6f</code>.</p>
 
 <div class="status"><dl>
   <dt>Before</dt><dd>No simulator existed. A training run sets its node count with <code>cluster.num_nodes=…</code>, and every value computed from it follows.</dd>
@@ -89,18 +89,18 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace
 <p class="chainnote">Two pages on this PR — this one: the config-loading bug.</p>
 
 <p>Recipes compute some values from the node count. The base recipe sets
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/examples/configs/grpo_math_1B.yaml#L730"><code>num_storage_units: ${mul:2, ${cluster.num_nodes}}</code></a>:
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/examples/configs/grpo_math_1B.yaml#L730"><code>num_storage_units: ${mul:2, ${cluster.num_nodes}}</code></a>:
 two data-plane storage units per node.
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L111"><code>_load_configs</code></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L139"><code>_load_config</code></a>
 fills in every <code>${…}</code> first (<code>to_container(resolve=True)</code>).
 Only after that does
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/simulator.py#L176-L180"><code>apply_simulator_overrides</code></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/simulator.py#L135-L139"><code>apply_simulator_overrides</code></a>
 write the simulator's node count, and nothing computes the derived values again.</p>
 
 <h2>Same recipe, three ways to ask for 4 nodes</h2>
 
 <svg viewBox="0 0 940 400" role="img" aria-label="The super-120B quick recipe on 4 nodes: the simulator setting gives 96 storage units, while the command-line setting and the proposed fix give 8.">
-  <text class="note" x="10" y="20">Recipe: <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/examples/configs/recipes/llm/grpo-nemotron3.5-super-120BA12B-56n4g-megatron-rlvr-single-controller-gym-quick.yaml#L12">super-120B quick SC</a>: cluster.num_nodes 48, vLLM nodes 32, num_storage_units ${mul:2, ${cluster.num_nodes}}</text>
+  <text class="note" x="10" y="20">Recipe: <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/examples/configs/recipes/llm/grpo-nemotron3.5-super-120BA12B-56n4g-megatron-rlvr-single-controller-gym-quick.yaml#L12">super-120B quick SC</a>: cluster.num_nodes 48, vLLM nodes 32, num_storage_units ${mul:2, ${cluster.num_nodes}}</text>
 
   <text class="hdr" x="10" y="52">A · this PR: simulator.num_nodes=4</text>
   <text class="hdr" x="325" y="52">B · training: cluster.num_nodes=4</text>
@@ -123,7 +123,7 @@ write the simulator's node count, and nothing computes the derived values again.
 
   <!-- step 2 resolve -->
   <rect class="box" x="10" y="140" width="290" height="56" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L111"><text x="22" y="162">to_container(resolve=True)</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L139"><text x="22" y="162">to_container(resolve=True)</text></a>
   <text class="r" x="22" y="182">num_storage_units = 2×48 = 96</text>
   <rect class="box" x="325" y="140" width="290" height="56" rx="6"/>
   <text class="lbl" x="337" y="162">to_container(resolve=True)</text>
@@ -138,7 +138,7 @@ write the simulator's node count, and nothing computes the derived values again.
 
   <!-- step 3 simulator overrides -->
   <rect class="box" x="10" y="216" width="290" height="56" rx="6"/>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L119"><text x="22" y="238">apply_simulator_overrides</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L143"><text x="22" y="238">apply_simulator_overrides</text></a>
   <text class="lbl" x="22" y="258">nodes 48 → 4, vLLM 32 → 4</text>
   <rect class="box" x="325" y="216" width="290" height="56" rx="6" style="stroke-dasharray:5 4"/>
   <text class="note" x="337" y="248">(no simulator step)</text>
@@ -166,33 +166,33 @@ write the simulator's node count, and nothing computes the derived values again.
 </svg>
 
 <p>The same happens to every other key derived from the node count, such as Gym's
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/examples/nemo_gym/grpo_workplace_assistant_nemotron_nano_v2_9b.yaml#L355"><code>num_processes: ${mul:64, ${cluster.num_nodes}}</code></a>.
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/examples/nemo_gym/grpo_workplace_assistant_nemotron_nano_v2_9b.yaml#L355"><code>num_processes: ${mul:64, ${cluster.num_nodes}}</code></a>.
 The PR's smoke test and its usage example use 1-node recipes with <code>num_nodes=1</code>, so neither shows the problem.</p>
 
 <h2>The fix, as pseudocode (proposed, not run)</h2>
 <p class="where"><b>Where the fix lands: RL only.</b>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L79"><code>entrypoint_utils._load_configs</code></a> sets the node count before resolving, and
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/simulator.py#L176-L180"><code>apply_simulator_overrides</code></a> drops its node-count branch.
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L115"><code>entrypoint_utils._load_config</code></a> sets the node count before resolving, and
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/simulator.py#L135-L139"><code>apply_simulator_overrides</code></a> drops its node-count branch.
 <code>num_steps</code> can stay where it is: no shipped recipe computes anything from <code>max_num_steps</code>.</p>
 
 <p class="pclbl">Load the config, before</p>
 <pre class="pc"><span class="who"># driver process, once at startup</span>
-config = load_config(recipe) + simulator yaml + CLI overrides
-raw = <a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L111">to_container(config, resolve=True)</a>   <span class="cm"># every ${…} filled in: storage units = 2×48</span>
-sim = SimulatorConfig(**raw.pop("simulator"))
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/503e652c1840791ecf4cca06a581cf24c15444df/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L119">apply_simulator_overrides</a>(raw, sim)               <span class="cm"># cluster.num_nodes = 4, storage units still 96</span></pre>
+sim = <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L81">_load_simulator_config</a>(...)            <span class="cm"># simulator.num_nodes = 4</span>
+config = load_config(recipe) + CLI overrides
+raw = <a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L139">to_container(config, resolve=True)</a>   <span class="cm"># every ${…} filled in: storage units = 2×48</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/f5020a6f046a4ac760dd534e002ca988d71109a7/nemo_rl/algorithms/single_controller_utils/entrypoint_utils.py#L143">apply_simulator_overrides</a>(raw, sim)               <span class="cm"># cluster.num_nodes = 4, storage units still 96</span></pre>
 
 <p class="pclbl">Load the config, after (proposed)</p>
 <pre class="pc"><span class="who"># driver process, once at startup</span>
 config = load_config(recipe) + CLI overrides
-<span class="add">sim = _load_simulator_config(...)</span>                  <span class="cm"># the split already asked for in the review</span>
+sim = _load_simulator_config(...)                 <span class="cm"># unchanged</span>
 <span class="add">if sim.num_nodes:</span>
 <span class="add">    OmegaConf.update(config, "cluster.num_nodes", sim.num_nodes)</span>
 <span class="add">    OmegaConf.update(config, "…colocated.resources.num_nodes", sim.num_nodes)</span>  <span class="cm"># vLLM nodes, non-colocated only</span>
 raw = to_container(config, resolve=True)          <span class="cm"># storage units = 2×4 = 8</span>
 apply_simulator_overrides(raw, sim)               <span class="cm"># steps, validation, load_format; no node count</span></pre>
 <p class="pcref">Plus a unit test: a recipe key <code>x: ${cluster.num_nodes}</code> with <code>simulator.num_nodes=4</code> must give <code>x == 4</code>.</p>
-<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4914">review comment C33 — entrypoint_utils.py:119</a></p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4914#discussion_r4645902046">review comment C33 — entrypoint_utils.py:139</a></p>
 
 <div class="warn"><b>So what.</b> Fitting a big recipe onto a few nodes is the main reason to run this simulator. Today that run gets the big recipe's data-plane layout (96 storage units on 4 nodes, not 8), so the rollout timing it reports is not what a 4-node training run would see. Setting <code>cluster.num_nodes</code> directly on the command line avoids the problem until the order is fixed.</div>
 
