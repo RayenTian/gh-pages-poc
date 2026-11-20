@@ -106,12 +106,12 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <div class="wrap">
 
 <h1>Who calls what in shared-prefix training, today and after the review</h1>
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4537">NVIDIA-NeMo/RL #4537</a> at <code>1110db98</code>; design draft <a href="https://github.com/terrykong/RL/pull/30">terrykong/RL#30</a> at <code>9cf50d9f</code>; Megatron-LM <a href="https://github.com/NVIDIA/Megatron-LM/pull/8152">#8152</a> at <code>d37b16e2</code> and <a href="https://github.com/NVIDIA/Megatron-LM/pull/8156">#8156</a> at <code>57877d12</code>.</p>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4537">NVIDIA-NeMo/RL #4537</a> at <code>1110db98</code>; design draft <a href="https://github.com/terrykong/RL/pull/30">terrykong/RL#30</a> at <code>448362c1</code>; Megatron-LM <a href="https://github.com/NVIDIA/Megatron-LM/pull/8152">#8152</a> at <code>d37b16e2</code> and <a href="https://github.com/NVIDIA/Megatron-LM/pull/8156">#8156</a> at <code>57877d12</code>.</p>
 
 <div class="status"><dl>
 <dt>Main</dt><dd>Every row is dense: each completion carries its own copy of the prompt, and nothing marks which rows share tokens.</dd>
 <dt>This PR</dt><dd>The reassembler adds one number per row. The driver keeps whole groups on one rank. The Megatron worker works out which rows share a prompt, using a packing library in Megatron-LM's <code>megatron.rl</code>.</dd>
-<dt>Status</dt><dd><span class="verdict">Right column proposed — not implemented,</span> apart from the reassembler part in the RL#30 draft. The review comments linked below are pending until the review is published.</dd>
+<dt>Status</dt><dd><span class="verdict">Right column proposed — not implemented,</span> apart from the reassembler columns in the RL#30 draft. The review comments linked below are pending until the review is published.</dd>
 </dl></div>
 
 <nav class="chain"><a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-batch-forming.html">how the batch is formed</a>
@@ -199,7 +199,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <text class="t" x="580" y="92" text-anchor="start">RolloutReassembler (no flag, no subclass)</text>
 <text class="d" x="580" y="106" text-anchor="start">② always writes a few ints per row; packing reads them</text>
 <text class="d" x="580" y="119" text-anchor="start">② adds prompt_len, slot, parent, shared_len per row</text>
-<a href="https://github.com/terrykong/RL/blob/9cf50d9fcb1240484c3867245808f03b136b709b/nemo_rl/data/packing/shared_prefix_metadata.py"><text x="580" y="131">column format: RL#30 shared_prefix_metadata.py</text></a>
+<a href="https://github.com/terrykong/RL/blob/448362c1dbeece39216aa88764cdb2a69ab0bed2/nemo_rl/data/packing/shared_prefix_metadata.py"><text x="580" y="131">column format: RL#30 shared_prefix_metadata.py</text></a>
 <rect class="tqb" x="560" y="160" width="508" height="62" rx="6"/>
 <text class="t" x="570" y="176" text-anchor="start">TQ (data-plane storage): one dense row per completion</text>
 <text class="d" x="570" y="191" text-anchor="start">input_ids · token_mask · logprobs · group_id tag  (unchanged)</text>
