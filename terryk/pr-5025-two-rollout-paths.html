@@ -87,8 +87,10 @@ th{background:var(--surface2)}
 <nav class="chain">
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-dynamo-paths.html">#4801 · where the switch sits</a>
   <span class="here">#5025 · direct vs. through Dynamo</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-two-backends.html">#5097 · two backends, one chat engine</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-faults-as-400.html">#5097 · server faults answered as 400</a>
 </nav>
-<p class="chainnote">One page for this PR. The left chip is the page for part 1 of the same stack.</p>
+<p class="chainnote">One page for this PR. The other chips are pages for part 1 and part 6 of the same stack.</p>
 
 <p class="bg"><b>Background.</b> A <i>rollout</i> is one prompt sent to the inference engine to get a completion back, with the log-probability of each new token. <span class="tip" tabindex="0" data-tip="Dynamo is NVIDIA's serving layer. Its frontend is an OpenAI-style HTTP server that routes each request to a registered engine.">Dynamo</span>'s frontend can split one request across two engines: a <i>prefill</i> engine reads the prompt and builds its KV cache, then hands that cache to a <i>decode</i> engine over <span class="tip" tabindex="0" data-tip="NVIDIA's GPU-to-GPU transfer library. Here it copies the prompt's KV cache from the prefill engine to the decode engine.">NIXL</span>, which writes the answer. PRs 1–4 of this stack built those engines. Dotted words have a short explanation: hover or tap them.</p>
 
@@ -181,7 +183,7 @@ async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f46
 <span class="add">body = <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L230-L256">completion_payload</a>(prompt ids, max_tokens = min(16, 5 - 3))</span>
 <span class="add">for attempt in 1..3:</span>                                    <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L180-L197">post_completion</a></span>
 <span class="add">    resp = await POST url + "/completions"</span>               <span class="cm"># new aiohttp session each try</span>
-<span class="add">    if not <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L100-L109">is_retryable</a>(resp): break</span>                <span class="cm"># C12: own status list; timeouts retried</span>
+<span class="add">    if not <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L100-L109">is_retryable</a>(resp): break</span>                <span class="cm"># C11: own status list; timeouts retried</span>
 <span class="add">    sleep 1 s</span>
 <span class="add">ids, lps, truncated = parse(resp)</span>                      <span class="cm"># nvext.completion_token_ids, token_logprobs</span>
 <span class="add">return single_sample_output(...)</span></pre>
@@ -207,11 +209,11 @@ use_nemo_gym = should_use_nemo_gym(cfg)</pre>
 <tr><th>What</th><th>Direct</th><th>Through Dynamo</th></tr>
 <tr><td><code>truncated</code></td><td>not set</td><td>set from <code>finish_reason == "length"</code> (noted in the author's own review)</td></tr>
 <tr><td><code>ignore_eos: true</code></td><td>honoured with <code>termination_id=-1</code></td><td>dropped from the request (open thread)</td></tr>
-<tr><td>a failed request</td><td>a Ray error</td><td>retried up to 3 times, timeouts too, using its own list of retryable statuses (C12)</td></tr>
+<tr><td>a failed request</td><td>a Ray error</td><td>retried up to 3 times, timeouts too, using its own list of retryable statuses (C11)</td></tr>
 <tr><td>CI</td><td>run in L1</td><td>functional test written, not in any lane (C8)</td></tr>
 </table>
 
-<div class="hl"><b>So what.</b> The new path gives the trainer the same tokens and log-probabilities as the direct one, so a reviewer can judge it as "the same rollout, over HTTP". Before merge: run the 3-GPU functional test and add it to L1, since the pinned Megatron-LM already has the Dynamo integration (C8). Move the startup check to the start of setup, so Gym configs get the clear error (C7). Reuse the vLLM path's HTTP client instead of a copy that has already drifted (C12).</div>
+<div class="hl"><b>So what.</b> The new path gives the trainer the same tokens and log-probabilities as the direct one, so a reviewer can judge it as "the same rollout, over HTTP". Before merge: run the 3-GPU functional test and add it to L1, since the pinned Megatron-LM already has the Dynamo integration (C8). Move the startup check to the start of setup, so Gym configs get the clear error (C7). Reuse the vLLM path's HTTP client instead of a copy that has already drifted (C11).</div>
 <div id="crefs"></div>
 
 </div>
