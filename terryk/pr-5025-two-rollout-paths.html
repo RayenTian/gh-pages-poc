@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PR #5025: one Megatron rollout, direct vs. through Dynamo</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:25px;line-height:1.3;margin:0 0 6px}
+h2{font-size:19px;margin:30px 0 8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface2);padding:1px 4px;border-radius:4px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--orange)}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:6px 12px;margin:0 0 14px;font-size:14px}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 16px}
+.fig{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px;margin:10px 0;overflow-x:auto}
+svg{display:block;width:100%;min-width:760px;height:auto}
+svg text{font-family:-apple-system,"Segoe UI",Helvetica,sans-serif;fill:var(--text)}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+svg .dim{fill:var(--dim)}svg .g{fill:var(--green)}svg .r{fill:var(--red)}svg .o{fill:var(--orange)}
+svg .t{font-size:13px;font-weight:600}
+svg a text{text-decoration:underline;fill:var(--accent)}
+svg .box{fill:var(--bg);stroke:var(--border);stroke-width:1.2}
+svg .boxr{fill:var(--bg);stroke:var(--red);stroke-width:1.6}
+svg .boxg{fill:var(--bg);stroke:var(--green);stroke-width:1.6}
+svg .proc{fill:none;stroke:var(--dim);stroke-dasharray:5 4}
+svg .arr{stroke:var(--dim);stroke-width:1.5;fill:none;marker-end:url(#ah)}
+svg #ah path{fill:var(--dim)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--surface2)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.hl{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:16px 0}
+.cref{margin:4px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:3px 9px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How one Megatron rollout reaches the engine: directly, or through the Dynamo frontend</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">PR #5025</a> (part 5 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a>) · permalinks at head <code>e85af6c2</code>, base <code>ea1a6e22</code></p>
+
+<div class="status"><dl>
+  <dt>Before</dt><dd>With <code>backend: megatron</code> and <code>dynamo: true</code>, startup refused the config: the prefill and decode engines were built and registered with the Dynamo frontend, but nothing sent them rollouts.</dd>
+  <dt>This PR</dt><dd>Turns the switch on. Each rollout is posted to the frontend as one HTTP completion request with token IDs in and token IDs plus log-probabilities out.</dd>
+  <dt>Status</dt><dd><span class="verdict open">New path, turned on by this PR. Review open.</span> The output matches the direct path where the trainer reads it. The open items are a wrong startup error for Gym configs (C7) and no CI run of the new path (C8). See the end of the page.</dd>
+</dl></div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-dynamo-paths.html">#4801 · where the switch sits</a>
+  <span class="here">#5025 · direct vs. through Dynamo</span>
+</nav>
+<p class="chainnote">One page for this PR. The left chip is the page for part 1 of the same stack.</p>
+
+<p class="bg"><b>Background.</b> A <i>rollout</i> is one prompt sent to the inference engine to get a completion back, with the log-probability of each new token. <span class="tip" tabindex="0" data-tip="Dynamo is NVIDIA's serving layer. Its frontend is an OpenAI-style HTTP server that routes each request to a registered engine.">Dynamo</span>'s frontend can split one request across two engines: a <i>prefill</i> engine reads the prompt and builds its KV cache, then hands that cache to a <i>decode</i> engine over <span class="tip" tabindex="0" data-tip="NVIDIA's GPU-to-GPU transfer library. Here it copies the prompt's KV cache from the prefill engine to the decode engine.">NIXL</span>, which writes the answer. PRs 1–4 of this stack built those engines. Dotted words have a short explanation: hover or tap them.</p>
+
+<h2>Two paths to one Megatron rollout</h2>
+<p>Both paths start from the same call, <code>generate_async</code>, made by the trainer's rollout loop for one prompt. The direct path makes a <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/megatron_generation.py#L618-L638">Ray call to one Megatron worker</a>, which runs prefill and decode in one engine. The new path builds an OpenAI completion request in <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L309-L362"><code>generate_through_frontend</code></a> and posts it over HTTP. The two meet again in the rollout loop, which reads only the new tokens and their log-probabilities. The example below is the PR's own unit test: prompt <code>[1, 2, 3]</code> padded to 4, one new token <code>8</code> with log-probability <code>-0.5</code>.</p>
+
+<div class="fig">
+<svg viewBox="0 0 960 660" role="img" aria-label="Two lanes: direct Megatron path and Dynamo frontend path, meeting in the rollout loop">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z"/></marker></defs>
+<text x="20" y="24" class="t">Direct: backend: megatron (one engine)</text>
+<text x="490" y="24" class="t">This PR: megatron + dynamo: true (prefill → decode)</text>
+<rect class="proc" x="12" y="34" width="460" height="104"/>
+<rect class="proc" x="482" y="34" width="466" height="104"/>
+<text x="20" y="50" class="dim" font-size="11">driver process (rollout loop)</text>
+<text x="490" y="50" class="dim" font-size="11">driver process (rollout loop)</text>
+<rect class="box" x="20" y="58" width="444" height="72" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/megatron_generation.py#L618"><text x="30" y="78" class="t">① MegatronGeneration.generate_async</text></a>
+<text x="30" y="98" class="mono">in: input_ids [[1,2,3,0]]  input_lengths [3]</text>
+<text x="30" y="117" class="mono dim">→ Ray streaming call to worker 0</text>
+<rect class="box" x="490" y="58" width="450" height="72" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_generation.py#L1115"><text x="500" y="78" class="t">① MegatronDynamoGeneration.generate_async</text></a>
+<text x="500" y="98" class="mono">in: input_ids [[1,2,3,0]]  input_lengths [3]</text>
+<text x="500" y="117" class="mono dim">→ generate_through_frontend(), one prompt</text>
+<path class="arr" d="M242,130 V162"/><path class="arr" d="M715,130 V162"/>
+<rect class="proc" x="12" y="150" width="460" height="246"/>
+<text x="20" y="166" class="dim" font-size="11">Megatron worker (Ray actor, GPU)</text>
+<text x="490" y="166" class="dim" font-size="11">still the driver: builds the HTTP body</text>
+<rect class="box" x="20" y="172" width="444" height="76" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/megatron_worker.py#L1283-L1314"><text x="30" y="192" class="t">② _build_sampling_params</text></a>
+<text x="30" y="212" class="mono">SamplingParams(temperature=1.0, top_k=0,</text>
+<text x="30" y="230" class="mono">  top_p=1.0, num_tokens=16, termination_id=eod)</text>
+<rect class="box" x="490" y="172" width="450" height="76" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L230-L256"><text x="500" y="192" class="t">② completion_payload</text></a>
+<text x="500" y="212" class="mono">{prompt:[1,2,3], max_tokens:2, temperature:1.0,</text>
+<text x="500" y="230" class="mono">  top_k:-1, logprobs:0, stop_token_ids:[2]}</text>
+<path class="arr" d="M242,248 V280"/>
+<path class="arr" d="M715,248 V280"/>
+<text x="722" y="268" class="mono o" font-size="10">POST /v1/completions, ≤3 tries</text>
+<rect class="box" x="20" y="286" width="444" height="98" rx="6"/>
+<text x="30" y="306" class="t">③ one Megatron engine: prefill + decode</text>
+<text x="30" y="328" class="mono">generated_tokens    [8]</text>
+<text x="30" y="347" class="mono">generated_log_probs [-0.5]</text>
+<text x="30" y="370" class="mono dim">no HTTP, no retry</text>
+<rect class="proc" x="482" y="280" width="466" height="116"/>
+<text x="490" y="296" class="dim" font-size="11">Dynamo frontend process + 2 engine worker groups (GPU)</text>
+<rect class="box" x="490" y="302" width="104" height="34" rx="5"/><text x="500" y="324" font-size="12">frontend</text>
+<path class="arr" d="M594,319 H620"/>
+<rect class="box" x="622" y="302" width="104" height="34" rx="5"/><text x="632" y="324" font-size="12">prefill engine</text>
+<path class="arr" d="M726,319 H752"/>
+<text x="729" y="312" class="mono dim" font-size="9">KV/NIXL</text>
+<rect class="box" x="754" y="302" width="104" height="34" rx="5"/><text x="764" y="324" font-size="12">decode engine</text>
+<text x="500" y="356" class="mono">{choices:[{finish_reason:"stop", logprobs:</text>
+<text x="500" y="374" class="mono">  {token_logprobs:[-0.5]}}], nvext:{completion_token_ids:[8]}}</text>
+<path class="arr" d="M242,396 V420"/><path class="arr" d="M715,396 V420"/>
+<rect class="box" x="20" y="424" width="444" height="96" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/megatron_worker.py#L1385-L1465"><text x="30" y="444" class="t">④ _parse_result_to_batched_data_dict</text></a>
+<text x="30" y="464" class="mono">output_ids [[1,2,3,8,0]]   width 4 padded + 1</text>
+<text x="30" y="483" class="mono">logprobs   [[0,0,0,-0.5,0]]</text>
+<text x="30" y="502" class="mono">unpadded_sequence_lengths [4]   (no truncated)</text>
+<rect class="boxr" x="490" y="424" width="450" height="96" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L259-L306"><text x="500" y="444" class="t">④ parse_completion_response + single_sample_output</text></a>
+<text x="500" y="464" class="mono">output_ids [[1,2,3,8]]     width 3 + 1</text>
+<text x="500" y="483" class="mono">logprobs   [[0,0,0,-0.5]]</text>
+<text x="500" y="502" class="mono">unpadded_sequence_lengths [4]   <tspan class="r">truncated [False]</tspan></text>
+<path class="arr" d="M242,520 V556"/><path class="arr" d="M715,520 V556"/>
+<rect class="boxg" x="20" y="560" width="920" height="66" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/experience/rollout_manager.py#L927-L937"><text x="30" y="582" class="t">⑤ both meet in the rollout loop (rollout_manager.py)</text></a>
+<text x="30" y="604" class="mono">output_ids[0, 3:4] → [8]     logprobs[0, 3:4] → [-0.5]     same on both paths</text>
+<text x="30" y="648" font-size="11.5"><tspan class="g">■ green</tspan> = the two paths agree here   <tspan class="r">■ red</tspan> = differs between the paths   <tspan class="dim">dashed box = one OS process or group of them</tspan></text>
+</svg>
+</div>
+<p class="pcref"><code>max_tokens:2</code> is the configured 16 cut to what fits: the test's <code>max_model_len</code> is 5 and the prompt is 3 tokens (<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L218-L227"><code>allowed_new_tokens</code></a>). <code>top_k:-1</code> and <code>top_k=0</code> both mean "off" in their own API.</p>
+
+<h2>The change, as pseudocode</h2>
+<p class="pclbl">Rollout call, before (#5024)</p>
+<pre class="pc"><span class="who"># driver, rollout event loop</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1094">generate_async</a>(data):
+    raise NotImplementedError("do not serve rollouts yet")</pre>
+<p class="pclbl">Rollout call, after</p>
+<pre class="pc"><span class="who"># driver, rollout event loop; one call per prompt, many run at once</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_generation.py#L1115-L1129">generate_async</a>(data):
+<span class="del">    raise NotImplementedError("do not serve rollouts yet")</span>
+<span class="add">    if data is empty: return</span>
+<span class="add">    url = dp_openai_server_base_urls[0]</span>                  <span class="cm"># the frontend's /v1 URL</span>
+<span class="add">    out = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L309-L362">generate_through_frontend</a>(cfg, url, data)</span>
+<span class="add">    out["gen_leader_worker_idx"] = [0]</span>                    <span class="cm"># same as the direct path</span>
+<span class="add">    yield 0, out</span>
+
+<span class="who"># generate_through_frontend, same event loop</span>
+<span class="add">body = <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L230-L256">completion_payload</a>(prompt ids, max_tokens = min(16, 5 - 3))</span>
+<span class="add">for attempt in 1..3:</span>                                    <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L180-L197">post_completion</a></span>
+<span class="add">    resp = await POST url + "/completions"</span>               <span class="cm"># new aiohttp session each try</span>
+<span class="add">    if not <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L100-L109">is_retryable</a>(resp): break</span>                <span class="cm"># C12: own status list; timeouts retried</span>
+<span class="add">    sleep 1 s</span>
+<span class="add">ids, lps, truncated = parse(resp)</span>                      <span class="cm"># nvext.completion_token_ids, token_logprobs</span>
+<span class="add">return single_sample_output(...)</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L62-L85"><code>async_http_post_json</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L112-L177"><code>parse_completion_response</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L259-L306"><code>single_sample_output</code></a>. The vLLM Dynamo path already has its own client for this in <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/dynamo/rollout_client.py#L37-L162"><code>rollout_client.py</code></a>.</p>
+
+<p class="pclbl">Startup check, before → after</p>
+<pre class="pc"><span class="who"># driver, setup_single_controller(), before anything is built</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/algorithms/single_controller_utils/setup.py#L1173">validate_single_controller_config</a>(cfg)                 <span class="cm"># C7: its penalty checks call should_use_nemo_gym()</span>
+...
+if token_capture.enabled and not <a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/algorithms/single_controller_utils/setup.py#L1447-L1452">should_use_nemo_gym</a>(cfg): …  <span class="cm"># C7: asserts expose_http_server first</span>
+...
+<span class="add">MegatronDynamoGeneration.<a href="https://github.com/NVIDIA-NeMo/RL/blob/e85af6c241b5fb00995f462d5ea78ed0c25c1ca9/nemo_rl/models/generation/megatron/dynamo_generation.py#L332-L373">validate_settings</a>(cfg)</span>       <span class="cm"># moved up from after the Gym check</span>
+<span class="del">    raise NotImplementedError("not served by MegatronGeneration yet")</span>
+<span class="add">    if env.should_use_nemo_gym:            raise NotImplementedError</span>  <span class="cm"># follow-up PR 6</span>
+<span class="add">    if policy.is_vlm:                       raise ValueError</span>
+<span class="add">    if router_replay:                       raise ValueError</span>          <span class="cm"># kept from #5024</span>
+<span class="add">    if storage units on "inference":        raise ValueError</span>
+use_nemo_gym = should_use_nemo_gym(cfg)</pre>
+
+<h2>Where they meet, and what still differs</h2>
+<p>The trainer only reads <code>output_ids</code> and <code>logprobs</code> between the prompt length and <code>unpadded_sequence_lengths</code>, so the narrower output width on the Dynamo path changes nothing. These do differ after the two paths meet:</p>
+<table>
+<tr><th>What</th><th>Direct</th><th>Through Dynamo</th></tr>
+<tr><td><code>truncated</code></td><td>not set</td><td>set from <code>finish_reason == "length"</code> (noted in the author's own review)</td></tr>
+<tr><td><code>ignore_eos: true</code></td><td>honoured with <code>termination_id=-1</code></td><td>dropped from the request (open thread)</td></tr>
+<tr><td>a failed request</td><td>a Ray error</td><td>retried up to 3 times, timeouts too, using its own list of retryable statuses (C12)</td></tr>
+<tr><td>CI</td><td>run in L1</td><td>functional test written, not in any lane (C8)</td></tr>
+</table>
+
+<div class="hl"><b>So what.</b> The new path gives the trainer the same tokens and log-probabilities as the direct one, so a reviewer can judge it as "the same rollout, over HTTP". Before merge: run the 3-GPU functional test and add it to L1, since the pinned Megatron-LM already has the Dynamo integration (C8). Move the startup check to the start of setup, so Gym configs get the clear error (C7). Reuse the vLLM path's HTTP client instead of a copy that has already drifted (C12).</div>
+<div id="crefs"></div>
+
+</div>
+</body>
+</html>
