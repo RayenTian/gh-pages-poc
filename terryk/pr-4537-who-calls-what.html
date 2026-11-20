@@ -191,15 +191,15 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <text class="d" x="26" y="852" text-anchor="start">(teachers force mode=disabled; reference reuses ⑤–⑧ with other weights)</text>
 <path class="tqr" d="M10,222 L10,834 L15,834"/>
 <text class="tr" x="12" y="850" text-anchor="start">R</text>
-<text class="colh" x="560" y="24" text-anchor="start">Proposed: after C11, C13, C14, C17</text>
+<text class="colh" x="560" y="24" text-anchor="start">Proposed: after C11, C13, C14, C17, C19</text>
 <text class="n" x="560" y="41" text-anchor="start">nothing here is implemented, except the RL#30 draft</text>
 <rect class="panel" x="560" y="52" width="508" height="92" rx="9"/>
 <text class="h" x="570" y="68" text-anchor="start">Rollout reassembler (Ray actor, CPU) × N</text>
 <rect class="pro" x="572" y="76" width="484" height="60" rx="6"/>
-<text class="t" x="580" y="92" text-anchor="start">SharedPrefixRolloutReassembler(RolloutReassembler)</text>
-<text class="d" x="580" y="106" text-anchor="start">② picked by token_capture.reassembler, like selection_policy</text>
+<text class="t" x="580" y="92" text-anchor="start">RolloutReassembler (no flag, no subclass)</text>
+<text class="d" x="580" y="106" text-anchor="start">② always writes a few ints per row; packing reads them</text>
 <text class="d" x="580" y="119" text-anchor="start">② adds prompt_len, slot, parent, shared_len per row</text>
-<a href="https://github.com/terrykong/RL/blob/9cf50d9fcb1240484c3867245808f03b136b709b/nemo_rl/experience/shared_prefix_reassembler.py"><text x="580" y="131">shared_prefix_reassembler.py (RL#30)</text></a>
+<a href="https://github.com/terrykong/RL/blob/9cf50d9fcb1240484c3867245808f03b136b709b/nemo_rl/data/packing/shared_prefix_metadata.py"><text x="580" y="131">column format: RL#30 shared_prefix_metadata.py</text></a>
 <rect class="tqb" x="560" y="160" width="508" height="62" rx="6"/>
 <text class="t" x="570" y="176" text-anchor="start">TQ (data-plane storage): one dense row per completion</text>
 <text class="d" x="570" y="191" text-anchor="start">input_ids · token_mask · logprobs · group_id tag  (unchanged)</text>
@@ -268,7 +268,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <h2>What the figure answers</h2>
 <table>
 <tr><th>Question</th><th>This PR</th><th>Proposed</th></tr>
-<tr><td>Who starts the reassembler?</td><td colspan="2">Single-controller setup, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/algorithms/single_controller_utils/setup.py#L2439-L2450">create_rollout_reassembler_actors</a>. Today it passes a flag; proposed, the config names the class.</td></tr>
+<tr><td>Who starts the reassembler?</td><td colspan="2">Single-controller setup, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/algorithms/single_controller_utils/setup.py#L2439-L2450">create_rollout_reassembler_actors</a>. Today setup passes it a flag; proposed, it always writes the columns and needs no packing setting.</td></tr>
 <tr><td>What crosses into TQ?</td><td>Dense rows + 1 int per row</td><td>Dense rows + 4 ints per row (the tree)</td></tr>
 <tr><td>Does the value model or a teacher see a different row shape?</td><td colspan="2">No. Both read the same dense rows. The value worker never fetches the new columns (<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/value/tq_value.py#L127">tq_value.py</a>), and teachers force sharing off (<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/teacher_worker_group.py#L208">teacher_worker_group.py</a>).</td></tr>
 <tr><td>Who decides which rows share?</td><td>The Megatron worker, again, from prompt tokens</td><td>The reassembler, once, from the calls' parent links (<a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4611142845">C11</a>)</td></tr>
