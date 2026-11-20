@@ -93,10 +93,12 @@ svg .time{stroke:var(--dim);stroke-width:1}
 <h1>How streaming training gets the right average when one step arrives in pieces</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4946">PR #4946</a> · refactor(loss) · permalinks pinned to <a href="https://github.com/NVIDIA-NeMo/RL/tree/d01c03a5d4481eb1635b48c3e0f08b88fa715082"><code>d01c03a5</code></a></p>
 <nav class="chain">
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-one-reducer.html">1 · one reducer</a>
-  <span class="here">2 · streaming average</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-one-reducer.html">1 · one reducer (#4946)</a>
+  <span class="here">2 · streaming average (#4946)</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4947-group-token-mean.html">3 · group average (#4947)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5276-remove-token-level-loss.html">4 · old key removed (#5276)</a>
 </nav>
-<p class="chainnote">Two pages on this PR — this one: how the step that arrives in pieces gets the right average.</p>
+<p class="chainnote">Four pages on #4946 and the two PRs stacked after it — this one: how a step that arrives in pieces gets the right average.</p>
 <div class="status"><dl>
 <dt>Before</dt><dd>Streaming training already existed. Each chunk trained with a divisor of 1, the worker added up token and response counts, and at the end of the step it picked one with its own copy of <code>if loss_type == TOKEN_LEVEL</code>.</dd>
 <dt>This PR</dt><dd>The reducer from <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-one-reducer.html">page 1</a> now counts each chunk and picks the end-of-step divisor. The logged loss and KL use that same divisor. MoE router losses under <code>sequence_mean</code> are now rejected at startup.</dd>
@@ -226,7 +228,7 @@ seqs, toks, <span class="add">objective</span> = <a href="https://github.com/NVI
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2447">grads *= 1 / n</a>;  optimizer.step()
 log loss, kl × 1 / <span class="add">R.loss_divisor(…)</span>                                 <span class="cm"># was: TOKENS or SEQUENCES</span></pre>
 <p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2189"><code>_train_microbatch_body</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2394"><code>_finish_train_step_body</code></a>.
-For token mean and sequence mean, <code>objective</code> always equals <code>toks</code> or <code>seqs</code>, and <code>loss_divisor</code> ignores it. It, and the <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/wrapper.py#L49"><code>StreamingObjectiveLoss</code></a> wrapper, are there for the group average in <a href="https://github.com/NVIDIA-NeMo/RL/pull/4947">#4947</a>, whose divisor is neither count.</p>
+For token mean and sequence mean, <code>objective</code> always equals <code>toks</code> or <code>seqs</code>, and <code>loss_divisor</code> ignores it. It, and the <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/wrapper.py#L49"><code>StreamingObjectiveLoss</code></a> wrapper, are there for the group average in <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4947-group-token-mean.html">#4947</a>, whose divisor is neither count.</p>
 
 <h2>Why MoE router losses are rejected under <code>sequence_mean</code></h2>
 <p>MoE models add small router losses that keep experts balanced. Megatron adds their gradients into the same layers during each chunk's backward pass. At the end, step ④ multiplies <i>every</i> gradient by 1/n. The router losses are summed over tokens, so they need n = tokens (<a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L66"><code>token_normalized</code></a>). Under token mean that is what they get. Under sequence mean they get n = responses: in the example, divided by 3 instead of 11, so about 3.7× too strong.</p>

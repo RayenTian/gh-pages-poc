@@ -79,15 +79,17 @@ svg a text,svg .lnk{text-decoration:underline;fill:var(--accent);font:11.5px ui-
 <h1>How the policy loss picks its average: one reducer object replaces five copies of the same <code>if</code></h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4946">PR #4946</a> · refactor(loss) · follow-up <a href="https://github.com/NVIDIA-NeMo/RL/pull/4947">#4947</a> adds a third average · permalinks pinned to <a href="https://github.com/NVIDIA-NeMo/RL/tree/d01c03a5d4481eb1635b48c3e0f08b88fa715082"><code>d01c03a5</code></a></p>
 <nav class="chain">
-  <span class="here">1 · one reducer</span>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-streaming-average.html">2 · streaming average</a>
+  <span class="here">1 · one reducer (#4946)</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-streaming-average.html">2 · streaming average (#4946)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4947-group-token-mean.html">3 · group average (#4947)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5276-remove-token-level-loss.html">4 · old key removed (#5276)</a>
 </nav>
-<p class="chainnote">Two pages on this PR — this one: where the averaging code lives now.</p>
+<p class="chainnote">Four pages on #4946 and the two PRs stacked after it — this one: where the averaging code lives now.</p>
 
 <div class="status"><dl>
 <dt>Before</dt><dd><code>loss_fn.token_level_loss: true/false</code> picked the average. Five places each had their own copy of the same <code>if token … else sequence …</code> branch.</dd>
-<dt>This PR</dt><dd>A new key, <code>loss_fn.normalization</code>, picks one reducer object. All five places now call it. The old key still works but warns.</dd>
-<dt>Status</dt><dd><span class="verdict good">Refactor — same numbers before and after.</span> Open and approved. It adds two startup checks that stop runs which used to go wrong quietly (table at the bottom).</dd>
+<dt>This PR</dt><dd>A new key, <code>loss_fn.normalization</code>, picks one reducer object. All five places now call it. The old key still works but warns; <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5276-remove-token-level-loss.html">#5276</a> proposes removing it.</dd>
+<dt>Status</dt><dd><span class="verdict good">Refactor — same numbers before and after.</span> Merged on 2026-11-20. It adds two startup checks that stop runs which used to go wrong quietly (table at the bottom).</dd>
 </dl></div>
 
 <div class="bg">
@@ -175,14 +177,14 @@ log loss, kl ÷ <span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blo
 <h2>What a user sees</h2>
 <div class="tw"><table>
 <tr><th>Case</th><th>Before</th><th>After</th></tr>
-<tr><td>Config</td><td><code>token_level_loss: true</code></td><td><code>normalization: global_token_mean</code> (the default) or <code>sequence_mean</code>. The <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L280">old key still works</a> but gives a <code>FutureWarning</code>; setting both is an error.</td></tr>
+<tr><td>Config</td><td><code>token_level_loss: true</code></td><td><code>normalization: global_token_mean</code> (the default) or <code>sequence_mean</code>. The <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L280">old key still works</a> but gives a <code>FutureWarning</code>; setting both is an error. <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5276-remove-token-level-loss.html">#5276</a> turns it into a startup error.</td></tr>
 <tr><td>MoE model with router balancing loss or z-loss, <code>sequence_mean</code>, single-controller Megatron</td><td>Trained, but with the wrong scale on the router losses' gradients: the end-of-step divide uses the response count, which is meant for the main loss only.</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1948">Fails at startup</a> with a message naming the coefficient to set to 0. Dense models and the synchronous <code>train()</code> path are not affected.</td></tr>
 <tr><td>Resume in the same <code>checkpoint_dir</code> with the other average</td><td>Resumed with buffered rollouts prepared for the old average.</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/single_controller_utils/setup.py#L351">Fails at startup</a>. Starting a new run from the weights still works. Checkpoints saved before this PR do not record the average, so they are not checked.</td></tr>
 <tr><td>Logged <code>loss</code> and <code>kl</code></td><td>Divided by tokens or responses, picked from <code>loss_type</code>.</td><td>Divided by <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L588"><code>LOSS_DIVISOR</code></a>: always the same number that divided the gradient.</td></tr>
 </table></div>
 
 <div class="hl"><b>So what.</b> Nothing about training changes for existing configs: same averages, same gradients, checked against the old formulas and on GPU at DP2 and TP2.
-The value is the next step. A new average (<a href="https://github.com/NVIDIA-NeMo/RL/pull/4947">#4947</a> adds a group average) now means writing one subclass, not finding and editing five branches.
+The value is the next step. A new average (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4947-group-token-mean.html">#4947</a> adds a group average) now means writing one subclass, not finding and editing five branches.
 If you run MoE with <code>sequence_mean</code> on the single-controller path, set the router loss coefficients to 0 before you update.</div>
 </div>
 </body>
