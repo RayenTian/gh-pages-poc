@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PR 5318: copies and cycle</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);margin:0;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:24px;line-height:1.3;margin:0 0 6px}
+h2{font-size:18px;margin:30px 0 8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface2);padding:1px 5px;border-radius:4px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 16px}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}
+.box{border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:8px;background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.box.fast{border-left-color:var(--green)}
+.box p{margin:6px 0}
+.box table{border-collapse:collapse;font-size:13px;margin:6px 0}
+.box td,.box th{border-bottom:1px solid var(--border);padding:3px 10px 3px 0;text-align:left}
+.box th{color:var(--dim);font-weight:600}
+.num{text-align:right!important;font-variant-numeric:tabular-nums}
+.fig{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px;margin:10px 0;overflow-x:auto}
+.fig svg{width:100%;min-width:640px;height:auto;display:block}
+svg text{fill:var(--text);font:13px -apple-system,sans-serif}
+svg .lane{font-weight:700;font-size:14px;fill:var(--dim)}
+svg .ev{font-weight:600;font-size:13px}
+svg .note{font-size:12px}
+svg .dim{fill:var(--dim)}
+svg .mono{font:12px ui-monospace,Menlo,monospace}
+svg .fn{font:14px ui-monospace,Menlo,monospace}
+svg .ok,svg .good{fill:var(--green)}
+svg .bad{fill:var(--red)}
+svg .tot{font-size:13px;font-weight:600}
+svg a text{text-decoration:underline}
+svg rect.red{fill:var(--red)}svg rect.gray{fill:var(--dim)}
+svg rect.empty{fill:none;stroke:var(--dim);stroke-dasharray:3 2}
+svg rect.copybox{fill:none;stroke:var(--red)}
+svg rect.okbox{fill:none;stroke:var(--green)}
+svg rect.fnbox{fill:var(--surface2);stroke:var(--border)}
+svg rect.cellbox{fill:var(--surface2);stroke:var(--green)}
+svg rect.heldbox{fill:none;stroke:var(--red);stroke-dasharray:4 3}
+svg line.rule{stroke:var(--border)}
+svg path.bad{stroke:var(--red);stroke-width:2;fill:none}
+svg path.good{stroke:var(--green);stroke-width:2;fill:none}
+svg path.cut{stroke:var(--red);stroke-width:2;stroke-dasharray:5 4;fill:none}
+svg .cutx{fill:var(--red);font-size:18px;font-weight:700}
+svg .arh{fill:var(--red)}svg .agh{fill:var(--green)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.hl{border:1px solid var(--green);border-radius:10px;background:var(--surface);padding:10px 16px;margin:26px 0 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head><body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+function wire(){var b=document.getElementById('theme-toggle');if(!b)return;b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+<h1>Why finished rollouts got cheaper: no group copies to read an ID, and no closure loop holding results</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5318">PR #5318</a> · links pinned to head <code>af39398</code> (before-code at base <code>bf50129</code>)</p>
+
+<div class="status"><dl>
+<dt>Before</dt><dd>Each finished sibling made a full deep copy of its prompt group just to read one ID. Finished results also stayed in memory until Python's cyclic garbage collector ran.</dd>
+<dt>This PR</dt><dd>Adds two small ledger reads that return just the strings, and cuts the function loop in the stream code once all streams end.</dd>
+<dt>Status</dt><dd><span class="verdict good">Fixed by this PR.</span> One smaller copy is left on the forest-training path (review comment C1).</dd>
+</dl></div>
+
+<div class="box"><b>Background.</b> The rollout manager keeps a <span class="tip" tabindex="0" data-tip="RolloutRecoveryLedger: one record per prompt group, so a checkpoint can save and later resume unfinished rollouts.">recovery ledger</span>. Each record has one entry per <span class="tip" tabindex="0" data-tip="One sampled answer for the prompt. A group of 16 siblings is 16 answers to one prompt.">sibling</span>. When a sibling finishes, its entry is <i>sealed</i>: it gets a <span class="tip" tabindex="0" data-tip="A dict that says where this answer&#x27;s captured tokens are staged. It grows with the answer, so copying it is not free.">receipt</span>. <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_recovery.py#L1705"><code>get_group()</code></a> returns a <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_recovery.py#L2174">deep copy</a> of the record, so callers cannot change the ledger by mistake. Dotted words have a short note: hover or tap them.</div>
+
+<div class="box fast"><b>Why it should be faster.</b>
+<p>The old code deep-copied the whole sibling list, receipts included, to read one string. Sibling <i>k</i> copied <i>k</i> sealed receipts, so a group of 16 copied 0+1+…+15 = 120 receipts for ID checks alone, plus 2 full copies at finalize. The new reads touch only the strings. The one receipt copy per sibling that the finalize request needs stays.</p>
+<p>The loop fix does not save compute. It lets finished results be freed as soon as the streams end, instead of piling up until the garbage collector runs, which costs time at high concurrency.</p>
+<table><tr><th>Author's measurement (CPU only, prototype stack, not this head)</th><th class="num">Before</th><th class="num">After</th></tr>
+<tr><td>Just the ID and name reads, 8,192 groups × 16 siblings</td><td class="num">100.46 s</td><td class="num">0.27 s</td></tr>
+<tr><td>Env checkpoint scope, 131k rollouts, 1st snapshot</td><td class="num">21.38 s</td><td class="num">21.17 s</td></tr>
+<tr><td>Same, 3rd snapshot (both fixes together)</td><td class="num">205.60 s</td><td class="num">58.09 s</td></tr></table>
+<p><b>Ceiling:</b> no GPU, network, or tensor work changes. The first snapshot shows no gain, because little has piled up yet. The new path never does more work than the old one: it adds only a bounds check.</p></div>
+
+<h2>1 · Reading an ID no longer copies the group</h2>
+<p>Example: one prompt group with 4 siblings. <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L3129"><code>_record_streamed_completion</code></a> runs once as each sibling finishes and checks that the stream's rollout ID matches the ledger's. When the last one seals, it builds the finalize request and reads the agent name and attribution key.</p>
+<div class="fig"><svg viewBox="0 0 940 300" role="img" aria-label="Copies per event, before and after"><text class="lane" x="14" y="62">Before</text><text class="lane" x="14" y="200">After</text><text class="ev" x="130" y="22">s0 done</text><rect class="copybox" x="124" y="40" width="92" height="30" rx="5"/><rect class="empty" x="130" y="47" width="16" height="16" rx="3"/><rect class="empty" x="150" y="47" width="16" height="16" rx="3"/><rect class="empty" x="170" y="47" width="16" height="16" rx="3"/><rect class="empty" x="190" y="47" width="16" height="16" rx="3"/><text class="note" x="130" y="90">1 group copy,</text><text class="note" x="130" y="104">0 receipts copied</text><rect class="okbox" x="124" y="180" width="92" height="30" rx="5"/><text class="mono ok" x="132" y="200">"g7_g0_a…"</text><text class="note" x="130" y="230">reads 1 string</text><text class="ev" x="260" y="22">s1 done</text><rect class="copybox" x="254" y="40" width="92" height="30" rx="5"/><rect class="red" x="260" y="47" width="16" height="16" rx="3"/><rect class="empty" x="280" y="47" width="16" height="16" rx="3"/><rect class="empty" x="300" y="47" width="16" height="16" rx="3"/><rect class="empty" x="320" y="47" width="16" height="16" rx="3"/><text class="note" x="260" y="90">1 group copy,</text><text class="note" x="260" y="104">1 receipt copied</text><rect class="okbox" x="254" y="180" width="92" height="30" rx="5"/><text class="mono ok" x="262" y="200">"g7_g1_a…"</text><text class="note" x="260" y="230">reads 1 string</text><text class="ev" x="390" y="22">s2 done</text><rect class="copybox" x="384" y="40" width="92" height="30" rx="5"/><rect class="red" x="390" y="47" width="16" height="16" rx="3"/><rect class="red" x="410" y="47" width="16" height="16" rx="3"/><rect class="empty" x="430" y="47" width="16" height="16" rx="3"/><rect class="empty" x="450" y="47" width="16" height="16" rx="3"/><text class="note" x="390" y="90">1 group copy,</text><text class="note" x="390" y="104">2 receipts copied</text><rect class="okbox" x="384" y="180" width="92" height="30" rx="5"/><text class="mono ok" x="392" y="200">"g7_g2_a…"</text><text class="note" x="390" y="230">reads 1 string</text><text class="ev" x="520" y="22">s3 done</text><rect class="copybox" x="514" y="40" width="92" height="30" rx="5"/><rect class="red" x="520" y="47" width="16" height="16" rx="3"/><rect class="red" x="540" y="47" width="16" height="16" rx="3"/><rect class="red" x="560" y="47" width="16" height="16" rx="3"/><rect class="empty" x="580" y="47" width="16" height="16" rx="3"/><text class="note" x="520" y="90">1 group copy,</text><text class="note" x="520" y="104">3 receipts copied</text><rect class="okbox" x="514" y="180" width="92" height="30" rx="5"/><text class="mono ok" x="522" y="200">"g7_g3_a…"</text><text class="note" x="520" y="230">reads 1 string</text><text class="ev" x="680" y="22">finalize (all 4 sealed)</text><rect class="copybox" x="674" y="40" width="92" height="30" rx="5"/><rect class="red" x="680" y="47" width="16" height="16" rx="3"/><rect class="red" x="700" y="47" width="16" height="16" rx="3"/><rect class="red" x="720" y="47" width="16" height="16" rx="3"/><rect class="red" x="740" y="47" width="16" height="16" rx="3"/><rect class="copybox" x="774" y="40" width="92" height="30" rx="5"/><rect class="red" x="780" y="47" width="16" height="16" rx="3"/><rect class="red" x="800" y="47" width="16" height="16" rx="3"/><rect class="red" x="820" y="47" width="16" height="16" rx="3"/><rect class="red" x="840" y="47" width="16" height="16" rx="3"/><text class="note" x="680" y="90">2 more group copies (agent name,</text><text class="note" x="680" y="104">attribution key): 8 receipts</text><rect class="okbox" x="674" y="180" width="192" height="30" rx="5"/><text class="mono ok" x="682" y="200">("agent", "dataset:train")</text><text class="note" x="680" y="230">reads 2 strings, no copy</text><text class="note dim" x="680" y="125">+</text><rect class="gray" x="692" y="112" width="16" height="16" rx="3"/><rect class="gray" x="712" y="112" width="16" height="16" rx="3"/><rect class="gray" x="732" y="112" width="16" height="16" rx="3"/><rect class="gray" x="752" y="112" width="16" height="16" rx="3"/><text class="note dim" x="780" y="126">kept: 1 per receipt</text><text class="note dim" x="680" y="262">+ same 4 kept copies</text><line class="rule" x1="14" y1="140" x2="926" y2="140"/><text class="tot bad" x="14" y="160">Before: 6 group copies, 14 receipts copied just to read IDs and names. The count grows with the square of the group size.</text><text class="tot good" x="14" y="286">After: 0 group copies on this path. Only the 4 copies the finalize request needs are left.</text><rect class="red" x="560" y="246" width="12" height="12" rx="2"/><text class="note" x="578" y="257">receipt copied for nothing</text><rect class="gray" x="740" y="246" width="12" height="12" rx="2"/><text class="note" x="758" y="257">copy kept on purpose</text><rect class="empty" x="440" y="246" width="12" height="12" rx="2"/><text class="note" x="458" y="257">not sealed yet</text></svg></div>
+<p class="pclbl">Before</p><pre class="pc"><span class="who"># rollout pump, one event loop. Runs once per finished sibling.</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L3112">_record_streamed_completion</a>(group, i, gate_id):
+    rec = ledger.<a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_recovery.py#L1705">get_group</a>(group)                        <span class="cm"># deep-copies every sibling and receipt</span>
+    if gate_id != rec.<a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L3153">gate_rollout_id</a>(i): raise          <span class="cm"># ...to read one string</span>
+    ...
+<span class="who">    # last sibling sealed: build the finalize request</span>
+    inputs = ledger.<a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_recovery.py#L1605">finalization_inputs</a>(group)           <span class="cm"># copies each receipt once, on purpose</span>
+    agent = ledger.<a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L3288">get_group</a>(group).resolved_agent_name  <span class="cm"># full copy again</span>
+    key   = ledger.<a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L3291">get_group</a>(group).attribution_key      <span class="cm"># and again</span></pre>
+<p class="pclbl">After</p><pre class="pc"><span class="who"># rollout pump, one event loop. Same callers, same order.</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L3129">_record_streamed_completion</a>(group, i, gate_id):
+<span class="del">    rec = ledger.get_group(group)</span>
+<span class="add">    if gate_id != ledger.<a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_recovery.py#L1708">current_gate_rollout_id</a>(group, i): raise</span>  <span class="cm"># one string, no copy</span>
+    ...
+    inputs = ledger.<a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L3281">finalization_inputs</a>(group)                     <span class="cm"># unchanged</span>
+<span class="del">    agent = ledger.get_group(group).resolved_agent_name</span>
+<span class="del">    key   = ledger.get_group(group).attribution_key</span>
+<span class="add">    agent, key = ledger.<a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_recovery.py#L1714">finalization_routing</a>(group)</span>                <span class="cm"># two strings, no copy</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_recovery.py#L1708"><code>current_gate_rollout_id</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_recovery.py#L1714"><code>finalization_routing</code></a>, call sites <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L3170">L3170</a> and <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L3283">L3283</a>. Test: <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/tests/unit/experience/test_rollout_manager.py#L2467"><code>test_streamed_identity_and_routing_do_not_copy_sealed_receipts</code></a> makes <code>_copy_group</code> fail if it sees a sealed receipt.</p>
+
+
+<h2>2 · Finished results are freed when the streams end</h2>
+<p><a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1330"><code>_stream_rows</code></a> runs each Gym stream as its own task. If Gym refuses a row, <code>consume()</code> calls <code>submit()</code> to re-send it, and <code>submit()</code> starts a new <code>consume()</code>. Two inner functions that point at each other form a loop, and Python's normal reference counting cannot free a loop. Everything they share (the results list with its receipts, the completion callback) waited for the cyclic garbage collector.</p>
+<div class="fig"><svg viewBox="0 0 940 190" role="img" aria-label="Closure cycle before and after">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="arh" d="M0,0L10,5L0,10z"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="agh" d="M0,0L10,5L0,10z"/></marker></defs>
+<text class="lane" x="14" y="24">Before</text>
+<rect class="fnbox" x="40" y="44" width="150" height="44" rx="6"/><a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L1373"><text class="fn" x="62" y="71">consume()</text></a>
+<rect class="fnbox" x="290" y="44" width="150" height="44" rx="6"/><a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L1558"><text class="fn" x="320" y="71">submit()</text></a>
+<path class="bad" d="M190,58 L288,58" marker-end="url(#ar)"/><text class="note" x="200" y="50">calls on refusal</text>
+<path class="bad" d="M290,76 L192,76" marker-end="url(#ar)"/><text class="note" x="200" y="100">create_task(consume)</text>
+<rect class="heldbox" x="40" y="118" width="400" height="40" rx="6"/>
+<text class="note" x="52" y="136">closure cells held by the loop: results (receipts),</text>
+<text class="note" x="52" y="151">on_completion, streams. Freed only when cyclic GC runs.</text>
+<text class="lane" x="490" y="24">After</text>
+<rect class="fnbox" x="510" y="44" width="130" height="44" rx="6"/><a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1380"><text class="fn" x="527" y="71">consume()</text></a>
+<rect class="fnbox" x="790" y="44" width="130" height="44" rx="6"/><a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1569"><text class="fn" x="815" y="71">submit()</text></a>
+<path class="good" d="M640,58 L788,58" marker-end="url(#ag)"/><text class="note" x="660" y="50">calls on refusal</text>
+<rect class="cellbox" x="655" y="96" width="120" height="30" rx="6"/><a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1565"><text class="mono" x="663" y="116">consume_stream</text></a>
+<path class="good" d="M840,88 L840,111 L777,111" marker-end="url(#ag)"/>
+<path class="cut" d="M655,111 L560,111 L560,90"/>
+<text class="cutx" x="596" y="117">✕</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1593"><text class="note bad" x="560" y="148">= None after every task is cancelled and done</text></a>
+<text class="note good" x="560" y="170">no loop left: refcounting frees results right away</text>
+</svg></div>
+<p class="pclbl">Before</p><pre class="pc"><span class="who"># _stream_rows: one event loop; each consume() is its own asyncio task</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L1373">consume</a>(rows):
+    async for item in gym_stream(rows):
+        if item is a refused row: <a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L1451">submit</a>([row])  <span class="cm"># consume -&gt; submit</span>
+        results[idx] = item; await on_completion(idx, item)
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L1558">submit</a>(rows):
+    streams.add(<a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L1559">create_task</a>(consume(rows)))      <span class="cm"># submit -&gt; consume: a cycle</span>
+submit(pending)
+try:     wait until every task in streams ends
+finally: cancel the rest; <a href="https://github.com/NVIDIA-NeMo/RL/blob/bf50129f25cbe6e57dfc1855cad01a5e0bd093ff/nemo_rl/experience/rollout_manager.py#L1576">gather</a>(*streams)
+return                                           <span class="cm"># results and on_completion wait for cyclic GC</span></pre>
+<p class="pclbl">After</p><pre class="pc"><span class="who"># _stream_rows: same tasks, same cancel-and-wait on exit</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1380">consume</a>(rows):                        <span class="cm"># unchanged, still calls submit</span>
+<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1565">consume_stream</a> = consume</span>                        <span class="cm"># the only path from submit to consume</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1569">submit</a>(rows):
+    streams.add(create_task(<a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1571">consume_stream</a>(rows)))
+submit(pending)
+try:     wait until every task in streams ends
+finally:
+<span class="add">    try:     cancel the rest; <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1589">gather</a>(*streams)</span>  <span class="cm"># every task is done after this</span>
+<span class="add">    finally: <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1593">consume_stream = None</a></span>              <span class="cm"># cuts the cycle</span>
+return                                          <span class="cm"># plain refcounting frees results now</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/nemo_rl/experience/rollout_manager.py#L1565">L1565–L1593</a>. Test: <a href="https://github.com/NVIDIA-NeMo/RL/blob/af3939831d7b03fd2c51cd39455184eacecf8a23/tests/unit/experience/test_rollout_manager.py#L1303"><code>test_stream_closures_release_completed_receipts_without_cyclic_gc</code></a> turns the collector off and checks that a weak reference to the finished result is dead. It fails on the base commit and passes at head.</p>
+
+<div class="hl"><b>So what.</b> Copies that grew with the square of the group size are gone from the per-completion path, and finished results no longer pile up between garbage-collector runs. Correctness does not change: the new reads return the same values as the old copies. On the failure path, the raised error's traceback still keeps results alive until the collector runs. That is normal Python, and the PR does not claim to fix it.</div>
+</div></body></html>
