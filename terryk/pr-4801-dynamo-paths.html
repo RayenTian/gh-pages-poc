@@ -75,6 +75,15 @@ nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px soli
 nav.chain a:hover{background:var(--surface2)}
 nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
 p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
   document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -192,34 +201,65 @@ pushes new weights from the trainer into the engines after every step. Dotted wo
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/dynamo/config.py#L34-L87"><code>DynamoFrontendArgs</code></a>, and <code>dynamo_enabled</code> is defined twice. This PR's Dynamo 1.8 commit already had to copy main's changes over by hand.</p>
 <p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583777">review comment C9 — dynamo_config.py:84</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583837">C10 — dynamo_config.py:47</a></p>
 
-<h2>What this PR changes now: refit with shards of different widths</h2>
-<p>The refit NCCL group lists the trainer ranks first, then each engine's ranks, shard by shard. Until now every shard had the same width, so shard <i>i</i> started at <code>i × width</code>. A prefill engine at TP 4 next to decode engines at TP 2 breaks that. <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L47-L59"><code>RefitMembership.worker_offset()</code></a> adds up the earlier widths instead, dead shards included, because the worker list never shrinks.</p>
-<div class="mono">workers_per_shard = (4, 2, 2)      # 1 prefill at TP 4, 2 decode at TP 2; 8 workers
-workers:   0 1 2 3 | 4 5 | 6 7
-shard:     0       | 1   | 2
-worker_offset(0, 1, 2) = 0, 4, 6   # an equal-width rule (i × 2) would give 0, 2, 4: wrong
-shard 0 dies → refit ranks after the trainers: shard 1 → 0..1, shard 2 → 2..3</div>
-<p>All four call sites switch to it: the Megatron path and three vLLM paths. With equal widths the result is the same as before:</p>
-<pre class="diff"><span class="hunk">@@ vllm_generation.py L1337 · rebuild_collective</span>
-         for shard_idx, rank_prefix in rank_prefixes.items():
-<span class="del">-            leader_idx = shard_idx * membership.workers_per_shard
-</span><span class="add">+            leader_idx = membership.worker_offset(shard_idx)
-</span>             if leader_idx &gt;= len(workers):</pre>
-<p>Only the plan and <code>worker_offset</code> are tested with uneven widths; the callers are still tested only with equal widths (C5). No caller passes uneven widths until <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a>'s engine fleet does.</p>
+<h2>What happens at startup with <code>dynamo: true</code> — before, after, and the C9 fix (proposed)</h2>
+<p>Three checks run in order on the driver before any engine starts. Before this PR, a Megatron config with <code>dynamo: true</code> stopped at the second one. After it, the config gets through the backend checks and is refused on purpose by <code>MegatronGeneration</code> until #5025 builds the engines. On the way, it now requires P/D: there is no Megatron + Dynamo without disaggregation, while vLLM + Dynamo on main has no P/D yet.</p>
+<p class="pclbl">Startup, before (main)</p>
+<pre class="pc"><span class="who"># driver, run_grpo_single_controller.py, in this order</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/examples/run_grpo_single_controller.py#L118">check_outdated_config</a>(config)                       <span class="cm"># dynamo_cfg.control_timeout_s: &#x27;was removed&#x27;</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/__init__.py#L144">configure_generation_config</a>(gen)
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/__init__.py#L163-L168">if gen.dynamo and gen.backend != &quot;vllm&quot;</a>: raise  <span class="cm"># megatron + dynamo stops here</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/__init__.py#L169">if gen.dynamo_cfg and not gen.dynamo</a>: raise
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/__init__.py#L95">resolve_generation_class</a>(gen)                       <span class="cm"># picks the class by backend name</span>
+    .<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/algorithms/single_controller_utils/setup.py#L1834">validate_settings</a>(master)                      <span class="cm"># MegatronGeneration: no Dynamo branch</span></pre>
+<p class="pclbl">Startup, after (this PR)</p>
+<pre class="pc"><span class="who"># driver, same order</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/examples/run_grpo_single_controller.py#L118">check_outdated_config</a>(config)                                     <span class="cm"># C9: still rejects control_timeout_s</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L151">configure_generation_config</a>(gen)
+<span class="del">    if gen.dynamo and gen.backend != &quot;vllm&quot;: raise</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L170-L176">if gen.dynamo and gen.backend not in (&quot;vllm&quot;, &quot;megatron&quot;)</a>: raise</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L177">if gen.dynamo_cfg and not gen.dynamo</a>: raise
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L95">resolve_generation_class</a>(gen)
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L100-L106">if gen.dynamo and backend not in (&quot;vllm&quot;, &quot;megatron&quot;)</a>: raise</span>  <span class="cm"># same check, a second copy</span>
+    .<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/algorithms/single_controller_utils/setup.py#L1834">validate_settings</a>(master)                                    <span class="cm"># MegatronGeneration</span>
+<span class="add">        <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L262-L263">if gen.dynamo</a>:</span>
+<span class="add">            <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L219">validate_megatron_dynamo_generation</a>(gen)</span>              <span class="cm"># needs disaggregation on; C14</span>
+<span class="add">            <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L275">raise NotImplementedError</a>(&quot;fleet not built&quot;)</span>          <span class="cm"># #5025 removes this</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/examples/run_grpo_single_controller.py#L118"><code>check_outdated_config</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L151"><code>configure_generation_config</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L95"><code>resolve_generation_class</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L224"><code>MegatronGeneration.validate_settings</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L219"><code>validate_megatron_dynamo_generation</code></a> (the P/D requirement is at <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L233-L238">L233-L238</a>).</p>
+<p class="pclbl">The fix for C9, as pseudocode (proposed, not run)</p>
+<p class="where"><b>Where the fix lands: RL only, one function.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/utils/outdated_config_checks.py#L239"><code>reject_outdated_dynamo_backend</code></a> skips the key for Megatron; plus one test case and one docs line. The vLLM migration message stays.</p>
+<pre class="pc"><span class="who"># driver, inside check_outdated_config</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/utils/outdated_config_checks.py#L239">reject_outdated_dynamo_backend</a>(config):
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/utils/outdated_config_checks.py#L265">for key, why in REMOVED_DYNAMO_CFG_KEYS</a>:                               <span class="cm"># includes control_timeout_s (L222)</span>
+<span class="add">        if key == &quot;control_timeout_s&quot; and backend == &quot;megatron&quot;: continue</span>  <span class="cm"># Megatron still uses it</span>
+        if key in dynamo_cfg: problems.append(f&quot;{key} was removed: {why}&quot;)</pre>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583777">review comment C9 — dynamo_config.py:84</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651584110">C14 — dynamo_config.py:283</a></p>
+
+<h2>Refit with shards of different widths — before and after</h2>
+<p>The refit NCCL group lists the trainer ranks first, then each engine's ranks, shard by shard. Before, every shard had one width, so shard <i>i</i> started at <code>i × width</code>. A prefill engine at TP 4 next to two decode engines at TP 2 breaks that, so this PR keeps one width per shard and adds the earlier widths up. Dead shards still count, because the worker list never shrinks.</p>
+<p class="pclbl">Refit plan, before (main)</p>
+<pre class="pc"><span class="who"># driver, weight synchronizer: plan the refit group (also after a shard dies)</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/membership.py#L121">plan_refit_membership</a>(surviving, dp_size, total_workers, trainers):
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/membership.py#L168">width = total_workers // dp_size</a>                          <span class="cm"># one width for every shard</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/membership.py#L170">prefix = {s: i * width for i, s in enumerate(surviving)}</a>  <span class="cm"># ranks after the trainers</span>
+    return Membership(world=trainers + len(surviving) * width, prefix, width)
+<span class="who"># driver, fan out the new group</span>
+vLLM:     leader = workers[<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/vllm/vllm_generation.py#L1334">shard * width</a>]                     <span class="cm"># first worker of the shard</span>
+Megatron: ranks for workers[<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/megatron/megatron_generation.py#L495-L496">shard * width</a> : + width]</pre>
+<p class="pclbl">Refit plan, after (this PR)</p>
+<pre class="pc"><span class="who"># driver, same place; example: 16 trainer ranks, shards (4, 2, 2), shard 0 dead</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L134">plan_refit_membership</a>(surviving, dp_size, total_workers, trainers,
+<span class="add">                          shard_widths=None):</span>                        <span class="cm"># no caller passes it yet</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L175-L188">widths = shard_widths or (total_workers // dp_size,) * dp_size</a></span>   <span class="cm"># (4, 2, 2)</span>
+<span class="del">    prefix = {s: i * width for i, s in enumerate(surviving)}</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L204-L205">for s in sorted(surviving): prefix[s] = next; next += widths[s]</a></span>  <span class="cm"># {1: 0, 2: 2}</span>
+    return Membership(world=trainers + next, prefix, widths)         <span class="cm"># world = 16 + 4 = 20</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L53-L59">worker_offset</a>(shard): return sum(widths[:shard])</span>                 <span class="cm"># 0, 4, 6: dead shards count</span>
+vLLM:     leader = workers[<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/vllm/vllm_generation.py#L1337">membership.worker_offset(shard)</a>]          <span class="cm"># C5: tested only with equal widths</span>
+Megatron: ranks for workers[<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L526-L527">worker_offset(shard)</a> : + widths[shard]]</pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L134"><code>plan_refit_membership</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L53-L59"><code>RefitMembership.worker_offset</code></a>, vLLM <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/vllm/vllm_generation.py#L1337"><code>rebuild_collective</code></a> (also <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/vllm/vllm_generation.py#L1288">L1288</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/vllm/vllm_generation.py#L2033">L2033</a>), Megatron <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L526-L527"><code>_refit_ranked_workers</code></a>. With equal widths the result is the same as before. No caller passes uneven widths until #5025's engine fleet does.</p>
 <p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583570">review comment C5 — vllm_generation.py:1337</a></p>
 
-<h2>The fix for C9 — proposed, not in the PR</h2>
-<p>Nothing below is implemented.</p>
-<p class="where"><b>Where the fix lands: RL only, one function.</b>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/utils/outdated_config_checks.py#L265"><code>reject_outdated_dynamo_backend</code></a> skips the key for Megatron, plus one test case and one docs line. The vLLM migration message stays.</p>
-<pre class="diff"><span class="hunk">@@ outdated_config_checks.py L265 · reject_outdated_dynamo_backend</span>
-         for key, replacement in _REMOVED_DYNAMO_CFG_KEYS.items():
-<span class="add">+            # Megatron engines behind Dynamo still use control_timeout_s.
-+            if key == "control_timeout_s" and generation.get("backend") == "megatron":
-+                continue
-</span>             if key in dynamo_cfg:</pre>
-
-<div class="hl"><b>So what.</b> This PR is groundwork: it does nothing at run time on main, and it now agrees with main on which backends may set <code>dynamo: true</code>. Fix C9 before #5025 turns the switch on, or every Megatron Dynamo config that sets <code>control_timeout_s</code> fails at startup with a vLLM error. The review links work for others only after the review is published.</div>
+<div class="hl"><b>So what.</b> This PR is groundwork: nothing new runs on main, and it now agrees with main on which backends may set <code>dynamo: true</code>. Two things to settle before #5025 turns the switch on: fix C9, or every Megatron Dynamo config that sets <code>control_timeout_s</code> fails at startup with a vLLM error; and decide whether Megatron + Dynamo should exist without P/D, as vLLM + Dynamo does today. The review links work for others only after the review is published.</div>
 
 </div>
 </body>
