@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #4801 stack — one prefill/decode interface, stamped out per backend</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--orange)}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.mono{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)} .diff .del{color:var(--red)} .diff .hunk{color:var(--accent)}
+.hl{border-left:4px solid var(--orange);background:var(--surface);padding:10px 14px;margin:18px 0;border-radius:0 8px 8px 0}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+ul{margin:6px 0 10px;padding-left:22px}
+li{margin:3px 0}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .ok{fill:var(--surface);stroke:var(--green);stroke-width:1.8}
+svg .gone{fill:var(--surface);stroke:var(--dim);stroke-width:1.3;stroke-dasharray:2 3;opacity:.75}
+svg .lg-gone{fill:none;stroke:var(--dim);stroke-width:2;stroke-dasharray:2 3}
+svg .okt{fill:var(--green);font:bold 12px -apple-system,sans-serif}
+svg .plan{fill:var(--surface);stroke:var(--orange);stroke-width:1.8;stroke-dasharray:5 3}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .gate{fill:var(--surface2);stroke:var(--border);stroke-width:1.3}
+svg .hdr{fill:var(--text);font:bold 13.5px -apple-system,sans-serif}
+svg .hdr2{fill:var(--dim);font:12px -apple-system,sans-serif}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .redt{fill:var(--red);font:bold 12px -apple-system,sans-serif}
+svg .redn{fill:var(--text);font:12px -apple-system,sans-serif}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .xg{fill:var(--red);font:bold 15px -apple-system,sans-serif}
+svg a text{text-decoration:underline;fill:var(--accent);font:12px ui-monospace,Menlo,monospace}
+svg .lg-ok{fill:none;stroke:var(--green);stroke-width:2}
+svg .lg-plan{fill:none;stroke:var(--orange);stroke-width:2;stroke-dasharray:5 3}
+svg .lg-bad{fill:none;stroke:var(--red);stroke-width:2}
+svg .k-shared{fill:var(--surface);stroke:var(--green);stroke-width:1.8}
+svg .k-hook{fill:var(--surface);stroke:var(--accent);stroke-width:1.8}
+svg .k-second{fill:var(--surface);stroke:var(--orange);stroke-width:1.8}
+svg .k-copy{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .k-none{fill:var(--surface);stroke:var(--dim);stroke-width:1.2;stroke-dasharray:2 3;opacity:.8}
+svg .cell{fill:var(--text);font:11px -apple-system,sans-serif}
+svg .cellb{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg a text.cl{fill:var(--accent);text-decoration:underline}
+svg .rowl{fill:var(--text);font:bold 12px -apple-system,sans-serif}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.figwrap{overflow-x:auto}
+.figwrap svg{min-width:720px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>One prefill/decode interface, stamped out per backend: where the Megatron stack, #4920 and TRT-LLM put each job</h1>
+<p class="sub">Megatron + Dynamo P/D: <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801">#4801</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">#4912</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">#5023</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5097">#5097</a> ·
+native vLLM P/D: <a href="https://github.com/NVIDIA-NeMo/RL/pull/4920">#4920</a> ·
+old Dynamo P/D: <a href="https://github.com/NVIDIA-NeMo/RL/pull/4773">#4773</a> ·
+main <code>5e271174</code> (vLLM + Dynamo from <a href="https://github.com/NVIDIA-NeMo/RL/pull/4905">#4905</a> and <a href="https://github.com/NVIDIA-NeMo/RL/pull/4979">#4979</a>; TRT-LLM P/D)</p>
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-dynamo-paths.html">#4801 next to main's Dynamo</a>
+  <span class="here">one P/D interface</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-one-chat-path.html">the vLLM design it should mirror</a>
+</nav>
+<p class="chainnote">Pages on this design, one question each. This one: who does each P/D job, and what one shared interface would look like.</p>
+
+<div class="status"><dl>
+  <dt>Before</dt>
+  <dd>P/D runs natively for TRT-LLM on main, and for vLLM in the open #4920. Behind Dynamo, main has only vLLM without P/D: every engine registers as one <code>backend</code> component. Megatron P/D behind Dynamo is the six-PR stack above.</dd>
+  <dt>This page</dt>
+  <dd>Compares where each design does each P/D job, against the shape main already uses for vLLM + Dynamo: one adapter base that a backend fills in with a few methods, and NeMo RL's own chat engine in the frontend.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Proposed — a design comparison. Nothing in the target section is implemented.</span> The #4801-sized parts are review comments C9–C10; the rest belongs on the later PRs.</dd>
+</dl></div>
+
+<div class="bg"><b>Background.</b> In <span class="tip" tabindex="0" data-tip="Prefill engines read the prompt and build its KV cache. Decode engines receive that cache over NIXL and write the answer.">P/D</span>, a replica is P prefill engines plus D decode engines, each with its own width (TP × PP). On main, vLLM behind Dynamo runs NeMo RL's own <span class="tip" tabindex="0" data-tip="DynamoEngineAdapter: the Dynamo side written once. A backend writes serve_rollout, start, abort and kv_event_sources, and may add request handlers.">adapter base</span> inside the native worker, so refit, pause, capture, forest training and prefix recovery work unchanged. Dotted words have a short explanation: hover or tap them.</div>
+
+<h2>Where each design does each job</h2>
+<div class="figwrap"><svg viewBox="0 0 1016 556" role="img" aria-label="Where each P/D design does each job">
+<text class="hdr" x="188" y="22">main: vLLM + Dynamo</text>
+<text class="hdr2" x="188" y="40">#4905 + #4979, no P/D yet</text>
+<text class="hdr" x="394" y="22">#4920: native vLLM P/D</text>
+<text class="hdr2" x="394" y="40">open, base main</text>
+<text class="hdr" x="600" y="22">Megatron + Dynamo P/D</text>
+<text class="hdr2" x="600" y="40">#4801 → #5025, #5097</text>
+<text class="hdr" x="806" y="22">main: TRT-LLM P/D</text>
+<text class="hdr2" x="806" y="40">native, the oldest</text>
+<text class="rowl" x="10" y="82">P/D layout config</text>
+<rect class="k-none" x="183" y="62" width="200" height="32" rx="6"/>
+<text class="cell" x="191" y="83">none: no roles</text>
+<rect class="k-shared" x="389" y="62" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/interfaces.py#L206"><text class="cell cl" x="397" y="83">DisaggConfig</text></a>
+<rect class="k-shared" x="595" y="62" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_config.py#L134"><text class="cell cl" x="603" y="83">DisaggConfig, 3 keys forced</text></a>
+<rect class="k-shared" x="801" y="62" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/interfaces.py#L198-L221"><text class="cell cl" x="809" y="83">DisaggConfig</text></a>
+<text class="rowl" x="10" y="122">Per-role engine knobs</text>
+<rect class="k-none" x="183" y="102" width="200" height="32" rx="6"/>
+<text class="cell" x="191" y="123">none</text>
+<rect class="k-hook" x="389" y="102" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/vllm/config.py#L65"><text class="cell cl" x="397" y="123">vllm_cfg.prefill_engine</text></a>
+<rect class="k-second" x="595" y="102" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L89-L90"><text class="cell cl" x="603" y="123">dynamo_cfg.prefill_engine</text></a>
+<rect class="k-hook" x="801" y="102" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/config.py#L118"><text class="cell cl" x="809" y="123">trtllm_cfg.prefill_engine</text></a>
+<text class="rowl" x="10" y="162">Roles, widths, placement</text>
+<rect class="k-none" x="183" y="142" width="200" height="32" rx="6"/>
+<text class="cell" x="191" y="163">none</text>
+<rect class="k-shared" x="389" y="142" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/disagg_layout.py#L48"><text class="cell cl" x="397" y="163">disagg_layout.py (shared)</text></a>
+<rect class="k-copy" x="595" y="142" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L179-L216"><text class="cell cl" x="603" y="163">own engine_roles, widths</text></a>
+<rect class="k-shared" x="801" y="142" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/config.py#L239"><text class="cell cl" x="809" y="163">own; moves to disagg_layout</text></a>
+<text class="rowl" x="10" y="202">Generation class</text>
+<rect class="k-shared" x="183" y="182" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/vllm/vllm_generation.py#L812-L831"><text class="cell cl" x="191" y="203">VllmGeneration, dynamo mode</text></a>
+<rect class="k-hook" x="389" y="182" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/vllm/vllm_generation.py#L993"><text class="cell cl" x="397" y="203">VllmGeneration + P/D branches</text></a>
+<rect class="k-copy" x="595" y="182" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L282"><text class="cell cl" x="603" y="203">sibling class, N engines</text></a>
+<rect class="k-hook" x="801" y="182" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L316"><text class="cell cl" x="809" y="203">TrtllmGeneration + roles</text></a>
+<text class="rowl" x="10" y="242">Frontend, P → D routing</text>
+<rect class="k-shared" x="183" y="222" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/managed_runtime.py#L443"><text class="cell cl" x="191" y="243">Dynamo frontend, KV router</text></a>
+<rect class="k-second" x="389" y="222" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/vllm/vllm_disagg_frontend.py#L1363"><text class="cell cl" x="397" y="243">own relay actor</text></a>
+<rect class="k-shared" x="595" y="222" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L470"><text class="cell cl" x="603" y="243">Dynamo frontend, P → D router</text></a>
+<rect class="k-second" x="801" y="222" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L572"><text class="cell cl" x="809" y="243">TRT-LLM OpenAIDisaggServer</text></a>
+<text class="rowl" x="10" y="282">Chat render (Gym)</text>
+<rect class="k-shared" x="183" y="262" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L285"><text class="cell cl" x="191" y="283">NemoRLChatEngine</text></a>
+<rect class="k-second" x="389" y="262" width="200" height="32" rx="6"/>
+<text class="cell" x="397" y="283">relay renders (chat_render)</text>
+<rect class="k-shared" x="595" y="262" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/chat_engine.py#L159"><text class="cell cl" x="603" y="283">shared engine + ChatBackend</text></a>
+<rect class="k-second" x="801" y="262" width="200" height="32" rx="6"/>
+<text class="cell" x="809" y="283">TRT-LLM server renders</text>
+<text class="rowl" x="10" y="322">Engine side of Dynamo</text>
+<rect class="k-shared" x="183" y="302" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/vllm/adapter.py#L203"><text class="cell cl" x="191" y="323">DynamoVllmAdapter (4 hooks)</text></a>
+<rect class="k-none" x="389" y="302" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/vllm/config.py#L1138"><text class="cell cl" x="397" y="323">n/a: refuses dynamo</text></a>
+<rect class="k-copy" x="595" y="302" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L147"><text class="cell cl" x="603" y="323">Megatron-LM adapter subclass</text></a>
+<rect class="k-none" x="801" y="302" width="200" height="32" rx="6"/>
+<text class="cell" x="809" y="323">n/a</text>
+<text class="rowl" x="10" y="362">Rollouts (no Gym)</text>
+<rect class="k-shared" x="183" y="342" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/rollout_client.py#L92"><text class="cell cl" x="191" y="363">rollout_client; worker params</text></a>
+<rect class="k-none" x="389" y="342" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/vllm/vllm_generation.py#L1158"><text class="cell cl" x="397" y="363">refused: Gym only</text></a>
+<rect class="k-copy" x="595" y="342" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L309"><text class="cell cl" x="603" y="363">copied client, own params</text></a>
+<rect class="k-none" x="801" y="342" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L553"><text class="cell cl" x="809" y="363">refused: Gym only</text></a>
+<text class="rowl" x="10" y="402">Capture after the call</text>
+<rect class="k-shared" x="183" y="382" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/vllm/adapter.py#L310"><text class="cell cl" x="191" y="403">worker&#x27;s save_capture</text></a>
+<rect class="k-none" x="389" y="382" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/vllm/vllm_generation.py#L361"><text class="cell cl" x="397" y="403">refused</text></a>
+<rect class="k-copy" x="595" y="382" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/megatron/token_capture.py#L571"><text class="cell cl" x="603" y="403">3rd path: stage_completed</text></a>
+<rect class="k-none" x="801" y="382" width="200" height="32" rx="6"/>
+<text class="cell" x="809" y="403">refused</text>
+<text class="rowl" x="10" y="442">Refit, pause</text>
+<rect class="k-shared" x="183" y="422" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/vllm/vllm_worker_async.py#L821"><text class="cell cl" x="191" y="443">native worker, unchanged</text></a>
+<rect class="k-hook" x="389" y="422" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/vllm/vllm_generation.py#L2947"><text class="cell cl" x="397" y="443">per engine; pause P, then D</text></a>
+<rect class="k-second" x="595" y="422" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L894"><text class="cell cl" x="603" y="443">own fan-out; pause P, then D</text></a>
+<rect class="k-hook" x="801" y="422" width="200" height="32" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L761"><text class="cell cl" x="809" y="443">per engine collective</text></a>
+<rect class="k-shared" x="10" y="480" width="16" height="12" rx="3"/>
+<text class="note" x="32" y="491">the shared way (main&#x27;s design)</text>
+<rect class="k-hook" x="247" y="480" width="16" height="12" rx="3"/>
+<text class="note" x="269" y="491">small backend piece, standard place</text>
+<rect class="k-second" x="516" y="480" width="16" height="12" rx="3"/>
+<text class="note" x="538" y="491">a second way to do a shared job</text>
+<rect class="k-copy" x="759" y="480" width="16" height="12" rx="3"/>
+<text class="note" x="781" y="491">parallel copy of what main has</text>
+<rect class="k-none" x="10" y="500" width="16" height="12" rx="3"/>
+<text class="note" x="32" y="511">missing or refused</text>
+<text class="note" x="10" y="536">Underlined cells link to the code. Megatron cells read the whole stack: #4801 → #5025, plus #5097 for Gym.</text>
+</svg></div>
+<p>Three things stand out:</p>
+<ul>
+  <li><b>The frontend chat side is already shared.</b> #5097 moves <code>NemoRLChatEngine</code> out of <code>dynamo/vllm/</code> and adds a <a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/chat_engine.py#L159"><code>ChatBackend</code></a> interface with a vLLM and a Megatron implementation. This is the pattern to copy everywhere else.</li>
+  <li><b>The engine side is not.</b> Megatron subclasses Megatron-LM's own adapter instead of main's <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/engine_adapter.py#L83"><code>DynamoEngineAdapter</code></a>, sends rollouts through a copied client whose retry rules differ, and stages capture through a third path. So routed experts and generation cuts are missing, and the driver builds each rollout's sampling settings as OpenAI fields, which Megatron-LM translates back, instead of the worker building them as native generation does.</li>
+  <li><b>The layout is split three ways.</b> #4920 makes <a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/disagg_layout.py#L48"><code>disagg_layout.py</code></a> shared by TRT-LLM and vLLM. The Megatron stack computes its own roles and widths, and keeps per-role engine knobs in <code>dynamo_cfg</code>, where TRT-LLM and vLLM keep them in the backend's own block.</li>
+</ul>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801">review comment C10 — dynamo_config.py:47</a></p>
+
+<h2>The target: one interface, two thin backends — proposed, not in any PR</h2>
+<p>Nothing below is implemented. Everything green is written once. A backend writes only the blue boxes.</p>
+<div class="figwrap"><svg viewBox="0 0 1016 470" role="img" aria-label="Target: shared P/D layers with two thin backends">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--dim)"/></marker></defs>
+<text class="hdr" x="10" y="20">Written once, backend-neutral</text>
+<rect class="k-shared" x="10" y="30" width="326" height="62" rx="7"/>
+<text class="cellb" x="22" y="50">Config</text>
+<text class="cell" x="22" y="68">DisaggConfig + one dynamo_cfg schema</text>
+<text class="cell" x="22" y="84">per-role knobs in the backend's own block</text>
+<rect class="k-shared" x="345" y="30" width="326" height="62" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/disagg_layout.py#L48"><text class="cellb cl" x="357" y="50">disagg_layout (from #4920)</text></a>
+<text class="cell" x="357" y="68">roles, widths, replica tiling, placement</text>
+<text class="cell" x="357" y="84">TRT-LLM and vLLM already share it</text>
+<rect class="k-shared" x="680" y="30" width="326" height="62" rx="7"/>
+<text class="cellb" x="692" y="50">P/D fleet steps</text>
+<text class="cell" x="692" y="68">refit ranks per engine (worker_offset)</text>
+<text class="cell" x="692" y="84">pause P then D; full-fleet membership only</text>
+<rect class="k-shared" x="10" y="102" width="326" height="62" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/managed_runtime.py#L443"><text class="cellb cl" x="22" y="122">ManagedDynamoRuntime</text></a>
+<text class="cell" x="22" y="140">frontends, KV router; + P → D routing</text>
+<text class="cell" x="22" y="156">+ readiness counted per role</text>
+<rect class="k-shared" x="345" y="102" width="326" height="62" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/chat_engine.py#L382"><text class="cellb cl" x="357" y="122">NemoRLChatEngine (from #5097)</text></a>
+<text class="cell" x="357" y="140">render, capture decision, TQ prefix splice</text>
+<text class="cell" x="357" y="156">backend plugs in through ChatBackend</text>
+<rect class="k-shared" x="680" y="102" width="326" height="62" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/rollout_client.py#L92"><text class="cellb cl" x="692" y="122">rollout_client</text></a>
+<text class="cell" x="692" y="140">one wire format; the worker builds sampling</text>
+<text class="cell" x="692" y="156">RolloutResult back, routed experts included</text>
+<rect class="k-shared" x="10" y="174" width="996" height="62" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/engine_adapter.py#L83-L172"><text class="cellb cl" x="22" y="194">DynamoEngineAdapter</text></a>
+<text class="cell" x="22" y="212">request handlers: rollout, Gym call (capture begin/save), generation cut · error mapping · start_dynamo_endpoint</text>
+<text class="cell" x="22" y="228">new for P/D: set disaggregation_mode + component by role · prefill leg returns a handle, decode leg gets it · no KV events on decode</text>
+<path class="arr" d="M250,236 L250,270"/><path class="arr" d="M760,236 L760,270"/>
+<text class="hdr" x="10" y="262">Written per backend</text>
+<rect class="k-hook" x="10" y="272" width="490" height="150" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/vllm/adapter.py#L203"><text class="cellb cl" x="22" y="292">DynamoVllmAdapter (on main)</text></a>
+<text class="cell" x="22" y="312">serve_rollout · start · abort · kv_event_sources</text>
+<text class="cell" x="22" y="330">+ serve_prefill, serve_rollout(handoff=) = NIXL kv_transfer_params</text>
+<text class="cell" x="22" y="348">VllmChatBackend (renderer + parsers)</text>
+<text class="cell" x="22" y="366">vllm_cfg.prefill_engine / decode_engine (as in #4920)</text>
+<text class="note" x="22" y="392">Runs in the native vLLM worker, on its own event loop.</text>
+<text class="note" x="22" y="410">Refit, pause and capture stay the native code.</text>
+<rect class="k-hook" x="516" y="272" width="490" height="150" rx="7"/>
+<text class="cellb" x="528" y="292">DynamoMegatronAdapter (does not exist yet)</text>
+<text class="cell" x="528" y="312">serve_rollout · start · abort · kv_event_sources</text>
+<text class="cell" x="528" y="330">+ serve_prefill, serve_rollout(handoff=), release_handoff (claim/pin)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/chat_backend.py#L303"><text class="cell cl" x="528" y="348">MegatronChatBackend (in #5097)</text></a>
+<text class="cell" x="528" y="366">Megatron per-role layout keys, in the backend's own block</text>
+<text class="note" x="528" y="392">Runs on each engine's rank 0, on the inference loop.</text>
+<text class="note" x="528" y="410">Keeps the stack's 3 engine-build hooks, which already fit.</text>
+<rect class="k-shared" x="10" y="440" width="16" height="12" rx="3"/><text class="note" x="32" y="451">written once</text>
+<rect class="k-hook" x="130" y="440" width="16" height="12" rx="3"/><text class="note" x="152" y="451">a backend writes only this</text>
+<text class="note" x="360" y="451">Underlined names link to the code.</text>
+</svg>
+</div>
+<p>The four engine methods are the ones main already asks of every backend (<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/engine_adapter.py#L148-L169">engine_adapter.py L148-L169</a>). P/D adds two: the engine's <b>role</b>, which picks the Dynamo component it registers as (main hard-codes <code>backend</code>), and the <b>KV handoff</b>: the prefill leg returns its transfer handle and the decode leg takes it. Dynamo's SDK (ai-dynamo 1.8 on main) already routes both legs: an engine sets <code>WorkerConfig.disaggregation_mode</code>, the prefill leg puts an opaque handle in <code>disaggregated_params</code> on its last chunk, and the frontend passes it to the decode leg as <code>prefill_result</code>. A decode engine never calls prefill. So a backend writes <code>serve_prefill</code> (returns the handle), takes the handle in <code>serve_rollout</code>, and may write <code>release_handoff</code> (Megatron-LM claims and releases prefill blocks; vLLM's NIXL needs nothing). Two things are not checked yet: whether Dynamo's prefill router keeps NeMo RL's request annotations, and what happens when a refit lands between the two legs (the base should refuse a handle from older weights).</p>
+<p>The fleet jobs are the same in all three P/D designs: plan the roles, give each engine its own refit ranks (the earlier widths added up, as <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L53-L59"><code>worker_offset</code></a> in #4801 does), pause prefill before decode, and refuse partial membership. Each design writes them again today. A backend only needs to supply its engine width and config per role.</p>
+
+<h2>What this means for #4801 and the rest of the stack</h2>
+<p>#4801 sets the config and layout shape every later PR builds on, so its parts are cheap to fix now:</p>
+<ul>
+  <li><b>C10:</b> import <code>dynamo_enabled</code> and the shared frontend fields from <code>dynamo/config.py</code>, instead of a second schema.</li>
+  <li><b>C9:</b> main still rejects <code>dynamo_cfg.control_timeout_s</code> as removed, so the Megatron key fails at startup.</li>
+  <li><b>Layout:</b> roles and widths belong in the shared layout code next to <code>DisaggConfig</code>, which TRT-LLM already uses and #4920 extends.</li>
+</ul>
+<p>The engine-side divergence lives in later PRs:</p>
+<ul>
+  <li>#5025: a <code>DynamoEngineAdapter</code> subclass and main's <code>rollout_client</code>, instead of Megatron-LM's adapter and a copied client.</li>
+  <li>#5097: capture through the same begin/save steps the native worker uses.</li>
+  <li>#5097: <code>setup_token_capture</code> lacks the three <code>prefix_*</code> arguments that single-controller setup passes, so token capture fails with a <code>TypeError</code> at startup.</li>
+</ul>
+
+<div class="hl"><b>So what.</b> Half of the "one interface" goal is already built: #5097's shared chat engine and #4920's shared layout. The other half is the engine side, where Megatron still goes around main's adapter. Moving it onto <code>DynamoEngineAdapter</code> plus the two P/D methods would let vLLM P/D behind Dynamo reuse all of it, so it would not need a fourth design. The review links work for others only after the review is published.</div>
+
+</div>
+</body>
+</html>
