@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lending vLLM engines to validation vs validating inline (PR #5183)</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#fff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;--dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 18px 60px}
+h1{font-size:26px;line-height:1.3;margin:6px 0 6px}
+h2{font-size:18px;margin:30px 0 8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font:12.5px ui-monospace,Menlo,monospace;background:var(--surface2);padding:1px 5px;border-radius:4px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--orange)}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 18px;font-size:14px}
+.bg b{display:block;margin-bottom:2px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.fig{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px;margin:14px 0;overflow-x:auto}
+svg{width:100%;height:auto;min-width:760px;display:block}
+svg text{fill:var(--text);font-family:-apple-system,sans-serif;font-size:12.5px}
+svg .m{font-family:ui-monospace,Menlo,monospace;font-size:11px}
+svg .d{fill:var(--dim)}svg .b{font-weight:700}
+svg .box{fill:var(--surface2);stroke:var(--border);stroke-width:1.5}
+svg .new{fill:var(--surface2);stroke:var(--green);stroke-width:2.2}
+svg .diff{fill:var(--surface2);stroke:var(--orange);stroke-width:2.2}
+svg .ar{stroke:var(--accent);stroke-width:1.8;fill:none}
+svg .kv{stroke:var(--green);stroke-width:2.2;fill:none;stroke-dasharray:6 4}
+svg a text{text-decoration:underline}
+.hl{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:18px 0}
+.warn{border-left:4px solid var(--orange);background:var(--surface);padding:8px 14px;margin:18px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface2)}
+ol,ul{padding-left:22px}li{margin:3px 0}
+
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+svg .bad{fill:var(--surface2);stroke:var(--red);stroke-width:2.2}
+svg .g{fill:var(--green)}svg .r{fill:var(--red)}svg .o{fill:var(--orange)}
+.verdict.bad{color:var(--red)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.diffc{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diffc .add{color:var(--green)}.diffc .del{color:var(--red)}.diffc .hunk{color:var(--accent)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head><body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+<h1>Validation without stopping training: lending vLLM engines, compared with validating inline</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5183">NVIDIA-NeMo/RL PR #5183</a> · code links pinned to <code>550bcd4a</code></p>
+<div class="status"><dl>
+<dt>Before</dt><dd>In async GRPO, each periodic validation pauses rollouts, runs on every vLLM engine, and the trainer waits for it.</dd>
+<dt>This PR</dt><dd>Adds an opt-in setting, <code>grpo.async_grpo.validation_engines</code>. The last N engines run validation in the background while the other engines keep training.</dd>
+<dt>Status</dt><dd><span class="verdict open">Proposed — PR is open, not merged.</span> The review found one bug that blocks some setups; see the second page.</dd>
+</dl></div>
+<nav class="chain"><span class="here">lent engines vs inline</span><a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-5183-router-413.html">413 on large requests</a></nav><p class="chainnote">Two pages on this PR, one question each. This one: what the feature does and how it compares with validating inline.</p>
+<div class="bg"><b>Background: the words on this page</b>
+In async GRPO, <span class="tip" tabindex="0" data-tip="Separate model servers on their own GPUs. They write the answers (rollouts) that training learns from.">vLLM engines</span> make rollouts all the time while the trainer learns. After each training step a <span class="tip" tabindex="0" data-tip="Copying the trainer's new weights into every engine. Here it is one broadcast that every engine must join, or it hangs.">refit</span> copies the new weights to the engines. <span class="tip" tabindex="0" data-tip="Runs the tasks and sends chat requests to the engines over HTTP.">NeMo Gym</span> is the caller. Validation scores the model on a held-out set. Dotted words have a short explanation: hover or tap them.</div>
+
+<p>The engines to lend are the last <code>num_engines</code> in the list (<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/async_utils/validation_engines.py#L55"><code>split_validation_urls</code></a>). Training requests now go through a small <span class="tip" tabindex="0" data-tip="A CPU-only server between Gym and the engines. It picks the least busy engine for each request, and can be told to stop using some engines.">router</span>, so a lent engine can be taken out and put back (<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L1996">setup</a>). Validation gets a second Gym stack that talks to the lent engines directly (<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L2012"><code>init_validation_nemo_gym</code></a>). A lent engine still joins every refit, but throws the new weights away (<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/models/generation/vllm/vllm_backend.py#L2334"><code>_discard_weights_from_collective</code></a>), so the score belongs to exactly one step's weights.</p>
+
+<h2>One validation, step by step</h2>
+<div class="fig"><svg viewBox="0 0 990 582" role="img" aria-label="Timeline: inline validation pauses training; lent engine keeps step-8 weights while the others keep training."><text x="20" y="22" class="b">Today (num_engines: 0): validation stops training</text>
+<rect class="box" x="20" y="34" width="150" height="62" rx="8"/><text x="30" y="56" class="b">step 8 trains</text><text x="30" y="76" class="m">e0–e4 make rollouts</text>
+<rect class="diff" x="200" y="34" width="420" height="62" rx="8"/><a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L6660"><text x="210" y="56" class="b">validate() on all 5 engines</text></a><text x="210" y="76" class="m">rollouts paused · trainer waits until it ends</text>
+<rect class="box" x="650" y="34" width="150" height="62" rx="8"/><text x="660" y="56" class="b">step 9 trains</text><text x="660" y="76" class="m">e0–e4 make rollouts</text>
+<path class="ar" d="M170 65 H198"/><path class="ar" d="M620 65 H648"/>
+<text x="815" y="58" class="m">logged at step 8:</text><text x="815" y="76" class="m">{accuracy: 0.88}</text>
+<text x="20" y="140" class="b">This PR (num_engines: 1, serve_training_steps: 3): engine e4 is lent, training never waits</text>
+<text x="20" y="168" class="d">after the refit of step →</text>
+<text x="239.0" y="168" text-anchor="middle" class="b">8</text>
+<text x="337.0" y="168" text-anchor="middle" class="b">9</text>
+<text x="435.0" y="168" text-anchor="middle" class="b">10</text>
+<text x="533.0" y="168" text-anchor="middle" class="b">11</text>
+<text x="631.0" y="168" text-anchor="middle" class="b">12</text>
+<text x="729.0" y="168" text-anchor="middle" class="b">13</text>
+<text x="827.0" y="168" text-anchor="middle" class="b">14</text>
+<text x="925.0" y="168" text-anchor="middle" class="b">15</text>
+<text x="20" y="198">trainer's weights</text>
+<rect class="box" x="193" y="180" width="92" height="28" rx="5"/><text x="239.0" y="198" text-anchor="middle" class="m ">v8</text>
+<rect class="box" x="291" y="180" width="92" height="28" rx="5"/><text x="337.0" y="198" text-anchor="middle" class="m ">v9</text>
+<rect class="box" x="389" y="180" width="92" height="28" rx="5"/><text x="435.0" y="198" text-anchor="middle" class="m ">v10</text>
+<rect class="box" x="487" y="180" width="92" height="28" rx="5"/><text x="533.0" y="198" text-anchor="middle" class="m ">v11</text>
+<rect class="box" x="585" y="180" width="92" height="28" rx="5"/><text x="631.0" y="198" text-anchor="middle" class="m ">v12</text>
+<rect class="box" x="683" y="180" width="92" height="28" rx="5"/><text x="729.0" y="198" text-anchor="middle" class="m ">v13</text>
+<rect class="box" x="781" y="180" width="92" height="28" rx="5"/><text x="827.0" y="198" text-anchor="middle" class="m ">v14</text>
+<rect class="box" x="879" y="180" width="92" height="28" rx="5"/><text x="925.0" y="198" text-anchor="middle" class="m ">v15</text>
+<text x="20" y="234">e0–e3 hold</text>
+<rect class="new" x="193" y="216" width="92" height="28" rx="5"/><text x="239.0" y="234" text-anchor="middle" class="m ">v8</text>
+<rect class="new" x="291" y="216" width="92" height="28" rx="5"/><text x="337.0" y="234" text-anchor="middle" class="m ">v9</text>
+<rect class="new" x="389" y="216" width="92" height="28" rx="5"/><text x="435.0" y="234" text-anchor="middle" class="m ">v10</text>
+<rect class="new" x="487" y="216" width="92" height="28" rx="5"/><text x="533.0" y="234" text-anchor="middle" class="m ">v11</text>
+<rect class="new" x="585" y="216" width="92" height="28" rx="5"/><text x="631.0" y="234" text-anchor="middle" class="m ">v12</text>
+<rect class="new" x="683" y="216" width="92" height="28" rx="5"/><text x="729.0" y="234" text-anchor="middle" class="m ">v13</text>
+<rect class="new" x="781" y="216" width="92" height="28" rx="5"/><text x="827.0" y="234" text-anchor="middle" class="m ">v14</text>
+<rect class="new" x="879" y="216" width="92" height="28" rx="5"/><text x="925.0" y="234" text-anchor="middle" class="m ">v15</text>
+<text x="20" y="270">e4 holds (lent)</text>
+<rect class="diff" x="193" y="252" width="92" height="28" rx="5"/><text x="239.0" y="270" text-anchor="middle" class="m ">v8</text>
+<rect class="diff" x="291" y="252" width="92" height="28" rx="5"/><text x="337.0" y="270" text-anchor="middle" class="m ">v8</text>
+<rect class="diff" x="389" y="252" width="92" height="28" rx="5"/><text x="435.0" y="270" text-anchor="middle" class="m ">v8</text>
+<rect class="diff" x="487" y="252" width="92" height="28" rx="5"/><text x="533.0" y="270" text-anchor="middle" class="m ">v8</text>
+<rect class="diff" x="585" y="252" width="92" height="28" rx="5"/><text x="631.0" y="270" text-anchor="middle" class="m ">v8</text>
+<rect class="diff" x="683" y="252" width="92" height="28" rx="5"/><text x="729.0" y="270" text-anchor="middle" class="m ">v8</text>
+<rect class="new" x="781" y="252" width="92" height="28" rx="5"/><text x="827.0" y="270" text-anchor="middle" class="m ">v14</text>
+<rect class="new" x="879" y="252" width="92" height="28" rx="5"/><text x="925.0" y="270" text-anchor="middle" class="m ">v15</text>
+<text x="20" y="306">e4 serves</text>
+<rect class="diff" x="193" y="288" width="92" height="28" rx="5"/><text x="239.0" y="306" text-anchor="middle" class="m ">val + train</text>
+<rect class="diff" x="291" y="288" width="92" height="28" rx="5"/><text x="337.0" y="306" text-anchor="middle" class="m ">val + train</text>
+<rect class="diff" x="389" y="288" width="92" height="28" rx="5"/><text x="435.0" y="306" text-anchor="middle" class="m ">val + train</text>
+<rect class="diff" x="487" y="288" width="92" height="28" rx="5"/><text x="533.0" y="306" text-anchor="middle" class="m ">val only</text>
+<rect class="diff" x="585" y="288" width="92" height="28" rx="5"/><text x="631.0" y="306" text-anchor="middle" class="m ">val only</text>
+<rect class="diff" x="683" y="288" width="92" height="28" rx="5"/><text x="729.0" y="306" text-anchor="middle" class="m ">val only</text>
+<rect class="new" x="781" y="288" width="92" height="28" rx="5"/><text x="827.0" y="306" text-anchor="middle" class="m ">train</text>
+<rect class="new" x="879" y="288" width="92" height="28" rx="5"/><text x="925.0" y="306" text-anchor="middle" class="m ">train</text>
+<text x="20" y="342">router sends training to</text>
+<rect class="box" x="193" y="324" width="92" height="28" rx="5"/><text x="239.0" y="342" text-anchor="middle" class="m ">e0…e4</text>
+<rect class="box" x="291" y="324" width="92" height="28" rx="5"/><text x="337.0" y="342" text-anchor="middle" class="m ">e0…e4</text>
+<rect class="box" x="389" y="324" width="92" height="28" rx="5"/><text x="435.0" y="342" text-anchor="middle" class="m ">e0…e4</text>
+<rect class="diff" x="487" y="324" width="92" height="28" rx="5"/><text x="533.0" y="342" text-anchor="middle" class="m ">e0…e3</text>
+<rect class="diff" x="585" y="324" width="92" height="28" rx="5"/><text x="631.0" y="342" text-anchor="middle" class="m ">e0…e3</text>
+<rect class="diff" x="683" y="324" width="92" height="28" rx="5"/><text x="729.0" y="342" text-anchor="middle" class="m ">e0…e3</text>
+<rect class="box" x="781" y="324" width="92" height="28" rx="5"/><text x="827.0" y="342" text-anchor="middle" class="m ">e0…e4</text>
+<rect class="box" x="879" y="324" width="92" height="28" rx="5"/><text x="925.0" y="342" text-anchor="middle" class="m ">e0…e4</text>
+<text x="198" y="376" class="m b">①</text><text x="492" y="376" class="m b">②</text><text x="786" y="376" class="m b">③ ④</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/async_utils/validation_engines.py#L123"><text x="20" y="400" class="m b">① lend_to_validation(8)</text></a><text x="180.1" y="400" class="m">e4 keeps v8: set_discard_refits([4], True). validate(step 8) starts on a thread.</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/async_utils/validation_engines.py#L154"><text x="20" y="420" class="m b">② after_refit(11)</text></a><text x="139.9" y="420" class="m">11 − 8 ≥ 3, so the router stops sending training to e4.</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/async_utils/validation_engines.py#L148"><text x="20" y="440" class="m b">③ before_refit()</text></a><text x="133.2" y="440" class="m">validation is done: set_discard_refits([4], False). Refit 14 loads v14; e4 rejoins.</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L5819"><text x="20" y="460" class="m b">④ logged at step 14</text></a><text x="153.3" y="460" class="m">{validation/accuracy: 0.89, validation/start_step: 8}</text>
+<text x="20" y="490" class="m">training request:   Gym → router → engine      {messages:[…], priority: -1}</text>
+<text x="20" y="508" class="m">validation request: 2nd Gym stack → e4 directly {messages:[…]}   (priority 0: picked after waiting training requests)</text>
+<rect class="new" x="20" y="534" width="14" height="14" rx="3"/><text x="40" y="546" class="d">takes every weight update</text>
+<rect class="diff" x="230" y="534" width="14" height="14" rx="3"/><text x="250" y="546" class="d">frozen for validation: joins each update, drops the weights</text>
+<rect class="box" x="640" y="534" width="14" height="14" rx="3"/><text x="660" y="546" class="d">unchanged</text>
+<text x="20" y="568" class="d" style="font-size:11px">Step numbers follow the linked code paths; the accuracy values are examples, not a captured run.</text></svg></div>
+<p>5 engines, 1 lent, validation due at step 8. The lent engine keeps serving training for 3 more steps on its old weights, then serves validation only. When the validation ends, the next refit loads current weights and the engine returns. The score shows up 6 steps after it started, tagged with <code>validation/start_step</code>.</p>
+
+<h2>Where the two paths meet, and what still differs</h2>
+<p>Both call the same function, <a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L5075"><code>validate()</code></a>: inline at <a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L6660">L6660</a>, lent through <a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L5806"><code>BackgroundValidator</code></a> at <a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L6616">L6616</a>. Scoring and metrics are the same code.</p>
+<table>
+<tr><th>Still different</th><th>Inline (today)</th><th>Lent engines (this PR)</th></tr>
+<tr><td>Who runs it</td><td>every engine</td><td>the last N engines, through a second Gym stack</td></tr>
+<tr><td>Trainer</td><td>waits</td><td>keeps going; waits only before the last step's refit (<code>val_at_end</code>) and when training stops</td></tr>
+<tr><td>Score is logged</td><td>at the step it scored</td><td>at the step it finished, with <code>validation/start_step</code></td></tr>
+<tr><td>Next validation due while one runs</td><td>cannot happen</td><td>skipped, logged as <code>validation/skipped</code> (<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L6628">L6628</a>)</td></tr>
+<tr><td>Training requests</td><td>Gym picks an engine per rollout and sticks to it</td><td>router picks the least busy engine per request, and adds <code>priority: -1</code></td></tr>
+</table>
+
+<h2>Why keep both, and what lending costs</h2>
+<ul>
+<li><b>What it buys:</b> in the PR's run (30 steps, a 120B model, 4 engines, 1 lent) the trainer waited 2,201 s on validation inline and 0 s with lending; total time fell from 147.8 to 138.0 min. One run per arm.</li>
+<li><b>What it costs:</b> fewer engines make rollouts while a validation runs, scores arrive late, a second Gym stack runs all the time, and all engines switch to vLLM priority scheduling (<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L1938">L1938</a>).</li>
+<li><b>Where it works:</b> vLLM engines on their own GPUs, NeMo Gym, in-flight weight updates, and the broadcast refit. Anything else is refused at startup (<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/nemo_rl/algorithms/grpo.py#L713"><code>_validate_validation_engines</code></a>). Inline stays the default.</li>
+</ul>
+<div class="hl"><b>So what.</b> The review checked the two things the design rests on, by reading the code: a validation tagged step 8 really scores step-8 weights, and the "drop the weights" flag lands on the same engine workers that take the refit. Both hold. One bug in the new router path stops training for large requests (images): <a href="https://rayentian.github.io/gh-pages-poc/ruit/pr-5183-router-413.html">see the second page</a>. Smaller points are in the review comments.</div>
+</div></body></html>
