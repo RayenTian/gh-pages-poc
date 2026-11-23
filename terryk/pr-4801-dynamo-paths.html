@@ -109,7 +109,7 @@ permalinks pinned to head <code>1a2eca34</code>; the removed path links to main 
 
 <nav class="chain">
   <span class="here">#4801 next to main's Dynamo</span>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-refit-widths.html">refit with uneven widths</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-refit-widths.html">how refit works</a>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-pd-one-interface.html">one P/D interface</a>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-one-chat-path.html">the vLLM design it should mirror</a>
 </nav>
@@ -235,30 +235,7 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5da
         if key in dynamo_cfg: problems.append(f&quot;{key} was removed: {why}&quot;)</pre>
 <p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583777">review comment C9 — dynamo_config.py:84</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651584110">C14 — dynamo_config.py:283</a></p>
 
-<h2>Refit with shards of different widths — before and after</h2>
-<p>The refit NCCL group lists the trainer ranks first, then each engine's ranks, shard by shard. Before, every shard had one width, so shard <i>i</i> started at <code>i × width</code>. A prefill engine at TP 4 next to two decode engines at TP 2 breaks that, so this PR keeps one width per shard and adds the earlier widths up. Dead shards still count, because the worker list never shrinks.</p>
-<p class="pclbl">Refit plan, before (main)</p>
-<pre class="pc"><span class="who"># driver, weight synchronizer: plan the refit group (also after a shard dies)</span>
-def <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/membership.py#L121">plan_refit_membership</a>(surviving, dp_size, total_workers, trainers):
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/membership.py#L168">width = total_workers // dp_size</a>                          <span class="cm"># one width for every shard</span>
-    <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/membership.py#L170">prefix = {s: i * width for i, s in enumerate(surviving)}</a>  <span class="cm"># ranks after the trainers</span>
-    return Membership(world=trainers + len(surviving) * width, prefix, width)
-<span class="who"># driver, fan out the new group</span>
-vLLM:     leader = workers[<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/vllm/vllm_generation.py#L1334">shard * width</a>]                     <span class="cm"># first worker of the shard</span>
-Megatron: ranks for workers[<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/megatron/megatron_generation.py#L495-L496">shard * width</a> : + width]</pre>
-<p class="pclbl">Refit plan, after (this PR)</p>
-<pre class="pc"><span class="who"># driver, same place; example: 16 trainer ranks, shards (4, 2, 2), shard 0 dead</span>
-def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L134">plan_refit_membership</a>(surviving, dp_size, total_workers, trainers,
-<span class="add">                          shard_widths=None):</span>                        <span class="cm"># no caller passes it yet</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L175-L188">widths = shard_widths or (total_workers // dp_size,) * dp_size</a></span>   <span class="cm"># (4, 2, 2)</span>
-<span class="del">    prefix = {s: i * width for i, s in enumerate(surviving)}</span>
-<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L204-L205">for s in sorted(surviving): prefix[s] = next; next += widths[s]</a></span>  <span class="cm"># {1: 0, 2: 2}</span>
-    return Membership(world=trainers + next, prefix, widths)         <span class="cm"># world = 16 + 4 = 20</span>
-<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L53-L59">worker_offset</a>(shard): return sum(widths[:shard])</span>                 <span class="cm"># 0, 4, 6: dead shards count</span>
-vLLM:     leader = workers[<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/vllm/vllm_generation.py#L1337">membership.worker_offset(shard)</a>]          <span class="cm"># C5: tested only with equal widths</span>
-Megatron: ranks for workers[<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L526-L527">worker_offset(shard)</a> : + widths[shard]]</pre>
-<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L134"><code>plan_refit_membership</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/weight_sync/membership.py#L53-L59"><code>RefitMembership.worker_offset</code></a>, vLLM <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/vllm/vllm_generation.py#L1337"><code>rebuild_collective</code></a> (also <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/vllm/vllm_generation.py#L1288">L1288</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/vllm/vllm_generation.py#L2033">L2033</a>), Megatron <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L526-L527"><code>_refit_ranked_workers</code></a>. With equal widths the result is the same as before. No caller passes uneven widths until #5025's engine fleet does.</p>
-<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583570">review comment C5 — vllm_generation.py:1337</a></p>
+<p>This PR also changes how refit numbers engines of different widths. That, and how all three refit transports work, is on <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-refit-widths.html">one refit page</a>.</p>
 
 <div class="hl"><b>So what.</b> This PR is groundwork: nothing new runs on main, and it now agrees with main on which backends may set <code>dynamo: true</code>. Two things to settle before #5025 turns the switch on: fix C9, or every Megatron Dynamo config that sets <code>control_timeout_s</code> fails at startup with a vLLM error; and decide whether Megatron + Dynamo should exist without P/D, as vLLM + Dynamo does today. The review links work for others only after the review is published.</div>
 
