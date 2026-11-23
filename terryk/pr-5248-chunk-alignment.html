@@ -85,7 +85,7 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace
 <h1>Why a GRPO training chunk now takes 20 of 21 ready groups</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">NVIDIA-NeMo/RL #5248</a>
 · issue <a href="https://github.com/NVIDIA-NeMo/RL/issues/5240">#5240</a> (item 1)
-· permalinks pin head <code>21f8a78</code></p>
+· permalinks pin head <code>b52f74b</code></p>
 
 <div class="status"><dl>
   <dt>Before</dt>
@@ -109,11 +109,11 @@ in <b>chunks</b> as they finish generating. Each chunk is split evenly across th
 and that split does not allow one rank to get more samples than another. Dotted words have a short explanation: hover or tap them.</div>
 
 <p>The trainer splits each chunk with
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/distributed/batched_data_dict.py#L603"><code>shard_by_batch_size</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/distributed/batched_data_dict.py#L603"><code>shard_by_batch_size</code></a>,
 which raises if the sample count is not a multiple of the DP size. Before this PR, GRPO gave the sampler no size rule, so with
 <b>16 answers per prompt</b> on <b>32 DP ranks</b>, a moment with <b>21 ready groups</b> made a chunk of 21 × 16 = <b>336</b> samples — 10.5 per rank.
 The PR adds
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/config.py#L1917"><code>resolve_grpo_group_multiple</code></a>:
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1942"><code>resolve_grpo_group_multiple</code></a>:
 the smallest group count whose samples always split evenly. Here that is 32 ÷ gcd(32, 16) = <b>2 groups</b>, so every chunk is an even number of groups.</p>
 
 <h2>Same 21 ready groups, before and after</h2>
@@ -141,7 +141,7 @@ the smallest group count whose samples always split evenly. Here that is 32 ÷ g
   <text class="lbl" x="700" y="68">336 ÷ 32 = 10.5</text>
   <text class="red" x="700" y="86">✗ crash</text>
   <text class="note" x="438" y="118">ValueError: Batch size (336) is not a multiple of shards (32)</text>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/distributed/batched_data_dict.py#L603"><text x="438" y="134">batched_data_dict.py:603</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/distributed/batched_data_dict.py#L603"><text x="438" y="134">batched_data_dict.py:603</text></a>
 
   <line x1="14" y1="160" x2="886" y2="160" style="stroke:var(--border)"/>
 
@@ -161,14 +161,14 @@ the smallest group count whose samples always split evenly. Here that is 32 ÷ g
   <text class="lbl" x="700" y="206">320 ÷ 32 = 10</text>
   <text class="grn" x="700" y="224">✓ trains</text>
   <text class="note" x="110" y="256">1 group stays in the buffer and joins the next chunk</text>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/async_utils/staleness_sampler.py#L367"><text x="438" y="256">rounding: staleness_sampler.py _finalize_selection</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/async_utils/staleness_sampler.py#L367"><text x="438" y="256">rounding: staleness_sampler.py _finalize_selection</text></a>
 
   <rect class="box" x="110" y="282" width="776" height="102" rx="8"/>
   <text class="lbl-b" x="124" y="304">Where the 2 comes from (computed once, at setup)</text>
   <text class="lbl" x="124" y="326">samples per chunk must divide by  32 DP ranks  (× microbatch size under static batching)</text>
   <text class="lbl" x="124" y="346">one group = 16 samples  →  groups needed = 32 ÷ gcd(32, 16) = 2</text>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/config.py#L1917"><text x="124" y="370">resolve_grpo_group_multiple</text></a>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/config.py#L1836"><text x="340" y="370">sample_multiple</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1942"><text x="124" y="370">resolve_grpo_group_multiple</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1861"><text x="340" y="370">sample_multiple</text></a>
   <text class="note" x="470" y="370">Forest training is exempt: it pads each group itself.</text>
 </svg>
 
@@ -183,23 +183,23 @@ the smallest group count whose samples always split evenly. Here that is 32 ÷ g
 chunk = sampler.select(min=floor, max=left, **kwargs)  <span class="cm"># any size: 21 groups</span>
 trainer.train(chunk)                         <span class="cm"># 336 samples → split raises</span></pre>
 
-<p class="pclbl">After (head <code>21f8a78</code>)</p>
+<p class="pclbl">After (head <code>b52f74b</code>)</p>
 <pre class="pc"><span class="who"># setup, when the trainer is built</span>
 <span class="del">validate_grpo_chunk_cap_alignment(cfg, dp)</span>
-<span class="add">m = <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/config.py#L1946">resolve_grpo_chunk_alignment</a>(cfg, dp)</span>    <span class="cm"># m = 2; raises if step size or cap % m != 0</span>
+<span class="add">m = <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1971">resolve_grpo_chunk_alignment</a>(cfg, dp)</span>    <span class="cm"># m = 2; raises if step size or cap % m != 0</span>
 <span class="add">                                              </span><span class="cm"># warns if drop budgets &gt; 0</span>
 
 <span class="who"># train pump (async loop on the controller)</span>
 kwargs = {}
-<span class="add">if m &gt; 1: <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2804">kwargs["group_multiple"] = m</a></span>
+<span class="add">if m &gt; 1: <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2809">kwargs["group_multiple"] = m</a></span>
 chunk = sampler.select(min=floor, max=left, **kwargs)  <span class="cm"># 21 ready → 20; 1 waits</span>
 trainer.train(chunk)                         <span class="cm"># 320 samples → 10 per rank</span>
 
 <span class="who"># same pump, when no chunk can be selected</span>
-<span class="add">if <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2993">data_exhausted and len(buffer) &lt; m</a>: return</span>  <span class="cm"># tail below m is not trained</span></pre>
-<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller_utils/setup.py#L1997-L1999"><code>setup.py</code> L1997-1999</a>,
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2796-L2805"><code>_train_pump</code> L2796-2805</a>,
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L3753-L3756"><code>is_last_step</code> L3753-3756</a>.</p>
+<span class="add">if <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2998">data_exhausted and len(buffer) &lt; m</a>: return</span>  <span class="cm"># tail below m is not trained</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/setup.py#L2040-L2042"><code>setup.py</code> L1997-1999</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2801-L2810"><code>_train_pump</code> L2796-2805</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L3758-L3761"><code>is_last_step</code> L3753-3756</a>.</p>
 
 <p class="where"><b>Where the fix lands: RL only.</b> Setup (<code>config.py</code>, <code>setup.py</code>) computes the multiple once; the train pump passes it to the sampler, which already knew how to round down (PPO used it first).</p>
 
@@ -207,9 +207,9 @@ trainer.train(chunk)                         <span class="cm"># 320 samples → 
 <p>The review found two cases the fix does not cover yet. Both are comments on the review.</p>
 <ul>
   <li><b>End of data with dynamic sampling.</b> A step whose target shrinks to an odd number still crashes with <code>No multiple of 2 fits selection bounds</code>. The second page shows it and the one-line fix.
-  <span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">review comment C1</a></span></li>
+  <span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284318">review comment C1 · single_controller.py:2810</a></span></li>
   <li><b><code>weight_fifo</code> streaming can now hang.</b> That sampler only reads groups from the oldest weight version. If one group is left there, it can never make a pair, and the step never closes. Before the PR this failed at once; now it waits until the stall watchdog fires. The fix is to reject this setup at startup.
-  <span class="cref" data-c="C2"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">review comment C2</a></span></li>
+  <span class="cref" data-c="C2"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284337">review comment C2 · config.py:2035</a></span></li>
 </ul>
 
 <div class="hl"><b>So what.</b> A streaming GRPO run can no longer crash mid-step because "too many" groups happened to be ready at once. A config that can never split evenly is now rejected at setup, not partway through a run. What you give up: up to <code>m − 1</code> ready groups wait one more chunk, and at data exhaustion a tail smaller than <code>m</code> is not trained.</div>

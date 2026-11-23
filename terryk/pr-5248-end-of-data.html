@@ -85,7 +85,7 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace
 <h1>A dynamic-sampling step that ends on an odd group count still crashes</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">NVIDIA-NeMo/RL #5248</a>
 · found in review
-· permalinks pin head <code>21f8a78</code></p>
+· permalinks pin head <code>b52f74b</code></p>
 
 <div class="status"><dl>
   <dt>Before</dt>
@@ -110,11 +110,11 @@ and its target drops by one. Page 1 explains the group multiple <code>m</code>. 
 
 <p>Take the shape of the shipped dapo-nanov3.5 single-controller recipes: <b>8</b> prompts per step, full batch, group multiple <b>m = 2</b>.
 At the end of data one prompt is filtered with no spare, so
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2575-L2588"><code>_pop_filtered_replacement</code></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2580-L2593"><code>_pop_filtered_replacement</code></a>
 marks the step short and
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2732-L2735"><code>_target_groups_for_step</code></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2737-L2740"><code>_target_groups_for_step</code></a>
 returns <b>7</b>. The pump asks the sampler for exactly 7 groups, in whole multiples of 2. No such number exists, so
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/async_utils/staleness_sampler.py#L393-L397"><code>_finalize_selection</code></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/async_utils/staleness_sampler.py#L393-L397"><code>_finalize_selection</code></a>
 raises on a step the controller had already said may close short. The drop-budget warning does not fire, because no drop budget is involved.</p>
 
 <h2>Target 8 → 7, in multiples of 2</h2>
@@ -150,7 +150,7 @@ raises on a step the controller had already said may close short. The drop-budge
   <text class="grn" x="680" y="170">✓ trains 6 groups</text>
   <text class="note" x="680" y="188">1 group left; pump exits</text>
   <text class="note" x="376" y="222">the leftover leaves through the PR's own "unaligned groups remain" exit</text>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2992-L3005"><text x="376" y="240">single_controller.py:2992-3005</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2997-L3010"><text x="376" y="240">single_controller.py:2992-3005</text></a>
 
   <text class="note" x="14" y="272">Both rows are real CPU runs of the train pump with the in_order sampler (head, and head + the fix below).</text>
 </svg>
@@ -158,12 +158,12 @@ raises on a step the controller had already said may close short. The drop-budge
 <h2>What would fix it — proposed, not in the PR</h2>
 <p>Nothing below is implemented. It is the fix asked for in review comment C1.</p>
 <p class="where"><b>Where the fix lands: RL only, one line</b> in
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2732-L2735"><code>_target_groups_for_step</code></a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2737-L2740"><code>_target_groups_for_step</code></a>,
 plus one line in a test that builds the controller by hand.</p>
 
 <p class="pclbl">The fix, as pseudocode (proposed; run on CPU)</p>
 <pre class="pc"><span class="who"># train pump, every time it needs the step's target</span>
-def <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834ea56710546e6/nemo_rl/algorithms/single_controller.py#L2700">target_groups_for_step</a>(step):
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2705">target_groups_for_step</a>(step):
     target = num_prompts_per_step - shortfall[step]  <span class="cm"># 8 - 1 = 7</span>
     if step in steps_allowed_short:
 <span class="del">        return target</span>                                <span class="cm"># 7: no multiple of 2 fits</span>
@@ -172,7 +172,7 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/21f8a7875b5332aa1bcdb6358834
 <p class="pcref">Every reader of the target then agrees: the pump's <code>while</code> loop, the select bound, and the PPO and Forest checks (both have <code>m = 1</code>, so they do not change). A target that rounds to 0 closes with no groups and is skipped with no optimizer update.</p>
 
 <div class="hl"><b>So what.</b> Any GRPO run with dynamic sampling, the <code>in_order</code> or <code>ready_first</code> sampler and <code>m &gt; 1</code> that reaches the end of its data can die on its last step instead of finishing cleanly: it only takes an odd number of filtered prompts with no spare. The shipped dapo-nanov3.5 recipes have exactly that shape; their 10-step limit usually stops them first. The fix is one line plus a regression test, so it belongs in this PR.
-<span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">review comment C1</a></span></div>
+<span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284318">review comment C1 · single_controller.py:2810</a></span></div>
 
 </div>
 </body>
