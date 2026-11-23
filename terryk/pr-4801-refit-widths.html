@@ -340,20 +340,20 @@ svg .empty{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:2 3}
 <text class="note" x="432" y="630" text-anchor="start">decode D1</text>
 <rect class="grp" x="8" y="464" width="580" height="162" rx="8"/>
 <path d="M49.0,528 L49.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
-<path d="M187.0,528 L113.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
-<path d="M113.0,528 L177.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
-<path d="M251.0,528 L241.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
-<path d="M55.0,528 L319.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
-<path d="M251.0,528 L383.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
-<path d="M55.0,528 L461.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
-<path d="M251.0,528 L525.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M43.0,528 L113.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M251.0,528 L177.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M257.0,528 L241.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M43.0,528 L319.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M113.0,528 L383.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M187.0,528 L461.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M257.0,528 L525.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
 <text class="fam" x="604" y="484" text-anchor="start">1 group of 16 (orange box), point to point</text>
 <text class="note" x="604" y="502" text-anchor="start">Every rank shares its own parallel groups in one</text>
 <text class="note" x="604" y="518" text-anchor="start">all-gather; Megatron-Core plans every send. Each</text>
 <text class="note" x="604" y="534" text-anchor="start">engine rank receives exactly its rows, no all-gather.</text>
-<text class="note" x="604" y="554" text-anchor="start">Sender: destination rank mod 2 picks trainer copy A</text>
-<text class="note" x="604" y="570" text-anchor="start">or B; both copies share the work (pairs follow this</text>
-<text class="note" x="604" y="586" text-anchor="start">rule, not run). Every parameter goes this way.</text>
+<text class="note" x="604" y="554" text-anchor="start">Sender copy: dst % 2, then (dst // 2) % 2.</text>
+<text class="note" x="604" y="570" text-anchor="start">Here t0 and t3 send 8192 rows each, t1 and t2 only</text>
+<text class="note" x="604" y="586" text-anchor="start">4096: uneven (hand trace, not run).</text>
 <text class="ok" x="604" y="606" text-anchor="start">Needs from NeMo RL: each engine&#x27;s offset.</text>
 <rect class="tb" x="10" y="680" width="16" height="12" rx="3"/>
 <text class="note" x="32" y="691" text-anchor="start">trainer rank (TP 2, PP 2, DP 2)</text>
