@@ -204,6 +204,23 @@ The number after each sample is its token length. Every result below is a real r
   <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/models/policy/tq_policy.py#L735"><text x="480" y="528">train dispatch: tq_policy.py:735</text></a>
 </svg>
 
+
+<p class="pclbl">How m is computed</p>
+<pre class="pc"><span class="who"># setup, once, when the policy trainer is built</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1861">sample_multiple</a>(policy, dp):            <span class="cm"># samples every chunk must divide by</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1881-L1884">if dynamic_batching or sequence_packing:</a>
+        return dp                           <span class="cm"># workers build their own microbatches</span>
+    if no logprob pass runs:
+        <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1887">return dp * train_micro_batch_size</a>  <span class="cm"># whole training microbatches per rank</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1889">return dp * lcm(train_micro_batch_size, logprob_batch_size)</a>
+
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1942">resolve_grpo_group_multiple</a>(cfg, dp):
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1958-L1959">if forest_training: return 1</a>            <span class="cm"># its producer pads each group itself</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1961-L1965">s = sample_multiple(policy, dp)</a>         <span class="cm"># e.g. packing, DP 3 → s = 3</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1966-L1968">return s // gcd(s, G)</a>                   <span class="cm"># fewest groups whose samples divide by s</span></pre>
+<p class="note2" style="color:var(--text)">A chunk of <i>k</i> groups has <i>k</i> × G samples. It splits evenly when s divides <i>k</i> × G, and the smallest such <i>k</i> is s ÷ gcd(s, G). In your example s = 3 and G = 2 share no factor, so it takes 3 whole groups (6 samples) to get a multiple of 3. "No logprob pass" means neither the previous-policy nor the reference-model logprob pass runs, so the logprob batch size never splits the chunk. Every value below is the real return value of these two functions:</p>
+<table><tr><th>Setup</th><th>DP</th><th>Samples per group (G)</th><th>Samples a chunk must divide by (s)</th><th>Group multiple m</th></tr><tr><td>packing or dynamic batching (your example)</td><td>3</td><td>2</td><td>3</td><td>3 ÷ gcd(3, 2) = <b>3</b></td></tr><tr><td>packing (the PR body's example)</td><td>32</td><td>16</td><td>32</td><td>32 ÷ gcd(32, 16) = <b>2</b></td></tr><tr><td>static, <code>train_micro_batch_size</code> 2</td><td>3</td><td>2</td><td>3 × 2 = 6</td><td>6 ÷ gcd(6, 2) = <b>3</b></td></tr><tr><td>static, microbatch 4, <code>logprob_batch_size</code> 6</td><td>2</td><td>4</td><td>2 × lcm(4, 6) = 24</td><td>24 ÷ gcd(24, 4) = <b>6</b></td></tr><tr><td>Forest training</td><td>3</td><td>2</td><td>—</td><td><b>1</b> (exempt)</td></tr></table>
+
 <h2>What the PR changes, as pseudocode</h2>
 
 <p class="pclbl">Before (base <code>9a7640c</code>)</p>
