@@ -111,6 +111,11 @@ svg .c-b2{fill:var(--accent);opacity:.2}
 svg .c-g{fill:var(--green);opacity:.45}
 svg .c-g2{fill:var(--green);opacity:.2}
 svg .empty{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:2 3}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.2}
+svg .hi{fill:var(--surface);stroke:var(--orange);stroke-width:2.2}
+svg .mono{fill:var(--text);font:10.5px ui-monospace,Menlo,monospace}
+svg a text.mono{fill:var(--accent);text-decoration:underline}
+svg .phl{fill:var(--accent);font:bold 13px -apple-system,sans-serif;text-decoration:underline}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
   document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -699,6 +704,92 @@ vLLM P/D (#4920): <a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9f
 <span class="add">groups  = one per (layout, trainer PP stage)</span>                       <span class="cm"># nccl_reshard, as today</span>
 <span class="add">mcore   = prepare_swap_model_weights(dst_rank_offset=offset, ...)</span>  <span class="cm"># Megatron only; offsets from the same layouts</span>
 <span class="add">membership = which replicas are alive</span>                              <span class="cm"># liveness only, as TRT-LLM keeps it</span></pre>
+<p>The packed broadcast is the one transport every backend shares, so it is the fair comparison. Same example, three designs, top to bottom: what each step knows and passes on.</p>
+<div class="figwrap" id="flow"><svg viewBox="0 0 960 438" role="img" aria-label="How engine start ranks flow to the workers in three designs">
+<defs><marker id="md" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--dim)"/></marker></defs>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L761-L794"><text class="phl" x="164" y="22">TRT-LLM P/D (main)</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L755-L825"><text class="phl" x="434" y="22">Megatron + Dynamo (#4801 + #5025)</text></a>
+<text class="ph" x="704" y="22">Proposed: one layout method</text>
+<text class="fam" x="10" y="66">generation object</text>
+<text class="note" x="10" y="82">(driver)</text>
+<rect class="hi" x="160" y="44" width="262" height="48" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L236-L251"><text class="mono" x="168" y="59">_plan_engines: roles [P, D, D]</text></a>
+<text class="mono" x="168" y="72">TP per engine [4, 2, 2]</text>
+<text class="mono" x="168" y="85">_engine_owner_indices = [0, 4, 6]</text>
+<path d="M291.0,92 L291.0,106" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<rect class="hi" x="430" y="44" width="262" height="48" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L737-L745"><text class="mono" x="438" y="59">engine records: widths (4, 2, 2)</text></a>
+<text class="mono" x="438" y="72">full_fleet_membership() →</text>
+<text class="mono" x="438" y="85">shared RefitMembership(widths)</text>
+<path d="M561.0,92 L561.0,106" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<rect class="box" x="700" y="44" width="262" height="48" rx="6"/>
+<text class="mono" x="708" y="59">refit_layouts() → plain data:</text>
+<text class="mono" x="708" y="72">[(P0, 4), (D0, 2), (D1, 2)]</text>
+<text class="mono" x="708" y="85">every backend, same shape</text>
+<path d="M831.0,92 L831.0,106" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<text class="fam" x="10" y="130">→ weight synchronizer</text>
+<text class="note" x="10" y="146">(driver)</text>
+<rect class="box" x="160" y="108" width="262" height="48" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/collective_weight_synchronizer.py#L227-L253"><text class="mono" x="168" y="123">receives: no layout at all</text></a>
+<text class="mono" x="168" y="136">world = 8 train GPUs</text>
+<text class="mono" x="168" y="149">      + 8 inference GPUs = 16</text>
+<path d="M291.0,156 L291.0,170" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<rect class="box" x="430" y="108" width="262" height="48" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/collective_weight_synchronizer.py#L217-L219"><text class="mono" x="438" y="123">receives: inference world size 8</text></a>
+<text class="mono" x="438" y="136">world = 8 + 8 = 16</text>
+<text class="mono" x="438" y="149">its own membership: None</text>
+<path d="M561.0,156 L561.0,170" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<rect class="hi" x="700" y="108" width="262" height="48" rx="6"/>
+<text class="mono" x="708" y="123">receives: the layouts</text>
+<text class="mono" x="708" y="136">prefix = running total [0, 4, 6]</text>
+<text class="mono" x="708" y="149">world = 8 + 4 + 2 + 2 = 16</text>
+<path d="M831.0,156 L831.0,170" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<text class="fam" x="10" y="194">→ Policy.init_collective</text>
+<text class="note" x="10" y="210">8 trainer workers</text>
+<rect class="box" x="160" y="172" width="262" height="48" rx="6"/>
+<text class="mono" x="168" y="187">init_collective(world 16, offset 0)</text>
+<text class="mono" x="168" y="200">t0–t7 → ranks 0–7</text>
+<path d="M291.0,220 L291.0,234" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<rect class="box" x="430" y="172" width="262" height="48" rx="6"/>
+<text class="mono" x="438" y="187">init_collective(world 16, offset 0)</text>
+<text class="mono" x="438" y="200">t0–t7 → ranks 0–7</text>
+<path d="M561.0,220 L561.0,234" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<rect class="box" x="700" y="172" width="262" height="48" rx="6"/>
+<text class="mono" x="708" y="187">init_collective(world 16, offset 0)</text>
+<text class="mono" x="708" y="200">t0–t7 → ranks 0–7</text>
+<path d="M831.0,220 L831.0,234" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<text class="fam" x="10" y="258">→ generation.init_collective</text>
+<text class="note" x="10" y="274">engine workers</text>
+<rect class="box" x="160" y="236" width="262" height="48" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L782-L794"><text class="mono" x="168" y="251">one call per engine:</text></a>
+<text class="mono" x="168" y="264">init_collective_async(</text>
+<text class="mono" x="168" y="277">  rank_prefix = 0 | 4 | 6)</text>
+<path d="M291.0,284 L291.0,298" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<rect class="box" x="430" y="236" width="262" height="48" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L815-L825"><text class="mono" x="438" y="251">engine_rank_offsets = [8, 12, 14]</text></a>
+<text class="mono" x="438" y="264">one call per engine record:</text>
+<text class="mono" x="438" y="277">  init_collective(rank_offset)</text>
+<path d="M561.0,284 L561.0,298" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<rect class="box" x="700" y="236" width="262" height="48" rx="6"/>
+<text class="mono" x="708" y="251">same call for every backend:</text>
+<text class="mono" x="708" y="264">init_collective(</text>
+<text class="mono" x="708" y="277">  rank_prefix = [0, 4, 6])</text>
+<path d="M831.0,284 L831.0,298" stroke="var(--dim)" stroke-width="1.3" fill="none" marker-end="url(#md)"/>
+<text class="fam" x="10" y="322">worker joins as</text>
+<rect class="box" x="160" y="300" width="262" height="48" rx="6"/>
+<text class="mono" x="168" y="315">rank = 8 + prefix + local rank</text>
+<text class="mono" x="168" y="328">P0 8–11, D0 12–13, D1 14–15</text>
+<rect class="box" x="430" y="300" width="262" height="48" rx="6"/>
+<text class="mono" x="438" y="315">rank = offset + local rank</text>
+<text class="mono" x="438" y="328">P0 8–11, D0 12–13, D1 14–15</text>
+<rect class="box" x="700" y="300" width="262" height="48" rx="6"/>
+<text class="mono" x="708" y="315">rank = 8 + prefix + local rank</text>
+<text class="mono" x="708" y="328">P0 8–11, D0 12–13, D1 14–15</text>
+<rect class="hi" x="10" y="370" width="16" height="12" rx="3"/>
+<text class="note" x="32" y="381">where the running total of engine widths is computed</text>
+<text class="note" x="10" y="402">Same ranks in every column. What differs is where the running total lives: inside one backend (TRT-LLM),</text>
+<text class="note" x="10" y="419">in the shared RefitMembership but used only by Dynamo (#4801), or once in shared code from plain data (proposed).</text>
+</svg></div>
 <p><b>What it takes.</b> TRT-LLM: rename <code>get_nccl_reshard_layouts</code> to the shared method and compute <code>_engine_owner_indices</code> from it. Megatron without Dynamo: move the Megatron branch of the synchronizer's <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/nccl_reshard_weight_synchronizer.py#L184-L200"><code>_gen_layouts</code></a> into <code>MegatronGeneration</code>. Megatron + Dynamo: build the layouts from the engine records, grouped by role. Then the synchronizer has no backend branches, <code>nccl_reshard</code> can be allowed behind Dynamo, and engine offsets come from the layouts, so <code>RefitMembership</code> does not need per-engine widths (#4801's change). For <code>mcore</code>, check whether Megatron-Core's <a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/core/resharding/refit.py#L365-L426"><code>num_dst_pools</code></a>, made "for disaggregated prefill/decode instances", should take one pool per layout; NeMo RL passes none today.</p>
 
 <div class="hl"><b>So what.</b> Three refit designs keep layout knowledge in three places: the generation object, the synchronizer and Megatron-Core. #4801 adds a fourth spot, <code>RefitMembership</code>. One <code>refit_layouts()</code> method per backend would serve all three transports, let Megatron + Dynamo use <code>nccl_reshard</code>, and make #4801's width change unneeded. The review links work for others only after the review is published.</div>
