@@ -105,6 +105,12 @@ svg .numd{fill:var(--dim);font:10.5px ui-monospace,Menlo,monospace}
 svg .pnote{fill:var(--accent);font:11.5px -apple-system,sans-serif}
 svg .gnote{fill:var(--green);font:11.5px -apple-system,sans-serif}
 svg .ok{fill:var(--green);font:bold 12px -apple-system,sans-serif}
+svg .c-o{fill:var(--orange);opacity:.35}
+svg .c-b{fill:var(--accent);opacity:.45}
+svg .c-b2{fill:var(--accent);opacity:.2}
+svg .c-g{fill:var(--green);opacity:.45}
+svg .c-g2{fill:var(--green);opacity:.2}
+svg .empty{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:2 3}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
   document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -358,6 +364,284 @@ svg .ok{fill:var(--green);font:bold 12px -apple-system,sans-serif}
 <rect class="grp" x="700" y="680" width="16" height="12" rx="3"/>
 <text class="note" x="722" y="691" text-anchor="start">one NCCL group</text>
 <text class="note" x="10" y="712" text-anchor="start">W [8192, 4096] = [output features, input features], split by rows under TP. Labels under boxes: the rows of W that rank holds or needs.</text>
+</svg></div>
+<div class="figwrap" id="groups"><svg viewBox="0 0 960 388" role="img" aria-label="NCCL group membership grid for the three refit transports">
+<text class="ph" x="10" y="18">Every NCCL group, one row each (number in a cell = that rank's number inside the group)</text>
+<rect class="tb" x="264" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="283.5" y="42" text-anchor="middle">t0</text>
+<rect class="tb" x="307" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="326.5" y="42" text-anchor="middle">t1</text>
+<rect class="tb" x="350" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="369.5" y="42" text-anchor="middle">t2</text>
+<rect class="tb" x="393" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="412.5" y="42" text-anchor="middle">t3</text>
+<rect class="dead" x="436" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="455.5" y="42" text-anchor="middle">t4</text>
+<rect class="dead" x="479" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="498.5" y="42" text-anchor="middle">t5</text>
+<rect class="dead" x="522" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="541.5" y="42" text-anchor="middle">t6</text>
+<rect class="dead" x="565" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="584.5" y="42" text-anchor="middle">t7</text>
+<rect class="pb" x="608" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="627.5" y="42" text-anchor="middle">r8</text>
+<rect class="pb" x="651" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="670.5" y="42" text-anchor="middle">r9</text>
+<rect class="pb" x="694" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="713.5" y="42" text-anchor="middle">r10</text>
+<rect class="pb" x="737" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="756.5" y="42" text-anchor="middle">r11</text>
+<rect class="db" x="780" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="799.5" y="42" text-anchor="middle">r12</text>
+<rect class="db" x="823" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="842.5" y="42" text-anchor="middle">r13</text>
+<rect class="db" x="866" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="885.5" y="42" text-anchor="middle">r14</text>
+<rect class="db" x="909" y="28" width="39" height="20" rx="3"/>
+<text class="rk" x="928.5" y="42" text-anchor="middle">r15</text>
+<text class="note" x="264" y="22">trainer: PP 0 = t0–t3, PP 1 = t4–t7</text>
+<text class="note" x="608" y="22">engines: P0 = r8–r11, D0 = r12–r13, D1 = r14–r15</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/collective_weight_synchronizer.py#L227-L253"><text x="10" y="71">1 · packed: model_update_group</text></a>
+<text class="note" x="254" y="71" text-anchor="end">16</text>
+<text class="ok" x="956" y="71">W</text>
+<rect class="c-o" x="264" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="283.5" y="71" text-anchor="middle">0</text>
+<rect class="c-o" x="307" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="326.5" y="71" text-anchor="middle">1</text>
+<rect class="c-o" x="350" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="369.5" y="71" text-anchor="middle">2</text>
+<rect class="c-o" x="393" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="412.5" y="71" text-anchor="middle">3</text>
+<rect class="c-o" x="436" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="455.5" y="71" text-anchor="middle">4</text>
+<rect class="c-o" x="479" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="498.5" y="71" text-anchor="middle">5</text>
+<rect class="c-o" x="522" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="541.5" y="71" text-anchor="middle">6</text>
+<rect class="c-o" x="565" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="584.5" y="71" text-anchor="middle">7</text>
+<rect class="c-o" x="608" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="627.5" y="71" text-anchor="middle">8</text>
+<rect class="c-o" x="651" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="670.5" y="71" text-anchor="middle">9</text>
+<rect class="c-o" x="694" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="713.5" y="71" text-anchor="middle">10</text>
+<rect class="c-o" x="737" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="756.5" y="71" text-anchor="middle">11</text>
+<rect class="c-o" x="780" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="799.5" y="71" text-anchor="middle">12</text>
+<rect class="c-o" x="823" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="842.5" y="71" text-anchor="middle">13</text>
+<rect class="c-o" x="866" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="885.5" y="71" text-anchor="middle">14</text>
+<rect class="c-o" x="909" y="57" width="39" height="20" rx="3"/>
+<text class="rk" x="928.5" y="71" text-anchor="middle">15</text>
+<line x1="10" x2="950" y1="80" y2="80" stroke="var(--border)" stroke-width="1"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/nccl_reshard_weight_synchronizer.py#L320-L343"><text x="10" y="97">2 · nccl_reshard: misc</text></a>
+<text class="note" x="254" y="97" text-anchor="end">16</text>
+<rect class="c-o" x="264" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="283.5" y="97" text-anchor="middle">0</text>
+<rect class="c-o" x="307" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="326.5" y="97" text-anchor="middle">1</text>
+<rect class="c-o" x="350" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="369.5" y="97" text-anchor="middle">2</text>
+<rect class="c-o" x="393" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="412.5" y="97" text-anchor="middle">3</text>
+<rect class="c-o" x="436" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="455.5" y="97" text-anchor="middle">4</text>
+<rect class="c-o" x="479" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="498.5" y="97" text-anchor="middle">5</text>
+<rect class="c-o" x="522" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="541.5" y="97" text-anchor="middle">6</text>
+<rect class="c-o" x="565" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="584.5" y="97" text-anchor="middle">7</text>
+<rect class="c-o" x="608" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="627.5" y="97" text-anchor="middle">8</text>
+<rect class="c-o" x="651" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="670.5" y="97" text-anchor="middle">9</text>
+<rect class="c-o" x="694" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="713.5" y="97" text-anchor="middle">10</text>
+<rect class="c-o" x="737" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="756.5" y="97" text-anchor="middle">11</text>
+<rect class="c-o" x="780" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="799.5" y="97" text-anchor="middle">12</text>
+<rect class="c-o" x="823" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="842.5" y="97" text-anchor="middle">13</text>
+<rect class="c-o" x="866" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="885.5" y="97" text-anchor="middle">14</text>
+<rect class="c-o" x="909" y="83" width="39" height="20" rx="3"/>
+<text class="rk" x="928.5" y="97" text-anchor="middle">15</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/nccl_reshard_weight_synchronizer.py#L363-L403"><text x="10" y="123">2 · prefill × PP 0</text></a>
+<text class="note" x="254" y="123" text-anchor="end">4 + 4 = 8</text>
+<text class="ok" x="956" y="123">W</text>
+<rect class="c-b" x="264" y="109" width="39" height="20" rx="3"/>
+<text class="rk" x="283.5" y="123" text-anchor="middle">0</text>
+<rect class="c-b" x="307" y="109" width="39" height="20" rx="3"/>
+<text class="rk" x="326.5" y="123" text-anchor="middle">1</text>
+<rect class="c-b" x="350" y="109" width="39" height="20" rx="3"/>
+<text class="rk" x="369.5" y="123" text-anchor="middle">2</text>
+<rect class="c-b" x="393" y="109" width="39" height="20" rx="3"/>
+<text class="rk" x="412.5" y="123" text-anchor="middle">3</text>
+<rect class="empty" x="436" y="109" width="39" height="20" rx="3"/>
+<rect class="empty" x="479" y="109" width="39" height="20" rx="3"/>
+<rect class="empty" x="522" y="109" width="39" height="20" rx="3"/>
+<rect class="empty" x="565" y="109" width="39" height="20" rx="3"/>
+<rect class="c-b" x="608" y="109" width="39" height="20" rx="3"/>
+<text class="rk" x="627.5" y="123" text-anchor="middle">4</text>
+<rect class="c-b" x="651" y="109" width="39" height="20" rx="3"/>
+<text class="rk" x="670.5" y="123" text-anchor="middle">5</text>
+<rect class="c-b" x="694" y="109" width="39" height="20" rx="3"/>
+<text class="rk" x="713.5" y="123" text-anchor="middle">6</text>
+<rect class="c-b" x="737" y="109" width="39" height="20" rx="3"/>
+<text class="rk" x="756.5" y="123" text-anchor="middle">7</text>
+<rect class="empty" x="780" y="109" width="39" height="20" rx="3"/>
+<rect class="empty" x="823" y="109" width="39" height="20" rx="3"/>
+<rect class="empty" x="866" y="109" width="39" height="20" rx="3"/>
+<rect class="empty" x="909" y="109" width="39" height="20" rx="3"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/nccl_reshard_weight_synchronizer.py#L363-L403"><text x="10" y="149">2 · prefill × PP 1</text></a>
+<text class="note" x="254" y="149" text-anchor="end">4 + 4 = 8</text>
+<rect class="empty" x="264" y="135" width="39" height="20" rx="3"/>
+<rect class="empty" x="307" y="135" width="39" height="20" rx="3"/>
+<rect class="empty" x="350" y="135" width="39" height="20" rx="3"/>
+<rect class="empty" x="393" y="135" width="39" height="20" rx="3"/>
+<rect class="c-b2" x="436" y="135" width="39" height="20" rx="3"/>
+<text class="rk" x="455.5" y="149" text-anchor="middle">0</text>
+<rect class="c-b2" x="479" y="135" width="39" height="20" rx="3"/>
+<text class="rk" x="498.5" y="149" text-anchor="middle">1</text>
+<rect class="c-b2" x="522" y="135" width="39" height="20" rx="3"/>
+<text class="rk" x="541.5" y="149" text-anchor="middle">2</text>
+<rect class="c-b2" x="565" y="135" width="39" height="20" rx="3"/>
+<text class="rk" x="584.5" y="149" text-anchor="middle">3</text>
+<rect class="c-b2" x="608" y="135" width="39" height="20" rx="3"/>
+<text class="rk" x="627.5" y="149" text-anchor="middle">4</text>
+<rect class="c-b2" x="651" y="135" width="39" height="20" rx="3"/>
+<text class="rk" x="670.5" y="149" text-anchor="middle">5</text>
+<rect class="c-b2" x="694" y="135" width="39" height="20" rx="3"/>
+<text class="rk" x="713.5" y="149" text-anchor="middle">6</text>
+<rect class="c-b2" x="737" y="135" width="39" height="20" rx="3"/>
+<text class="rk" x="756.5" y="149" text-anchor="middle">7</text>
+<rect class="empty" x="780" y="135" width="39" height="20" rx="3"/>
+<rect class="empty" x="823" y="135" width="39" height="20" rx="3"/>
+<rect class="empty" x="866" y="135" width="39" height="20" rx="3"/>
+<rect class="empty" x="909" y="135" width="39" height="20" rx="3"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/nccl_reshard_weight_synchronizer.py#L363-L403"><text x="10" y="175">2 · decode × PP 0</text></a>
+<text class="note" x="254" y="175" text-anchor="end">4 + 4 = 8</text>
+<text class="ok" x="956" y="175">W</text>
+<rect class="c-g" x="264" y="161" width="39" height="20" rx="3"/>
+<text class="rk" x="283.5" y="175" text-anchor="middle">0</text>
+<rect class="c-g" x="307" y="161" width="39" height="20" rx="3"/>
+<text class="rk" x="326.5" y="175" text-anchor="middle">1</text>
+<rect class="c-g" x="350" y="161" width="39" height="20" rx="3"/>
+<text class="rk" x="369.5" y="175" text-anchor="middle">2</text>
+<rect class="c-g" x="393" y="161" width="39" height="20" rx="3"/>
+<text class="rk" x="412.5" y="175" text-anchor="middle">3</text>
+<rect class="empty" x="436" y="161" width="39" height="20" rx="3"/>
+<rect class="empty" x="479" y="161" width="39" height="20" rx="3"/>
+<rect class="empty" x="522" y="161" width="39" height="20" rx="3"/>
+<rect class="empty" x="565" y="161" width="39" height="20" rx="3"/>
+<rect class="empty" x="608" y="161" width="39" height="20" rx="3"/>
+<rect class="empty" x="651" y="161" width="39" height="20" rx="3"/>
+<rect class="empty" x="694" y="161" width="39" height="20" rx="3"/>
+<rect class="empty" x="737" y="161" width="39" height="20" rx="3"/>
+<rect class="c-g" x="780" y="161" width="39" height="20" rx="3"/>
+<text class="rk" x="799.5" y="175" text-anchor="middle">4</text>
+<rect class="c-g" x="823" y="161" width="39" height="20" rx="3"/>
+<text class="rk" x="842.5" y="175" text-anchor="middle">5</text>
+<rect class="c-g" x="866" y="161" width="39" height="20" rx="3"/>
+<text class="rk" x="885.5" y="175" text-anchor="middle">6</text>
+<rect class="c-g" x="909" y="161" width="39" height="20" rx="3"/>
+<text class="rk" x="928.5" y="175" text-anchor="middle">7</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/nccl_reshard_weight_synchronizer.py#L363-L403"><text x="10" y="201">2 · decode × PP 1</text></a>
+<text class="note" x="254" y="201" text-anchor="end">4 + 4 = 8</text>
+<rect class="empty" x="264" y="187" width="39" height="20" rx="3"/>
+<rect class="empty" x="307" y="187" width="39" height="20" rx="3"/>
+<rect class="empty" x="350" y="187" width="39" height="20" rx="3"/>
+<rect class="empty" x="393" y="187" width="39" height="20" rx="3"/>
+<rect class="c-g2" x="436" y="187" width="39" height="20" rx="3"/>
+<text class="rk" x="455.5" y="201" text-anchor="middle">0</text>
+<rect class="c-g2" x="479" y="187" width="39" height="20" rx="3"/>
+<text class="rk" x="498.5" y="201" text-anchor="middle">1</text>
+<rect class="c-g2" x="522" y="187" width="39" height="20" rx="3"/>
+<text class="rk" x="541.5" y="201" text-anchor="middle">2</text>
+<rect class="c-g2" x="565" y="187" width="39" height="20" rx="3"/>
+<text class="rk" x="584.5" y="201" text-anchor="middle">3</text>
+<rect class="empty" x="608" y="187" width="39" height="20" rx="3"/>
+<rect class="empty" x="651" y="187" width="39" height="20" rx="3"/>
+<rect class="empty" x="694" y="187" width="39" height="20" rx="3"/>
+<rect class="empty" x="737" y="187" width="39" height="20" rx="3"/>
+<rect class="c-g2" x="780" y="187" width="39" height="20" rx="3"/>
+<text class="rk" x="799.5" y="201" text-anchor="middle">4</text>
+<rect class="c-g2" x="823" y="187" width="39" height="20" rx="3"/>
+<text class="rk" x="842.5" y="201" text-anchor="middle">5</text>
+<rect class="c-g2" x="866" y="187" width="39" height="20" rx="3"/>
+<text class="rk" x="885.5" y="201" text-anchor="middle">6</text>
+<rect class="c-g2" x="909" y="187" width="39" height="20" rx="3"/>
+<text class="rk" x="928.5" y="201" text-anchor="middle">7</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/xferdtensor_python.py#L453-L470"><text x="10" y="227">2 · decode copies, split off</text></a>
+<text class="note" x="254" y="227" text-anchor="end">2 + 2</text>
+<text class="ok" x="956" y="227">W</text>
+<rect class="empty" x="264" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="307" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="350" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="393" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="436" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="479" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="522" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="565" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="608" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="651" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="694" y="213" width="39" height="20" rx="3"/>
+<rect class="empty" x="737" y="213" width="39" height="20" rx="3"/>
+<rect class="c-g" x="780" y="213" width="39" height="20" rx="3"/>
+<text class="rk" x="799.5" y="227" text-anchor="middle">0</text>
+<rect class="c-g2" x="823" y="213" width="39" height="20" rx="3"/>
+<text class="rk" x="842.5" y="227" text-anchor="middle">0</text>
+<rect class="c-g" x="866" y="213" width="39" height="20" rx="3"/>
+<text class="rk" x="885.5" y="227" text-anchor="middle">1</text>
+<rect class="c-g2" x="909" y="213" width="39" height="20" rx="3"/>
+<text class="rk" x="928.5" y="227" text-anchor="middle">1</text>
+<line x1="10" x2="950" y1="236" y2="236" stroke="var(--border)" stroke-width="1"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/megatron/megatron_worker.py#L1610-L1663"><text x="10" y="253">3 · mcore: refit group</text></a>
+<text class="note" x="254" y="253" text-anchor="end">16</text>
+<text class="ok" x="956" y="253">W</text>
+<rect class="c-o" x="264" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="283.5" y="253" text-anchor="middle">0</text>
+<rect class="c-o" x="307" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="326.5" y="253" text-anchor="middle">1</text>
+<rect class="c-o" x="350" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="369.5" y="253" text-anchor="middle">2</text>
+<rect class="c-o" x="393" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="412.5" y="253" text-anchor="middle">3</text>
+<rect class="c-o" x="436" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="455.5" y="253" text-anchor="middle">4</text>
+<rect class="c-o" x="479" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="498.5" y="253" text-anchor="middle">5</text>
+<rect class="c-o" x="522" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="541.5" y="253" text-anchor="middle">6</text>
+<rect class="c-o" x="565" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="584.5" y="253" text-anchor="middle">7</text>
+<rect class="c-o" x="608" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="627.5" y="253" text-anchor="middle">8</text>
+<rect class="c-o" x="651" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="670.5" y="253" text-anchor="middle">9</text>
+<rect class="c-o" x="694" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="713.5" y="253" text-anchor="middle">10</text>
+<rect class="c-o" x="737" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="756.5" y="253" text-anchor="middle">11</text>
+<rect class="c-o" x="780" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="799.5" y="253" text-anchor="middle">12</text>
+<rect class="c-o" x="823" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="842.5" y="253" text-anchor="middle">13</text>
+<rect class="c-o" x="866" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="885.5" y="253" text-anchor="middle">14</text>
+<rect class="c-o" x="909" y="239" width="39" height="20" rx="3"/>
+<text class="rk" x="928.5" y="253" text-anchor="middle">15</text>
+<text class="note" x="10" y="284">nccl_reshard group count = 1 misc + (roles × trainer PP stages) = 1 + 2 × 2 = 5.</text>
+<text class="note" x="10" y="302">Each bulk group = the trainer ranks of one PP stage (8 / 2 = 4) + one role&#x27;s engine ranks (4): 8. A layer&#x27;s shards travel only in its stage&#x27;s groups.</text>
+<text class="note" x="10" y="320">With trainer PP 4 instead: 1 + 2 × 4 = 9 groups, each of 2 + 4 = 6.</text>
+<text class="note" x="10" y="338">Each trainer rank joins misc + one group per role (3 here); each engine rank joins misc + its role&#x27;s group for every stage (3 here).</text>
+<text class="note" x="10" y="356">W marks the groups that carry W, a PP 0 layer. D0 and D1 need the same rows: each gets half from the trainer,</text>
+<text class="note" x="10" y="374">then they swap halves inside a pair split off the decode group.</text>
 </svg></div>
 <table class="mx">
 <tr><th>backend</th><th>1 · packed broadcast</th><th>2 · nccl_reshard</th><th>3 · mcore</th><th>who knows the layout</th></tr>
