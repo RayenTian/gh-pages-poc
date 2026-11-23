@@ -67,12 +67,12 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <div class="wrap">
 
 <h1>How the Megatron prefill/decode engine fleet now orders refit, shutdown and startup</h1>
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">PR #5024</a> (4 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">#5023</a>) · head <code>ea1a6e22</code> · base <code>868942a0</code></p>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">PR #5024</a> (4 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">#5023</a>) · reviewed at <code>ea1a6e22</code>, re-checked at <code>d2e22762</code></p>
 
 <div class="status"><dl>
 <dt>Before</dt><dd>PR 3 suspended every engine at once, stopped them in index order at shutdown, and built them one at a time.</dd>
 <dt>This PR</dt><dd>Suspends prefill, then decode. Shutdown stops decode first and reports each stopped decode engine to prefill before stopping it. Builds up to 8 engines at once.</dd>
-<dt>Status</dt><dd><span class="verdict open">Open — two parts need changes in this PR.</span> The report step at shutdown can stall teardown for hours and frees nothing (C1). Code for a refit wait that a later commit removed is still there (C2).</dd>
+<dt>Status</dt><dd><span class="verdict open">Open — two parts need changes in this PR.</span> The report step at shutdown can stall teardown for hours and frees nothing (C3). Code for a refit wait that a later commit removed is still there (C4).</dd>
 </dl></div>
 
 <nav class="chain">
@@ -136,7 +136,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <text x="680" y="221" class="tred">≤610 s each</text>
 <path class="ln" d="M826 209 L844 209 M838 204 L844 209 L838 214"/>
 <rect class="pf" x="848" y="196" width="40" height="26" rx="5"/><text x="858" y="214" class="tpf">P0</text>
-<text x="550" y="250" class="tred">C1: frees nothing, can stall teardown</text>
+<text x="550" y="250" class="tred">C3: frees nothing, can stall teardown</text>
 <line class="sep" x1="10" y1="266" x2="930" y2="266"/>
 
 <!-- row 4 build -->
@@ -177,18 +177,18 @@ on failure: resume every engine the suspend reached       <span class="cm"># the
 <span class="del">for engine in engines: stop(engine)</span>                       <span class="cm"># PR 3: index order</span>
 <span class="add">owners = read handoff owner from each decode rank 0</span>      <span class="cm"># ≤600 s</span>
 <span class="add">for d in decode: stop(d)</span>                                  <span class="cm"># one at a time</span>
-<span class="bad">for owner in owners:                                      # C1: one Ray call per owner</span>
+<span class="bad">for owner in owners:                                      # C3: one Ray call per owner</span>
 <span class="bad">    prefill0.confirm_decode_terminated(owner)             # ≤ 600 + 10 s each</span>
 <span class="add">for p in prefill: stop(p)</span>                                 <span class="cm"># frees every pinned block anyway</span>
 stop frontend, NATS, etcd</pre>
 <p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_generation.py#L1191-L1215">PR 3 <code>shutdown</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1365-L1427">PR 4 <code>shutdown</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1455-L1498"><code>_confirm_decode_terminated</code></a>.</p>
-<p class="cref">🔴 <a href="#C1">review comment C1 — dynamo_generation.py:1365</a></p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4672550185">review comment C3 — dynamo_generation.py:1381</a></p>
 
 <h2>Left behind: a pause for a wait that is gone</h2>
 <p>An earlier commit in this PR paused prefill, waited for decode to pull every pinned block, then suspended. A later commit (<code>ef48e301</code>) removed the wait, because with a deep decode backlog the pins did not drain for over an hour. The worker pieces stayed: <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/megatron_worker.py#L2492"><code>pause_for_refit</code></a>, a paused flag read in four places, and <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L198"><code>pinned_handoff_block_count</code></a>. Only tests call them, here and in PRs 5 and 6. The class docstring, the PR title and the PR body still describe the wait.</p>
-<p class="cref">🔴 <a href="#C2">review comment C2 — megatron_worker.py:2492</a> <a href="#C3">C3 — dynamo_generation.py:307</a> <a href="#C4">C4 — PR body</a></p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4672550394">review comment C4 — megatron_worker.py:2492</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4672550595">C5 — dynamo_generation.py:307</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4672550800">C6 — PR body</a></p>
 
-<div class="hl"><b>So what.</b> The refit order is safe: upstream Megatron-LM keeps a suspended prefill engine serving pulls and releases in <code>persist</code> mode, and records the weight version per token. The PR should drop the shutdown report step (C1) and the leftover pause code (C2), and fix the docs (C3, C4).</div>
+<div class="hl"><b>So what.</b> The refit order is safe: upstream Megatron-LM keeps a suspended prefill engine serving pulls and releases in <code>persist</code> mode, and records the weight version per token. The PR should drop the shutdown report step (C3) and the leftover pause code (C4), and fix the docs (C5, C6).</div>
 </div>
 </body>
 </html>

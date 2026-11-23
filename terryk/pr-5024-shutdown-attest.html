@@ -67,12 +67,12 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <div class="wrap">
 
 <h1>Why the decode report at shutdown can stall teardown for half an hour and frees nothing</h1>
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">PR #5024</a> · head <code>ea1a6e22</code> · Megatron-LM <code>e0a4bfed</code></p>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">PR #5024</a> · reviewed at <code>ea1a6e22</code>, re-checked at <code>d2e22762</code> · Megatron-LM <code>e0a4bfed</code></p>
 
 <div class="status"><dl>
 <dt>Before</dt><dd>PR 3's shutdown stopped every engine in index order, then the frontend, NATS and etcd.</dd>
 <dt>This PR</dt><dd>After stopping the decode engines, it reports each one to the prefill coordinators as "gone for good", one Ray call per engine, before it stops prefill.</dd>
-<dt>Status</dt><dd><span class="verdict open">Open — not fixed in this PR.</span> Raised as review comment C1, which asks to drop the step.</dd>
+<dt>Status</dt><dd><span class="verdict open">Open — not fixed in this PR.</span> Raised as review comment C3, which asks to drop the step.</dd>
 </dl></div>
 
 <nav class="chain">
@@ -130,7 +130,7 @@ for d in decode: stop(d)                                  <span class="cm"># fir
 for p in prefill: stop(p)                                 <span class="cm"># frees every pinned block</span>
 stop frontend, NATS, etcd</pre>
 <p class="pcref">Delete too: <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1334"><code>_prefill_coordinator_addresses</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1428"><code>_handoff_owners</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1455"><code>_confirm_decode_terminated</code></a>, and the worker's <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L407"><code>confirm_decode_terminated</code></a>.</p>
-<p class="cref">🔴 <a href="#C1">review comment C1 — dynamo_generation.py:1365</a></p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4672550185">review comment C3 — dynamo_generation.py:1381</a></p>
 
 <div class="warn"><b>So what.</b> With one prefill coordinator that does not answer, shutdown waits about (number of decode engines) × 610 s: 30.5 min for 3 decode engines, over 5 hours for 32. It buys nothing, because stopping prefill frees the same blocks. Drop the step; batching the calls would cap the wait but still free nothing.</div>
 </div>
