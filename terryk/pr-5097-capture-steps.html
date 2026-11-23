@@ -217,7 +217,7 @@ def <span class="add">_stage_call</span>(admission, *, prompt_ids, gen_ids, logp
                              attachments=media)
 <span class="add">    except Exception:</span>                                              <span class="cm"># C3: as native stage()</span>
 <span class="add">        return fail_call(call) if call else None</span>                 <span class="cm"># None → answer the call, no coords</span></pre>
-<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5097#discussion_r4651585463">review comment C2 — token_capture.py:571</a> · C3 link added once staged</p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5097#discussion_r4651585463">review comment C2 — token_capture.py:571</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5097#discussion_r4673086177">C3 — token_capture.py:598</a></p>
 
 <div class="hl"><b>So what.</b> For text-only Gym calls, Megatron behind Dynamo already reads TQ the same way vLLM does, and its "begin after generation" matches aggregated Megatron. The real gap is the write: a second copy that drops routes and fails differently. One shared Megatron staging function fixes both. Moving all three steps into one module shared with vLLM is the longer-term goal, and fits the refit and worker cleanup tracked in <a href="https://github.com/NVIDIA-NeMo/RL/issues/5413">#5413</a>.</div>
 
