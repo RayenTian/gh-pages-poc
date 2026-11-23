@@ -131,5 +131,6 @@ The <span class="tip" tabindex="0" data-tip="A CPU-only server between NeMo Gym 
 </span></pre>
 <p>The router sets one header and goes back to passing the body through. Run on CPU with this change: the 2 MB request passes, the stub engine sees <code>X-Vllm-Priority: -1</code>, and the body is unchanged. The vLLM side was checked by reading its source, not by running an engine. A smaller change also works: pass a large <code>client_max_size</code> to <code>web.Application</code>; it keeps the JSON rewrite on every request.</p>
 
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5183#discussion_r4661673970">review comment — generation_router.py:317</a></p>
 <div class="warn"><b>So what.</b> Text-only runs, like the ones in the PR description, never hit this. A run that sends images through NeMo Gym with lent engines on stops at the first large request, because the default allows zero failed rollouts. The repo ships image recipes for this path (<a href="https://github.com/NVIDIA-NeMo/RL/blob/550bcd4a1d8a15cfb9e021ae223d99aace89b20d/examples/configs/recipes/vlm">recipes/vlm</a>), and the new setting does not refuse them.</div>
 </div></body></html>
