@@ -119,7 +119,7 @@ main <code>5e271174</code> (vLLM + Dynamo from <a href="https://github.com/NVIDI
   <dt>This page</dt>
   <dd>Compares where each design does each P/D job, against the shape main already uses for vLLM + Dynamo: one adapter base that a backend fills in with a few methods, and NeMo RL's own chat engine in the frontend.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">Proposed — a design comparison. Nothing in the target section is implemented.</span> The #4801-sized parts are review comments C9–C14; the engine-side asks are staged on #5023, #5024, #5025 and #5097.</dd>
+  <dd><span class="verdict open">Proposed — a design comparison. Nothing in the target section is implemented.</span> The #4801-sized parts are review comments C9–C12; the engine-side asks are staged on #5023, #5024, #5025 and #5097.</dd>
 </dl></div>
 
 <div class="bg"><b>Background.</b> In <span class="tip" tabindex="0" data-tip="Prefill engines read the prompt and build its KV cache. Decode engines receive that cache over NIXL and write the answer.">P/D</span>, a replica is P prefill engines plus D decode engines, each with its own width (TP × PP). On main, vLLM behind Dynamo runs NeMo RL's own <span class="tip" tabindex="0" data-tip="DynamoEngineAdapter: the Dynamo side written once. A backend writes serve_rollout, start, abort and kv_event_sources, and may add request handlers.">adapter base</span> inside the native worker, so refit, pause, capture, forest training and prefix recovery work unchanged. Dotted words have a short explanation: hover or tap them.</div>
@@ -311,7 +311,6 @@ main <code>5e271174</code> (vLLM + Dynamo from <a href="https://github.com/NVIDI
   <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583893"><b>C11</b></a>: build roles and widths on #4920's shared layout module, and add Megatron to its allowed backends (otherwise the two PRs refuse each other).</li>
   <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583948"><b>C12</b></a>: keep per-role layouts in <code>mcore_generation_config</code>, as TRT-LLM and #4920 keep them in their own blocks.</li>
   <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4672410215"><b>C9</b></a>: remove <code>dynamo_cfg.control_timeout_s</code>: main rejects it, and on main the caller passes each control call its timeout.</li>
-  <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651584110"><b>C14</b></a>: drop the <code>expose_http_server</code> check, which #5097 deletes and reverses.</li>
 </ul>
 <p>The engine-side asks are staged on the later PRs, for their own reviews:</p>
 <ul>
