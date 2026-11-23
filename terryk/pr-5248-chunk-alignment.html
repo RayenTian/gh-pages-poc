@@ -104,9 +104,10 @@ td:first-child{white-space:nowrap;color:var(--dim)}
 
 <nav class="chain">
   <span class="here">1 · 5 groups on 3 ranks</span>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-end-of-data.html">2 · end-of-data crash (open)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-end-of-data.html">2 · short step crashes (open)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-weight-fifo-hang.html">3 · weight_fifo hang (open)</a>
 </nav>
-<p class="chainnote">Two pages on this PR, one question each — this one: how a chunk is split across ranks, before and after.</p>
+<p class="chainnote">Three pages on this PR, one question each — this one: how a chunk is split across ranks, before and after.</p>
 
 <div class="bg"><b>Setup for the whole page.</b> GRPO, streaming: the trainer trains on
 <span class="tip" tabindex="0" data-tip="A group is one prompt plus all its sampled answers. Here 2 answers per prompt, so one group = 2 samples.">prompt groups</span>
@@ -248,14 +249,13 @@ trainer.train(chunk)                               <span class="cm"># 6 samples 
 
 <p class="where"><b>Where the fix lands: RL only.</b> Setup (<code>config.py</code>, <code>setup.py</code>) computes <code>m</code> once; the train pump passes it to the sampler, which already knew how to round down (PPO used it first). Sharding and packing are untouched.</p>
 
-<p><b>Still open</b> (both are review comments):</p>
+<p><b>Still open</b> (review comments; each bug has its own page):</p>
 <ul>
-  <li><b>End of data with dynamic sampling.</b> A step whose target shrinks to a number that is not a multiple of <code>m</code> still crashes, now in the sampler. Page 2 shows it and the one-line fix.
-  <span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284318">review comment C1 · single_controller.py:2810</a></span></li>
-  <li><b><code>weight_fifo</code> streaming can now hang.</b> That sampler only takes groups from the oldest weight version, so a leftover group there can never fill a multiple. Before the PR this failed at once; now it waits for the stall watchdog.
-  <span class="cref" data-c="C2"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284337">review comment C2 · config.py:2035</a></span></li>
-  <li><b>A step that loses a prompt.</b> With a drop budget and <code>on_dropped_prompt: shrink</code>, a step of 18 that loses one prompt has 17 groups. With a multiple of 3 it crashes in the sampler (main crashed too, at the split). Rounding every shrunk step down to a whole multiple — 15 here — lets <code>min_step_batch_fraction</code> decide whether it trains or stops cleanly.
+  <li><b>A step that ends up with fewer groups than planned still crashes.</b> Dynamic sampling at the end of data (C1) or a dropped prompt (C5) can leave 7 groups when the multiple is 2. <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-end-of-data.html">Page 2</a> shows it and the one-line fix.
+  <span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284318">review comment C1 · single_controller.py:2810</a></span>
   <span class="cref" data-c="C5"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670813458">review comment C5 · config.py:2012</a></span></li>
+  <li><b><code>weight_fifo</code> streaming can now hang.</b> It only takes groups from the oldest weight version, so one leftover group there can never fill a multiple. <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-weight-fifo-hang.html">Page 3</a> walks through it.
+  <span class="cref" data-c="C2"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284337">review comment C2 · config.py:2035</a></span></li>
 </ul>
 
 <div class="hl"><b>So what.</b> On main, a streaming GRPO chunk crashes whenever the ready sample count does not divide by the DP size. Packing does not save it, because the even-split check runs first. With this PR the chunk is always a whole multiple of <code>m</code> groups, so the split always succeeds. The cost is that up to <code>m − 1</code> ready groups wait one more chunk, and at the end of data a tail smaller than <code>m</code> is not trained.</div>

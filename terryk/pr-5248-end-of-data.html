@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NVIDIA-NeMo/RL #5248 — a dynamic-sampling step that ends on an odd group count still crashes</title>
+<title>NVIDIA-NeMo/RL #5248 — when a step ends up with fewer groups than planned</title>
 <style>
 :root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
   --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
@@ -68,6 +68,12 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace
 .cref{margin:6px 0 0;font-size:13px}
 .cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
 .cref a:hover{background:var(--surface2);text-decoration:none}
+table{border-collapse:collapse;width:100%;margin:8px 0 6px;font-size:14px}
+th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface);font-size:12.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.03em}
+td:first-child{white-space:nowrap;color:var(--dim)}
+.note2{color:var(--dim);font-size:13.5px;margin:4px 0 0}
+@media (max-width:600px){td:first-child{white-space:normal}}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
   document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -82,48 +88,48 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace
   document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
 <div class="wrap">
 
-<h1>A dynamic-sampling step that ends on an odd group count still crashes</h1>
+<h1>When a step ends up with fewer groups than planned, it still crashes</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">NVIDIA-NeMo/RL #5248</a>
-· found in review
+· review comments C1 and C5
 · permalinks pin head <code>b52f74b</code></p>
 
 <div class="status"><dl>
   <dt>Before</dt>
-  <dd>This step crashed in the trainer's even-split check (<code>not a multiple of shards</code>).</dd>
+  <dd>A step that came up short crashed in the trainer's even-split check (<code>not a multiple of shards</code>).</dd>
   <dt>This PR</dt>
-  <dd>The crash moves one line earlier, into the sampler (<code>No multiple of 2 fits selection bounds</code>). The PR's own end-of-data fix covers only the <code>windowed</code> sampler.</dd>
+  <dd>The crash moves one line earlier, into the sampler (<code>No multiple of 2 fits selection bounds</code>). Setup warns about drops, but nothing rounds a short step.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">Open — not fixed in this PR.</span> Asked for in review comment C1, with a one-line fix that was run on CPU.</dd>
+  <dd><span class="verdict open">Open — not fixed in this PR.</span> Asked for in review comments C1 and C5; the one-line fix below was run on CPU.</dd>
 </dl></div>
 
 <nav class="chain">
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-chunk-alignment.html">1 · 5 groups on 3 ranks</a>
-  <span class="here">2 · end-of-data crash (open)</span>
+  <span class="here">2 · short step crashes (open)</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-weight-fifo-hang.html">3 · weight_fifo hang (open)</a>
 </nav>
-<p class="chainnote">Two pages on this PR, one question each — this one: the case the fix still misses.</p>
+<p class="chainnote">Three pages on this PR, one question each — this one: what happens when a step loses a group.</p>
 
-<div class="bg"><b>Background.</b> With
-<span class="tip" tabindex="0" data-tip="grpo.use_dynamic_sampling: a prompt whose answers all get the same reward teaches nothing, so it is filtered out and a spare prompt takes its place.">dynamic sampling</span>,
-a prompt whose answers all score the same is thrown away and a spare prompt replaces it. When the data runs out there may be no spare left. The step is then
-<span class="tip" tabindex="0" data-tip="steps_allowed_short: the controller marks the step as allowed to train on fewer groups than num_prompts_per_step.">allowed to close short</span>,
-and its target drops by one. Page 1 explains the group multiple <code>m</code>. Dotted words have a short explanation: hover or tap them.</div>
+<div class="bg"><b>Background.</b> Page 1 showed that every chunk must be a whole multiple <code>m</code> of groups. A step plans <code>num_prompts_per_step</code> groups, but two things can shrink it <i>after</i> setup:
+<ul style="margin:6px 0 0">
+<li><b>C1 — dynamic sampling at end of data.</b> With <span class="tip" tabindex="0" data-tip="grpo.use_dynamic_sampling: a group whose answers all got the same reward teaches nothing, so it is thrown away and a spare prompt takes its place.">dynamic sampling</span>, a group whose answers all score the same is thrown away and a spare prompt replaces it. Once the data runs out there is no spare, so the step is marked <span class="tip" tabindex="0" data-tip="steps_allowed_short: the controller lets this step train on fewer groups than planned instead of failing.">allowed to close short</span>.</li>
+<li><b>C5 — a dropped prompt.</b> With a drop budget above 0 and <code>on_dropped_prompt: shrink</code> (the default), a prompt that keeps failing is given up and the step closes without it.</li>
+</ul>
+This is not the <code>windowed</code> sampler's end-of-data tail: the PR already stops cleanly there. Dotted words have a short explanation: hover or tap them.</div>
 
-<p>Take the shape of the shipped dapo-nanov3.5 single-controller recipes: <b>8</b> prompts per step, full batch, group multiple <b>m = 2</b>.
-At the end of data one prompt is filtered with no spare, so
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2580-L2593"><code>_pop_filtered_replacement</code></a>
-marks the step short and
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2737-L2740"><code>_target_groups_for_step</code></a>
-returns <b>7</b>. The pump asks the sampler for exactly 7 groups, in whole multiples of 2. No such number exists, so
+<p>Either way the step's target drops by one: 8 → 7.
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2729-L2749"><code>_target_groups_for_step</code></a>
+returns 7 as is. The pump then asks the sampler for 7 groups in whole multiples of 2, and no such number exists, so
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/async_utils/staleness_sampler.py#L393-L397"><code>_finalize_selection</code></a>
-raises on a step the controller had already said may close short. The drop-budget warning does not fire, because no drop budget is involved.</p>
+raises. The fix rounds the target down to a whole multiple, and the existing
+<span class="tip" tabindex="0" data-tip="async_rl.rollout_failure.min_step_batch_fraction (default 0.9): the smallest step, as a fraction of num_prompts_per_step, that may still train.">min_step_batch_fraction</span> check decides what happens to the smaller step.</p>
 
 <h2>Target 8 → 7, in multiples of 2</h2>
 
-<svg viewBox="0 0 900 290" role="img" aria-label="At head the step target is 7 and the sampler raises. With the fix the target is rounded down to 6, six groups train and one is left.">
-  <rect class="g-ok" x="560" y="10" width="14" height="14"/><text class="note" x="580" y="22">trained</text>
-  <rect class="g-bad" x="640" y="10" width="14" height="14"/><text class="note" x="660" y="22">crashes</text>
-  <rect class="g-wait" x="725" y="10" width="14" height="14"/><text class="note" x="745" y="22">left in buffer</text>
-  <text class="hdr" x="14" y="22">8 prompts per step · 1 filtered, no spare · m = 2</text>
+<svg viewBox="0 0 900 330" role="img" aria-label="At head the target is 7 and the sampler raises. With the fix the target rounds down to 6; the floor check then trains or skips the step, and one group is left.">
+  <rect class="g-ok" x="560" y="10" width="14" height="14"/><text class="note" x="580" y="22">used</text>
+  <rect class="g-bad" x="630" y="10" width="14" height="14"/><text class="note" x="650" y="22">crashes</text>
+  <rect class="g-wait" x="718" y="10" width="14" height="14"/><text class="note" x="738" y="22">not trained</text>
+  <text class="hdr" x="14" y="22">8 prompts per step · 1 group lost · m = 2</text>
 
   <text class="lbl-b" x="14" y="66">At head</text>
   <rect class="g-bad" x="110" y="50" width="26" height="26"/><rect class="g-bad" x="140" y="50" width="26" height="26"/><rect class="g-bad" x="170" y="50" width="26" height="26"/><rect class="g-bad" x="200" y="50" width="26" height="26"/><rect class="g-bad" x="230" y="50" width="26" height="26"/><rect class="g-bad" x="260" y="50" width="26" height="26"/><rect class="g-bad" x="290" y="50" width="26" height="26"/>
@@ -147,32 +153,39 @@ raises on a step the controller had already said may close short. The drop-budge
   <text class="lbl" x="388" y="170">select(min=6, max=6,</text>
   <text class="lbl" x="388" y="188">       group_multiple=2)</text>
   <path class="arr" d="M632 173 L672 173 M666 168 L672 173 L666 178"/>
-  <text class="grn" x="680" y="170">✓ trains 6 groups</text>
-  <text class="note" x="680" y="188">1 group left; pump exits</text>
-  <text class="note" x="376" y="222">the leftover leaves through the PR's own "unaligned groups remain" exit</text>
-  <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2997-L3010"><text x="376" y="240">single_controller.py:2992-3005</text></a>
+  <text class="grn" x="680" y="170">✓ no crash</text>
+  <text class="note" x="680" y="188">floor check decides</text>
 
-  <text class="note" x="14" y="272">Both rows are real CPU runs of the train pump with the in_order sampler (head, and head + the fix below).</text>
+  <rect class="box" x="110" y="222" width="776" height="76" rx="8"/>
+  <text class="lbl-b" x="124" y="244">What the floor check does with 6 of 8 (default min_step_batch_fraction 0.9 → floor 8)</text>
+  <text class="lbl" x="124" y="266">C1, end of data:   skipped, no optimizer update; run ends cleanly    (0.75 → trains 6)</text>
+  <text class="lbl" x="124" y="286">C5, dropped prompt: clean stop: "lost 1 of 8 ... leaving 7 (6 in whole multiples of 2)"</text>
+
+  <text class="note" x="14" y="320">Real CPU runs of the train pump with the in_order sampler, at head and at head + the fix below. The 7th group is not trained.</text>
 </svg>
 
-<h2>What would fix it — proposed, not in the PR</h2>
-<p>Nothing below is implemented. It is the fix asked for in review comment C1.</p>
-<p class="where"><b>Where the fix lands: RL only, one line</b> in
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2737-L2740"><code>_target_groups_for_step</code></a>,
-plus one line in a test that builds the controller by hand.</p>
+<h2>The fix — proposed, not in the PR</h2>
+<p>Nothing below is implemented. It is the fix in review comment C5, which also covers C1.</p>
+<p class="where"><b>Where the fix lands: RL only.</b> One rounding line in
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2729-L2749"><code>_target_groups_for_step</code></a>,
+a clearer floor error, and new wording for the setup warning and the docs.</p>
 
 <p class="pclbl">The fix, as pseudocode (proposed; run on CPU)</p>
 <pre class="pc"><span class="who"># train pump, every time it needs the step's target</span>
 def <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller.py#L2705">target_groups_for_step</a>(step):
-    target = num_prompts_per_step - shortfall[step]  <span class="cm"># 8 - 1 = 7</span>
-    if step in steps_allowed_short:
-<span class="del">        return target</span>                                <span class="cm"># 7: no multiple of 2 fits</span>
-<span class="add">        return target - target % m</span>                   <span class="cm"># 6: closes on whole multiples</span>
-    ...</pre>
-<p class="pcref">Every reader of the target then agrees: the pump's <code>while</code> loop, the select bound, and the PPO and Forest checks (both have <code>m = 1</code>, so they do not change). A target that rounds to 0 closes with no groups and is skipped with no optimizer update.</p>
+<span class="del">    target = num_prompts_per_step - shortfall[step]</span>
+<span class="add">    kept = num_prompts_per_step - shortfall[step]</span>      <span class="cm"># 8 - 1 = 7</span>
+<span class="add">    target = kept - kept % m</span>                          <span class="cm"># 6: whole multiples of 2</span>
+    if step in steps_allowed_short:                   <span class="cm"># C1: end of data</span>
+        return target                                 <span class="cm"># trained or skipped later by the floor</span>
+    if target &lt; floor:                                <span class="cm"># C5: a dropped prompt</span>
+        raise RuntimeError("... leaving 7 (6 in whole multiples of 2) ...")
+    return target</pre>
+<p class="pcref">The same step in a bigger run: 18 prompts, multiple 3, one prompt dropped → at head <code>No multiple of 3 fits selection bounds [17, 17]</code>; with the fix it stops cleanly at fraction 0.9, and trains 15 at 0.8.</p>
 
-<div class="hl"><b>So what.</b> Any GRPO run with dynamic sampling, the <code>in_order</code> or <code>ready_first</code> sampler and <code>m &gt; 1</code> that reaches the end of its data can die on its last step instead of finishing cleanly: it only takes an odd number of filtered prompts with no spare. The shipped dapo-nanov3.5 recipes have exactly that shape; their 10-step limit usually stops them first. The fix is one line plus a regression test, so it belongs in this PR.
-<span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284318">review comment C1 · single_controller.py:2810</a></span></div>
+<div class="hl"><b>So what.</b> On a GRPO run with <code>m &gt; 1</code>, any step that comes up short by a non-multiple ends the run with a sampler error that names neither dynamic sampling nor drops. The shipped dapo-nanov3.5 single-controller recipes (multiple 2, <code>in_order</code>, dynamic sampling) hit it if a run reaches the end of its data. With the fix, a short step closes on a whole multiple and <code>min_step_batch_fraction</code> decides its fate, as it already does for every other short step.
+<span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284318">review comment C1 · single_controller.py:2810</a></span>
+<span class="cref" data-c="C5"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670813458">review comment C5 · config.py:2012</a></span></div>
 
 </div>
 </body>
