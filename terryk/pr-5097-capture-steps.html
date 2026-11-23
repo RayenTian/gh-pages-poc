@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5097 — where a Gym call reads and writes TQ on vLLM, Megatron, and Megatron behind Dynamo</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700;--purple:#8250df}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--orange)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.hl{border-left:4px solid var(--orange);background:var(--surface);padding:10px 14px;margin:18px 0;border-radius:0 8px 8px 0}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface2)}
+.scroll{overflow-x:auto}
+svg{display:block;margin:14px 0;min-width:1080px;max-width:100%;height:auto}
+svg .proc{fill:none;stroke:var(--dim);stroke-width:1.2;stroke-dasharray:5 4}
+svg .ph{fill:var(--dim);font:bold 11.5px -apple-system,sans-serif}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .shared{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .copy{fill:var(--surface);stroke:var(--orange);stroke-width:2}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .gen{fill:var(--surface2);stroke:var(--border);stroke-width:1}
+svg .tq{fill:var(--surface2);stroke:var(--purple);stroke-width:2}
+svg .h{fill:var(--text);font:bold 13.5px -apple-system,sans-serif}
+svg .h2{fill:var(--dim);font:12px -apple-system,sans-serif}
+svg .t{fill:var(--text);font:bold 12px -apple-system,sans-serif}
+svg .d{fill:var(--text);font:11.5px ui-monospace,Menlo,monospace}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .r{fill:var(--red);font:bold 11.5px -apple-system,sans-serif}
+svg .g{fill:var(--green);font:bold 11.5px -apple-system,sans-serif}
+svg .o{fill:var(--orange);font:bold 11.5px -apple-system,sans-serif}
+svg .p{fill:var(--purple);font:bold 12px ui-monospace,Menlo,monospace}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .tqa{stroke:var(--purple);stroke-width:1.6;fill:none;stroke-dasharray:4 3;marker-end:url(#ahp)}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+svg .lg1{fill:none;stroke:var(--green);stroke-width:2}svg .lg2{fill:none;stroke:var(--orange);stroke-width:2}
+svg .lg3{fill:none;stroke:var(--red);stroke-width:2}svg .lg4{fill:none;stroke:var(--purple);stroke-width:2}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Where a Gym call reads and writes TQ: vLLM, Megatron, and Megatron behind Dynamo</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5097">PR #5097</a> (6 of 6 in the Megatron prefill/decode stack) · main <code>a723b597</code>, #5097 head <code>751efd79</code></p>
+
+<div class="status"><dl>
+  <dt>Before</dt><dd>vLLM runs every Gym call through three shared steps — prepare, begin, finalize — on all its paths. Aggregated Megatron has its own two-hook copy.</dd>
+  <dt>This PR</dt><dd>Adds token capture for Megatron engines behind Dynamo: prepare is <b>shared with vLLM</b> (in the frontend); finalize is a <b>second Megatron copy</b>, <code>stage_completed</code>, on the decode engine.</dd>
+  <dt>Status</dt><dd><span class="verdict open">Open — two asks staged on #5097:</span> write routed experts (C2), and use the native failure path so a staging error cannot turn a finished call into a 400 (C3). Nothing else needs to change for the text-only calls #5097 serves.</dd>
+</dl></div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4912-dynamo-engines.html">#4912 · old path vs new path</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-two-backends.html">#5097 · two backends, one chat engine</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-faults-as-400.html">#5097 · server faults answered as 400</a>
+  <span class="here">#5097 · TQ steps on each path</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-media-under-pd.html">#5097 · media under prefill/decode</a>
+</nav>
+<p class="chainnote">Four pages on #5097, one question each; the first chip is an earlier PR in the stack. This one: does Megatron run a Gym call through the same steps as vLLM?</p>
+
+<div class="bg"><b>Background.</b> A Gym call is one chat turn from an agent. <span class="tip" tabindex="0" data-tip="TransferQueue, NeMo RL's data plane. Each call's exact prompt and output token ids, logprobs, routed experts and media are written there; training reads them back.">TQ</span> holds what the model actually saw and wrote. Each call does at most one <b>read</b> (the earlier turns' exact token ids, the <span class="tip" tabindex="0" data-tip="On turn 2 and later, the earlier turns in the prompt are swapped for the exact token ids the model produced, read from TQ.">prefix</span>) and one <b>write</b> (this call's tokens). Behind Dynamo, the <span class="tip" tabindex="0" data-tip="Dynamo's router picks the engine whose cache already holds most of the prompt. It needs the final token ids to do that, so the prompt must be ready before routing.">KV router</span> needs final token ids, so the read moves to the frontend. Dotted words: hover or tap.</div>
+
+<h2>Four paths, the same three steps</h2>
+<div class="scroll"><svg viewBox="0 0 1150 640" role="img" aria-label="Prepare, begin, generate and finalize on four paths, with TQ reads and writes">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--dim)"/></marker>
+<marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--purple)"/></marker>
+</defs>
+<!-- column headers -->
+<text class="h" x="14" y="20">vLLM, native + Gym</text><text class="h2" x="14" y="36">main</text>
+<text class="h" x="300" y="20">vLLM behind Dynamo</text><text class="h2" x="300" y="36">main</text>
+<text class="h" x="586" y="20">Megatron, aggregated</text><text class="h2" x="586" y="36">main</text>
+<text class="h" x="872" y="20">Megatron behind Dynamo, P/D</text><text class="h2" x="872" y="36">#5097</text>
+
+<!-- col 1: vLLM native, one worker process -->
+<rect class="proc" x="8" y="48" width="272" height="440" rx="8"/><text class="ph" x="16" y="64">vLLM worker process (Ray actor)</text>
+<rect class="shared" x="18" y="74" width="252" height="70" rx="6"/>
+<text class="t" x="28" y="92">① prepare</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/vllm/prompt_and_capture.py#L352"><text x="110" y="92">prepare_prompt</text></a>
+<text class="p" x="28" y="112">R TQ: prefix [1,5,6,2]</text>
+<text class="d" x="28" y="132">splice + clamp → ids</text>
+<rect class="shared" x="18" y="152" width="252" height="86" rx="6"/>
+<text class="t" x="28" y="170">② begin</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/vllm/prompt_and_capture.py#L414"><text x="100" y="170">start_capture</text></a>
+<text class="d" x="28" y="190">cut restore · media copy</text>
+<text class="d" x="28" y="208">begin_call  (before gen)</text>
+<text class="n" x="28" y="228">stamps the weight version</text>
+<rect class="gen" x="18" y="246" width="252" height="34" rx="6"/><text class="n" x="28" y="268">③ generate (vLLM engine)</text>
+<rect class="shared" x="18" y="288" width="252" height="70" rx="6"/>
+<text class="t" x="28" y="306">④ finalize</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/vllm/prompt_and_capture.py#L548"><text x="110" y="306">save_capture</text></a>
+<text class="p" x="28" y="326">W TQ: ids, logprobs,</text>
+<text class="p" x="28" y="344">  routes, media, top-k</text>
+<path class="arr" d="M144,144 L144,152"/><path class="arr" d="M144,238 L144,246"/><path class="arr" d="M144,280 L144,288"/>
+
+<!-- col 2: vLLM Dynamo: frontend + worker -->
+<rect class="proc" x="294" y="48" width="272" height="110" rx="8"/><text class="ph" x="302" y="64">Dynamo frontend process</text>
+<rect class="shared" x="304" y="74" width="252" height="70" rx="6"/>
+<text class="t" x="314" y="92">① prepare</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L390"><text x="396" y="92">same function</text></a>
+<text class="p" x="314" y="112">R TQ: prefix [1,5,6,2]</text>
+<text class="d" x="314" y="132">ids → KV router</text>
+<path class="arr" d="M430,158 L430,174"/><text class="n" x="440" y="170">ids + extra_args</text>
+<rect class="proc" x="294" y="176" width="272" height="312" rx="8"/><text class="ph" x="302" y="192">vLLM worker process</text>
+<rect class="shared" x="304" y="200" width="252" height="66" rx="6"/>
+<text class="t" x="314" y="218">② begin</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/dynamo/vllm/adapter.py#L346"><text x="386" y="218">start_capture</text></a>
+<text class="d" x="314" y="238">cut restore · media copy</text>
+<text class="d" x="314" y="256">begin_call  (before gen)</text>
+<rect class="gen" x="304" y="274" width="252" height="34" rx="6"/><text class="n" x="314" y="296">③ generate</text>
+<rect class="shared" x="304" y="316" width="252" height="70" rx="6"/>
+<text class="t" x="314" y="334">④ finalize</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/dynamo/vllm/adapter.py#L534"><text x="396" y="334">save_capture</text></a>
+<text class="p" x="314" y="354">W TQ: ids, logprobs,</text>
+<text class="p" x="314" y="372">  routes, media, top-k</text>
+<path class="arr" d="M430,266 L430,274"/><path class="arr" d="M430,308 L430,316"/>
+
+<!-- col 3: Megatron aggregated, engine rank 0 -->
+<rect class="proc" x="580" y="48" width="272" height="440" rx="8"/><text class="ph" x="588" y="64">Megatron engine, rank 0 (Ray actor)</text>
+<rect class="copy" x="590" y="74" width="252" height="70" rx="6"/>
+<text class="t" x="600" y="92">① prepare</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/megatron/token_capture.py#L124-L139"><text x="682" y="92">prompt_preparer</text></a>
+<text class="p" x="600" y="112">R TQ: prefix [1,5,6,2]</text>
+<text class="d" x="600" y="132">own splice function</text>
+<rect class="gen" x="590" y="152" width="252" height="34" rx="6"/><text class="n" x="600" y="174">③ generate (MLM engine)</text>
+<rect class="copy" x="590" y="194" width="252" height="112" rx="6"/>
+<text class="t" x="600" y="212">②+④ stage</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/megatron/token_capture.py#L443"><text x="690" y="212">payload_stager</text></a>
+<text class="d" x="600" y="232">begin_call  (after gen)</text>
+<text class="n" x="600" y="250">weight version from policy_epoch</text>
+<text class="p" x="600" y="272">W TQ: ids, logprobs,</text>
+<text class="p" x="600" y="290">  routes, media</text>
+<text class="g" x="600" y="326">on error: answer, no coords</text>
+<path class="arr" d="M716,144 L716,152"/><path class="arr" d="M716,186 L716,194"/>
+
+<!-- col 4: Megatron Dynamo P/D -->
+<rect class="proc" x="866" y="48" width="276" height="110" rx="8"/><text class="ph" x="874" y="64">Dynamo frontend process</text>
+<rect class="shared" x="876" y="74" width="256" height="70" rx="6"/>
+<text class="t" x="886" y="92">① prepare</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/751efd79684855e0e4c2c5b682f1f8122de719cb/nemo_rl/models/generation/gym_prompt.py#L157"><text x="968" y="92">gym_prompt.py</text></a>
+<text class="p" x="886" y="112">R TQ: prefix [1,5,6,2]</text>
+<text class="d" x="886" y="132">same as vLLM → ids</text>
+<path class="arr" d="M1004,158 L1004,174"/><text class="n" x="1014" y="170">ids + extra_args</text>
+<rect class="proc" x="866" y="176" width="276" height="56" rx="8"/><text class="ph" x="874" y="192">prefill engine, rank 0</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/751efd79684855e0e4c2c5b682f1f8122de719cb/nemo_rl/models/generation/dynamo/megatron/adapter.py#L193-L201"><text x="876" y="212">fills KV; skips capture</text></a>
+<path class="arr" d="M1004,232 L1004,244"/><text class="n" x="1014" y="242">KV handoff</text>
+<rect class="proc" x="866" y="246" width="276" height="242" rx="8"/><text class="ph" x="874" y="262">decode engine, rank 0</text>
+<rect class="gen" x="876" y="270" width="256" height="34" rx="6"/><text class="n" x="886" y="292">③ generate</text>
+<rect class="bad" x="876" y="312" width="256" height="150" rx="6"/>
+<text class="t" x="886" y="330">②+④ copy</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/751efd79684855e0e4c2c5b682f1f8122de719cb/nemo_rl/models/generation/megatron/token_capture.py#L571-L619"><text x="958" y="330">stage_completed</text></a>
+<text class="d" x="886" y="350">begin_call  (after gen)</text>
+<text class="p" x="886" y="372">W TQ: ids, logprobs</text>
+<text class="r" x="886" y="394">✕ no routes  (C2)</text>
+<text class="r" x="886" y="414">✕ admission error → 400,</text>
+<text class="r" x="886" y="430">   tokens thrown away  (C3)</text>
+<text class="n" x="886" y="452">media, top-k, cuts: refused</text>
+<path class="arr" d="M1004,304 L1004,312"/>
+
+<!-- legend -->
+<rect class="lg1" x="14" y="510" width="16" height="12" rx="2"/><text class="n" x="38" y="521">one shared function, used by every vLLM path (and by #5097's prepare)</text>
+<rect class="lg2" x="14" y="532" width="16" height="12" rx="2"/><text class="n" x="38" y="543">Megatron's own copy of the step (on main)</text>
+<rect class="lg3" x="14" y="554" width="16" height="12" rx="2"/><text class="n" x="38" y="565">second Megatron copy added by #5097, with the two gaps marked ✕</text>
+<text class="p" x="600" y="521">R TQ / W TQ</text><text class="n" x="690" y="521">= the one TQ read and the one TQ write per call</text>
+<text class="n" x="600" y="543">Dashed boxes = one OS process. Underlined names link to the code.</text>
+<text class="n" x="14" y="600">Same example on every path: turn 2 of a Gym call; TQ holds turn 1's exact ids [1,5,6,2]; the prompt sent to the engine starts with them.</text>
+<text class="n" x="14" y="620">② and ④ are one box on Megatron because begin_call runs at stage time, after generation, on both Megatron paths.</text>
+</svg></div>
+
+<table>
+<tr><th>Step</th><th>Same on all four?</th><th>What differs, and does it matter today</th></tr>
+<tr><td>① prepare (TQ read)</td><td>vLLM ×2 and #5097: <b>yes</b>, one function. Aggregated Megatron: its own copy.</td><td>Aggregated Megatron splices with <a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/megatron/token_capture.py#L266"><code>replace_prefix_tokens</code></a>, not the shared <a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/openai_server_utils.py#L74"><code>splice_prefix_tokens</code></a>. Already on main; not this stack.</td></tr>
+<tr><td>② begin (before generation)</td><td>vLLM: before. <b>Both Megatron paths: after</b>, inside staging.</td><td>The weight version comes out the same (taken from <code>policy_epoch</code>). What vLLM does before generation — cut restore, media copy, top-k — #5097 refuses (<a href="https://github.com/NVIDIA-NeMo/RL/blob/751efd79684855e0e4c2c5b682f1f8122de719cb/nemo_rl/models/generation/megatron/dynamo_generation.py#L1256-L1267">here</a>). So no ask now; it matters when a later PR lifts those refusals.</td></tr>
+<tr><td>④ finalize (TQ write)</td><td><b>No.</b> #5097 adds a second Megatron copy.</td><td>It writes no routed experts (C2), and its failure handling differs from native: an admission error escapes to the adapter's <code>except ValueError</code> and becomes a 400 (C3).</td></tr>
+</table>
+
+<h2>The ask: one Megatron staging core — proposed, not in the PR</h2>
+<p>Nothing below is implemented. Both Megatron paths should finalize through one function, so the Dynamo path gets routes and the native failure rule for free.</p>
+<p class="pclbl">Decode engine rank 0, after generation (proposed)</p>
+<pre class="pc"><span class="who"># token_capture.py, called by native stage() and by the Dynamo adapter</span>
+def <span class="add">_stage_call</span>(admission, *, prompt_ids, gen_ids, logprobs, policy_epoch, routes, media):
+<span class="add">    call = None</span>
+<span class="add">    try:</span>
+        call = begin_call(CaptureAdmission.model_validate(admission),
+                          weight_version=_weight_version(policy_epoch))   <span class="cm"># inside the try now</span>
+        return complete_call(call, prompt_ids, gen_ids, logprobs,
+                             extras=<span class="add">routed_experts(routes)</span>,        <span class="cm"># C2: no more extras=None</span>
+                             attachments=media)
+<span class="add">    except Exception:</span>                                              <span class="cm"># C3: as native stage()</span>
+<span class="add">        return fail_call(call) if call else None</span>                 <span class="cm"># None → answer the call, no coords</span></pre>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5097#discussion_r4651585463">review comment C2 — token_capture.py:571</a> · C3 link added once staged</p>
+
+<div class="hl"><b>So what.</b> For text-only Gym calls, Megatron behind Dynamo already reads TQ the same way vLLM does, and its "begin after generation" matches aggregated Megatron. The real gap is the write: a second copy that drops routes and fails differently. One shared Megatron staging function fixes both. Moving all three steps into one module shared with vLLM is the longer-term goal, and fits the refit and worker cleanup tracked in <a href="https://github.com/NVIDIA-NeMo/RL/issues/5413">#5413</a>.</div>
+
+</div>
+</body>
+</html>
