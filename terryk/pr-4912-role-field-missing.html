@@ -88,7 +88,7 @@ RL head <code>1cb4fef4</code> (cited code unchanged at <code>44035e16</code>) ·
   <dt>This PR</dt>
   <dd>Each prefill/decode engine adds <code>disaggregation_role</code> to that config. The field exists only in a Megatron-LM commit newer than the one the repo installs.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">Open — not fixed in this PR, and no later PR in the stack moves the pin.</span> Raised in review comment C3. Nothing has run on a GPU yet, which is why no test has caught it.</dd>
+  <dd><span class="verdict open">Open — not fixed in this PR, and no later PR in the stack moves the pin.</span> Review comment C3 asks for a clear startup error (a guard), not a Megatron-LM bump in this PR. Nothing has run on a GPU yet, which is why no test has caught it.</dd>
 </dl></div>
 
 <nav class="chain">
@@ -163,24 +163,26 @@ only compares the returned dict. It never hands that dict to a real <code>Infere
 also passes at the pin, because the module it imports does exist there.</p>
 <p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4672549057">review comment C3 — dynamo_worker_mixin.py:80</a></p>
 
-<h2>The fix — proposed, not in the PR</h2>
-<p class="where"><b>Where the fix lands: Megatron-Bridge first, then RL.</b>
-Bridge moves its Megatron-LM pin to a commit that contains <code>84c7f168</code>. RL then bumps
-<a href="https://github.com/NVIDIA-NeMo/RL/tree/1cb4fef41a20976dd44f3992278671defd4ff98a/3rdparty/Megatron-Bridge-workspace">its Bridge submodule</a>
-(on Bridge's tracked <code>main</code>) and <code>uv.lock</code> in this PR, and adds one CPU test. <b>No change to the RL worker code.</b></p>
+<h2>The fix — a startup guard, proposed, not in the PR</h2>
+<p class="where"><b>Where the fix lands: RL only, in this PR.</b>
+The existing check <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L30-L42"><code>require_megatron_dynamo_integration()</code></a>
+already runs in the worker's constructor, before the model loads. It also checks for the field, so an old Megatron-LM gets a clear error at startup instead of a <code>TypeError</code> at the first refit.
+<b>No Megatron-LM bump in this PR:</b> a bump is a large change with convergence risk, so it lands on its own. The feature just needs to say plainly which Megatron-LM it requires.</p>
 <p>Nothing below is implemented.</p>
-<p class="pclbl">The test, as pseudocode (proposed, not run)</p>
-<pre class="pc"><span class="who"># tests/unit/models/generation/test_megatron_dynamo_worker_mixin.py, mcore lane</span>
-<span class="add">@pytest.mark.parametrize("role", ["prefill", "decode"])</span>
-<span class="add">def test_overrides_build_a_real_inference_config(role):</span>
-<span class="add">    overrides = _bare_worker(role)._inference_config_overrides()</span>
-<span class="add">    InferenceConfig(**overrides)</span>                  <span class="cm"># fails today with the TypeError above</span></pre>
+<p class="pclbl">The guard, as pseudocode (proposed, not run)</p>
+<pre class="pc"><span class="who"># dynamo worker constructor, every rank, before the model loads</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L30-L42">require_megatron_dynamo_integration</a>():
+    import megatron.inference.integrations.dynamo.dynamic_engine   <span class="cm"># today's only check: passes at the pin</span>
+<span class="add">    if "disaggregation_role" not in fields(InferenceConfig):</span>      <span class="cm"># the field 84c7f168 adds</span>
+<span class="add">        raise RuntimeError("needs Megatron-LM with InferenceConfig.disaggregation_role "</span>
+<span class="add">                           "(84c7f168, #9534); use a newer one or drop dynamo")</span></pre>
+<p>Plus a CPU test that swaps in a fake <code>InferenceConfig</code> without the field and expects that error. A second Megatron-LM gap later in the stack (<code>ChatRenderer</code>, used by #5097's render workers) gets the same kind of check on #5097.</p>
 <p><b>Do not just delete the field.</b> Without it, a decode engine of a hybrid (Mamba) model keeps the prefix-cache budget that
 <code>prefix_caching_mamba_gb</code> gives, and the pinned Megatron-LM then
 <a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/core/inference/disaggregation/inference_state_handoff.py#L295-L301">refuses the KV handoff</a>
 at the first refit. The field is what turns that budget off for decode.</p>
 
-<div class="hl"><b>So what.</b> As written, the whole six-PR stack ships an engine that cannot be built: the error moves from setup to the first refit, but it always fires. The fix is a version bump plus one small test, not a code change. It needs Bridge's pin to move first, so it should start now rather than after PR 5 turns the feature on.</div>
+<div class="hl"><b>So what.</b> As written, the whole six-PR stack ships an engine that cannot be built: the error moves from setup to the first refit, but it always fires. The fix in this PR is a guard plus one small test, so anyone on today's Megatron-LM gets a plain "this needs a newer Megatron-LM" at startup. The Megatron-LM bump that makes the feature run is a separate change, and needs Bridge to move its pin first.</div>
 
 </div>
 </body>
