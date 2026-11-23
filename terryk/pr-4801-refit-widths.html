@@ -100,6 +100,11 @@ table.mx{border-collapse:collapse;font-size:13.5px;margin:10px 0;width:100%}
 table.mx th,table.mx td{border:1px solid var(--border);padding:5px 8px;text-align:left;vertical-align:top}
 table.mx th{background:var(--surface);font-weight:600}
 .y{color:var(--green);font-weight:600}.n{color:var(--red);font-weight:600}.na{color:var(--dim)}
+svg .dead{fill:var(--surface);stroke:var(--dim);stroke-width:1;stroke-dasharray:3 3;opacity:.6}
+svg .numd{fill:var(--dim);font:10.5px ui-monospace,Menlo,monospace}
+svg .pnote{fill:var(--accent);font:11.5px -apple-system,sans-serif}
+svg .gnote{fill:var(--green);font:11.5px -apple-system,sans-serif}
+svg .ok{fill:var(--green);font:bold 12px -apple-system,sans-serif}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
   document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -135,157 +140,224 @@ table.mx th{background:var(--surface);font-weight:600}
 <div class="bg"><b>Background.</b> After each training step, the trainer's GPUs send new weights to every inference GPU over <span class="tip" tabindex="0" data-tip="NCCL communicators: every GPU in one gets a rank number 0, 1, 2, …">NCCL groups</span>. Trainer ranks come first, then each engine's ranks. The example everywhere: 8 trainer GPUs (TP 2, PP 2, DP 2) and one prefill engine at TP 4 plus two decode engines at TP 2. One weight to follow: W <code>[8192, 4096]</code> = <code>[output features, input features]</code>, split by rows under TP, so a TP 2 trainer rank holds <code>[4096, 4096]</code>, a TP 4 prefill rank <code>[2048, 4096]</code> and a TP 2 decode rank <code>[4096, 4096]</code>. Dotted words have a short explanation: hover or tap them.</div>
 
 <h2>Three ways to send the weights</h2>
-<div class="figwrap"><svg viewBox="0 0 960 470" role="img" aria-label="Refit groups for three transports">
-<defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--dim)"/></marker></defs>
-<text class="ph" x="14" y="20">1 · Packed broadcast (default)</text>
-<text class="note" x="14" y="38">refit_transport: null</text>
-<text class="note" x="14" y="84">PP 0</text>
-<rect class="tb" x="50" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="65.0" y="84" text-anchor="middle">t0</text>
-<rect class="tb" x="84" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="99.0" y="84" text-anchor="middle">t1</text>
-<rect class="tb" x="118" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="133.0" y="84" text-anchor="middle">t2</text>
-<rect class="tb" x="152" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="167.0" y="84" text-anchor="middle">t3</text>
-<text class="note" x="14" y="110">PP 1</text>
-<rect class="tb" x="50" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="65.0" y="110" text-anchor="middle">t4</text>
-<rect class="tb" x="84" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="99.0" y="110" text-anchor="middle">t5</text>
-<rect class="tb" x="118" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="133.0" y="110" text-anchor="middle">t6</text>
-<rect class="tb" x="152" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="167.0" y="110" text-anchor="middle">t7</text>
-<rect class="pb" x="16" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="31.0" y="182" text-anchor="middle">r8</text>
-<rect class="pb" x="50" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="65.0" y="182" text-anchor="middle">r9</text>
-<rect class="pb" x="84" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="99.0" y="182" text-anchor="middle">r10</text>
-<rect class="pb" x="118" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="133.0" y="182" text-anchor="middle">r11</text>
-<rect class="db" x="158" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="173.0" y="182" text-anchor="middle">r12</text>
-<rect class="db" x="192" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="207.0" y="182" text-anchor="middle">r13</text>
-<rect class="db" x="232" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="247.0" y="182" text-anchor="middle">r14</text>
-<rect class="db" x="266" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="281.0" y="182" text-anchor="middle">r15</text>
-<rect class="grp" x="10" y="62" width="308" height="134" rx="8"/>
-<path class="arr2" d="M65,116 L65,164"/>
-<path class="arr2" d="M80,116 C160,128 240,138 247,164"/>
-<text class="fam" x="14" y="218">WHOLE weight: t0 sends all of W [8192, 4096]</text>
-<text class="note" x="14" y="234">to every engine rank r8–r15; each keeps its</text>
-<text class="note" x="14" y="250">rows (2048 on P0, 4096 on D). 1 group, 16</text>
-<text class="ok" x="14" y="270">needs only where each engine starts</text>
-<text class="note" x="14" y="286">(P0 at r8, D0 at r12, D1 at r14)</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L761-L794"><text x="14" y="308">TRT-LLM init_collective</text></a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L755-L813"><text x="14" y="326">Dynamo init_collective (#5025)</text></a>
-<text class="ph" x="338" y="20">2 · nccl_reshard (NeMo RL plan)</text>
-<text class="note" x="338" y="38">refit_transport: nccl_reshard</text>
-<text class="note" x="338" y="84">PP 0</text>
-<rect class="tb" x="374" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="389.0" y="84" text-anchor="middle">t0</text>
-<rect class="tb" x="408" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="423.0" y="84" text-anchor="middle">t1</text>
-<rect class="tb" x="442" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="457.0" y="84" text-anchor="middle">t2</text>
-<rect class="tb" x="476" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="491.0" y="84" text-anchor="middle">t3</text>
-<text class="note" x="338" y="110">PP 1</text>
-<rect class="tb" x="374" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="389.0" y="110" text-anchor="middle">t4</text>
-<rect class="tb" x="408" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="423.0" y="110" text-anchor="middle">t5</text>
-<rect class="tb" x="442" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="457.0" y="110" text-anchor="middle">t6</text>
-<rect class="tb" x="476" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="491.0" y="110" text-anchor="middle">t7</text>
-<rect class="pb" x="340" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="355.0" y="182" text-anchor="middle">r8</text>
-<rect class="pb" x="374" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="389.0" y="182" text-anchor="middle">r9</text>
-<rect class="pb" x="408" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="423.0" y="182" text-anchor="middle">r10</text>
-<rect class="pb" x="442" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="457.0" y="182" text-anchor="middle">r11</text>
-<rect class="db" x="482" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="497.0" y="182" text-anchor="middle">r12</text>
-<rect class="db" x="516" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="531.0" y="182" text-anchor="middle">r13</text>
-<rect class="db" x="556" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="571.0" y="182" text-anchor="middle">r14</text>
-<rect class="db" x="590" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="605.0" y="182" text-anchor="middle">r15</text>
-<path class="arrp" d="M442,92 L389,164"/>
-<path class="arrd" d="M491,92 L531,164"/>
-<path class="arrp" d="M442,118 L389,164"/>
-<path class="arrd" d="M491,118 L531,164"/>
-<text class="fam" x="338" y="218">SHARD to shard: t0&#x27;s half of W [4096, 4096]</text>
-<text class="note" x="338" y="234">goes only to the engine ranks that hold those</text>
-<text class="note" x="338" y="250">rows. Groups: misc (16) + role × stage (8)</text>
-<text class="ok" x="338" y="270">needs TP/EP/PP of both sides, per role, from</text>
-<text class="note" x="338" y="286">NeMo RL: generation object or config</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L931-L968"><text x="338" y="308">get_nccl_reshard_layouts</text></a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/nccl_reshard_weight_synchronizer.py#L297-L427"><text x="338" y="326">synchronizer _build</text></a>
-<text class="ph" x="662" y="20">3 · mcore (Megatron-Core plan)</text>
-<text class="note" x="662" y="38">refit_transport: mcore   (Megatron only)</text>
-<text class="note" x="662" y="84">PP 0</text>
-<rect class="tb" x="698" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="713.0" y="84" text-anchor="middle">t0</text>
-<rect class="tb" x="732" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="747.0" y="84" text-anchor="middle">t1</text>
-<rect class="tb" x="766" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="781.0" y="84" text-anchor="middle">t2</text>
-<rect class="tb" x="800" y="70" width="30" height="20" rx="3"/>
-<text class="rk" x="815.0" y="84" text-anchor="middle">t3</text>
-<text class="note" x="662" y="110">PP 1</text>
-<rect class="tb" x="698" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="713.0" y="110" text-anchor="middle">t4</text>
-<rect class="tb" x="732" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="747.0" y="110" text-anchor="middle">t5</text>
-<rect class="tb" x="766" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="781.0" y="110" text-anchor="middle">t6</text>
-<rect class="tb" x="800" y="96" width="30" height="20" rx="3"/>
-<text class="rk" x="815.0" y="110" text-anchor="middle">t7</text>
-<rect class="pb" x="664" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="679.0" y="182" text-anchor="middle">r8</text>
-<rect class="pb" x="698" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="713.0" y="182" text-anchor="middle">r9</text>
-<rect class="pb" x="732" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="747.0" y="182" text-anchor="middle">r10</text>
-<rect class="pb" x="766" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="781.0" y="182" text-anchor="middle">r11</text>
-<rect class="db" x="806" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="821.0" y="182" text-anchor="middle">r12</text>
-<rect class="db" x="840" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="855.0" y="182" text-anchor="middle">r13</text>
-<rect class="db" x="880" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="895.0" y="182" text-anchor="middle">r14</text>
-<rect class="db" x="914" y="168" width="30" height="20" rx="3"/>
-<text class="rk" x="929.0" y="182" text-anchor="middle">r15</text>
-<rect class="grp" x="658" y="62" width="308" height="134" rx="8"/>
-<path class="arr2" d="M747,90 L713,164"/>
-<path class="arr2" d="M781,90 L821,164"/>
-<path class="arr2" d="M781,116 L895,164"/>
-<text class="fam" x="662" y="218">SHARD to shard, like 2, in Megatron&#x27;s format</text>
-<text class="note" x="662" y="234">every rank shares its own parallel groups in</text>
-<text class="note" x="662" y="250">one all-gather; MCore plans who sends what</text>
-<text class="ok" x="662" y="270">needs from NeMo RL only each engine&#x27;s</text>
-<text class="note" x="662" y="286">rank offset (no layout passed)</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/megatron/megatron_worker.py#L1564-L1694"><text x="662" y="308">init_collective_mcore_generation</text></a>
-<a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/core/resharding/planner.py#L867-L931"><text x="662" y="326">MCore build_local_reshard_plan</text></a>
-<rect class="tb" x="10" y="420" width="16" height="12" rx="3"/>
-<text class="note" x="32" y="431">trainer rank t0–t7 (TP 2, PP 2, DP 2)</text>
-<rect class="pb" x="248" y="420" width="16" height="12" rx="3"/>
-<text class="note" x="270" y="431">prefill engine P0, TP 4</text>
-<rect class="db" x="486" y="420" width="16" height="12" rx="3"/>
-<text class="note" x="508" y="431">decode engines D0, D1, TP 2</text>
-<rect class="grp" x="724" y="420" width="16" height="12" rx="3"/>
-<text class="note" x="746" y="431">one NCCL group</text>
-<text class="note" x="10" y="454">r = rank in the refit group. Same example in all three: 8 trainer GPUs, 1 prefill engine at TP 4, 2 decode engines at TP 2. Underlined names link to code.</text>
+<div class="figwrap"><svg viewBox="0 0 960 716" role="img" aria-label="How one weight reaches every engine rank in each refit transport">
+<defs><marker id="mo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--orange)"/></marker><marker id="mb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker><marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--green)"/></marker></defs>
+<text class="ph" x="10" y="18" text-anchor="start">1 · Packed broadcast: WHOLE weight</text>
+<text class="note" x="20" y="34" text-anchor="start">PP 0 · copy A (DP 0)</text>
+<text class="note" x="158" y="34" text-anchor="start">copy B (DP 1)</text>
+<text class="note" x="310" y="34" text-anchor="start">PP 1 · later layers, not W</text>
+<rect class="tb" x="20" y="40" width="58" height="26" rx="4"/>
+<text class="rk" x="49.0" y="57" text-anchor="middle">t0</text>
+<text class="note" x="49.0" y="79" text-anchor="middle">full W</text>
+<rect class="tb" x="84" y="40" width="58" height="26" rx="4"/>
+<text class="rk" x="113.0" y="57" text-anchor="middle">t1</text>
+<text class="note" x="113.0" y="79" text-anchor="middle"></text>
+<rect class="tb" x="158" y="40" width="58" height="26" rx="4"/>
+<text class="rk" x="187.0" y="57" text-anchor="middle">t2</text>
+<text class="note" x="187.0" y="79" text-anchor="middle"></text>
+<rect class="tb" x="222" y="40" width="58" height="26" rx="4"/>
+<text class="rk" x="251.0" y="57" text-anchor="middle">t3</text>
+<text class="note" x="251.0" y="79" text-anchor="middle"></text>
+<rect class="dead" x="310" y="40" width="58" height="26" rx="4"/>
+<text class="numd" x="339.0" y="57" text-anchor="middle">t4</text>
+<rect class="dead" x="374" y="40" width="58" height="26" rx="4"/>
+<text class="numd" x="403.0" y="57" text-anchor="middle">t5</text>
+<rect class="dead" x="448" y="40" width="58" height="26" rx="4"/>
+<text class="numd" x="477.0" y="57" text-anchor="middle">t6</text>
+<rect class="dead" x="512" y="40" width="58" height="26" rx="4"/>
+<text class="numd" x="541.0" y="57" text-anchor="middle">t7</text>
+<rect class="pb" x="20" y="132" width="58" height="26" rx="4"/>
+<text class="rk" x="49.0" y="149" text-anchor="middle">r8</text>
+<text class="note" x="49.0" y="171" text-anchor="middle">0–2047</text>
+<rect class="pb" x="84" y="132" width="58" height="26" rx="4"/>
+<text class="rk" x="113.0" y="149" text-anchor="middle">r9</text>
+<text class="note" x="113.0" y="171" text-anchor="middle">2048–4095</text>
+<rect class="pb" x="148" y="132" width="58" height="26" rx="4"/>
+<text class="rk" x="177.0" y="149" text-anchor="middle">r10</text>
+<text class="note" x="177.0" y="171" text-anchor="middle">4096–6143</text>
+<rect class="pb" x="212" y="132" width="58" height="26" rx="4"/>
+<text class="rk" x="241.0" y="149" text-anchor="middle">r11</text>
+<text class="note" x="241.0" y="171" text-anchor="middle">6144–8191</text>
+<rect class="db" x="290" y="132" width="58" height="26" rx="4"/>
+<text class="rk" x="319.0" y="149" text-anchor="middle">r12</text>
+<text class="note" x="319.0" y="171" text-anchor="middle">0–4095</text>
+<rect class="db" x="354" y="132" width="58" height="26" rx="4"/>
+<text class="rk" x="383.0" y="149" text-anchor="middle">r13</text>
+<text class="note" x="383.0" y="171" text-anchor="middle">4096–8191</text>
+<rect class="db" x="432" y="132" width="58" height="26" rx="4"/>
+<text class="rk" x="461.0" y="149" text-anchor="middle">r14</text>
+<text class="note" x="461.0" y="171" text-anchor="middle">0–4095</text>
+<rect class="db" x="496" y="132" width="58" height="26" rx="4"/>
+<text class="rk" x="525.0" y="149" text-anchor="middle">r15</text>
+<text class="note" x="525.0" y="171" text-anchor="middle">4096–8191</text>
+<text class="note" x="20" y="186" text-anchor="start">prefill P0 (TP 4)</text>
+<text class="note" x="290" y="186" text-anchor="start">decode D0</text>
+<text class="note" x="432" y="186" text-anchor="start">decode D1</text>
+<rect class="grp" x="8" y="20" width="580" height="162" rx="8"/>
+<path d="M49.0,70 L49.0,110" stroke="var(--orange)" stroke-width="2.4" fill="none"/>
+<path d="M49.0,110 L525.0,110" stroke="var(--orange)" stroke-width="2.4" fill="none"/>
+<path d="M49.0,110 L49.0,130" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M113.0,110 L113.0,130" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M177.0,110 L177.0,130" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M241.0,110 L241.0,130" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M319.0,110 L319.0,130" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M383.0,110 L383.0,130" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M461.0,110 L461.0,130" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M525.0,110 L525.0,130" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<text class="fam" x="604" y="40" text-anchor="start">1 group (orange box): all 16 ranks</text>
+<text class="note" x="604" y="58" text-anchor="start">t0 holds the full W [8192, 4096] and broadcasts it;</text>
+<text class="note" x="604" y="74" text-anchor="start">NCCL moves it along a ring or tree, so every rank in</text>
+<text class="note" x="604" y="90" text-anchor="start">the group gets all 8192 rows, t1–t7 included.</text>
+<text class="note" x="604" y="110" text-anchor="start">Each engine rank keeps only its own rows (below its</text>
+<text class="note" x="604" y="126" text-anchor="start">box) and drops the rest. Its TP does not matter.</text>
+<text class="ok" x="604" y="146" text-anchor="start">Needs: where each engine starts.</text>
+<text class="ph" x="10" y="240" text-anchor="start">2 · nccl_reshard: SHARD to shard, NeMo RL&#x27;s plan</text>
+<text class="note" x="20" y="256" text-anchor="start">PP 0 · copy A (DP 0)</text>
+<text class="note" x="158" y="256" text-anchor="start">copy B (DP 1)</text>
+<text class="note" x="310" y="256" text-anchor="start">PP 1 · later layers, not W</text>
+<rect class="tb" x="20" y="262" width="58" height="26" rx="4"/>
+<text class="rk" x="49.0" y="279" text-anchor="middle">t0</text>
+<text class="note" x="49.0" y="301" text-anchor="middle">rows 0–4095</text>
+<rect class="tb" x="84" y="262" width="58" height="26" rx="4"/>
+<text class="rk" x="113.0" y="279" text-anchor="middle">t1</text>
+<text class="note" x="113.0" y="301" text-anchor="middle">4096–8191</text>
+<rect class="tb" x="158" y="262" width="58" height="26" rx="4"/>
+<text class="rk" x="187.0" y="279" text-anchor="middle">t2</text>
+<text class="note" x="187.0" y="301" text-anchor="middle">rows 0–4095</text>
+<rect class="tb" x="222" y="262" width="58" height="26" rx="4"/>
+<text class="rk" x="251.0" y="279" text-anchor="middle">t3</text>
+<text class="note" x="251.0" y="301" text-anchor="middle">4096–8191</text>
+<rect class="dead" x="310" y="262" width="58" height="26" rx="4"/>
+<text class="numd" x="339.0" y="279" text-anchor="middle">t4</text>
+<rect class="dead" x="374" y="262" width="58" height="26" rx="4"/>
+<text class="numd" x="403.0" y="279" text-anchor="middle">t5</text>
+<rect class="dead" x="448" y="262" width="58" height="26" rx="4"/>
+<text class="numd" x="477.0" y="279" text-anchor="middle">t6</text>
+<rect class="dead" x="512" y="262" width="58" height="26" rx="4"/>
+<text class="numd" x="541.0" y="279" text-anchor="middle">t7</text>
+<rect class="pb" x="20" y="354" width="58" height="26" rx="4"/>
+<text class="rk" x="49.0" y="371" text-anchor="middle">r8</text>
+<text class="note" x="49.0" y="393" text-anchor="middle">0–2047</text>
+<rect class="pb" x="84" y="354" width="58" height="26" rx="4"/>
+<text class="rk" x="113.0" y="371" text-anchor="middle">r9</text>
+<text class="note" x="113.0" y="393" text-anchor="middle">2048–4095</text>
+<rect class="pb" x="148" y="354" width="58" height="26" rx="4"/>
+<text class="rk" x="177.0" y="371" text-anchor="middle">r10</text>
+<text class="note" x="177.0" y="393" text-anchor="middle">4096–6143</text>
+<rect class="pb" x="212" y="354" width="58" height="26" rx="4"/>
+<text class="rk" x="241.0" y="371" text-anchor="middle">r11</text>
+<text class="note" x="241.0" y="393" text-anchor="middle">6144–8191</text>
+<rect class="db" x="290" y="354" width="58" height="26" rx="4"/>
+<text class="rk" x="319.0" y="371" text-anchor="middle">r12</text>
+<text class="note" x="319.0" y="393" text-anchor="middle">0–4095</text>
+<rect class="db" x="354" y="354" width="58" height="26" rx="4"/>
+<text class="rk" x="383.0" y="371" text-anchor="middle">r13</text>
+<text class="note" x="383.0" y="393" text-anchor="middle">4096–8191</text>
+<rect class="db" x="432" y="354" width="58" height="26" rx="4"/>
+<text class="rk" x="461.0" y="371" text-anchor="middle">r14</text>
+<text class="note" x="461.0" y="393" text-anchor="middle">0–4095</text>
+<rect class="db" x="496" y="354" width="58" height="26" rx="4"/>
+<text class="rk" x="525.0" y="371" text-anchor="middle">r15</text>
+<text class="note" x="525.0" y="393" text-anchor="middle">4096–8191</text>
+<text class="note" x="20" y="408" text-anchor="start">prefill P0 (TP 4)</text>
+<text class="note" x="290" y="408" text-anchor="start">decode D0</text>
+<text class="note" x="432" y="408" text-anchor="start">decode D1</text>
+<path d="M49.0,306 L49.0,352" stroke="var(--accent)" stroke-width="1.4" fill="none" marker-end="url(#ma)"/>
+<path d="M49.0,306 L113.0,352" stroke="var(--accent)" stroke-width="1.4" fill="none" marker-end="url(#ma)"/>
+<path d="M113.0,306 L177.0,352" stroke="var(--accent)" stroke-width="1.4" fill="none" marker-end="url(#ma)"/>
+<path d="M113.0,306 L241.0,352" stroke="var(--accent)" stroke-width="1.4" fill="none" marker-end="url(#ma)"/>
+<path d="M55.0,306 L319.0,352" stroke="var(--green)" stroke-width="1.4" fill="none" marker-end="url(#mg)"/>
+<path d="M55.0,306 L461.0,352" stroke="var(--green)" stroke-width="1.4" fill="none" marker-end="url(#mg)"/>
+<path d="M119.0,306 L383.0,352" stroke="var(--green)" stroke-width="1.4" fill="none" marker-end="url(#mg)"/>
+<path d="M119.0,306 L525.0,352" stroke="var(--green)" stroke-width="1.4" fill="none" marker-end="url(#mg)"/>
+<path d="M319.0,410 C319.0,424 461.0,424 461.0,410" stroke="var(--green)" stroke-width="1.4" stroke-dasharray="3 2" fill="none"/>
+<path d="M383.0,410 C383.0,424 525.0,424 525.0,410" stroke="var(--green)" stroke-width="1.4" stroke-dasharray="3 2" fill="none"/>
+<text class="fam" x="604" y="262" text-anchor="start">5 groups, one per job:</text>
+<text class="note" x="604" y="280" text-anchor="start">· misc (16): unsharded params, broadcast as in 1</text>
+<text class="pnote" x="604" y="296" text-anchor="start">· prefill × PP 0 (8): t0–t3 + r8–r11  (blue)</text>
+<text class="gnote" x="604" y="312" text-anchor="start">· decode × PP 0 (8): t0–t3 + r12–r15  (green)</text>
+<text class="note" x="604" y="328" text-anchor="start">· prefill × PP 1, decode × PP 1: t4–t7 (idle for W)</text>
+<text class="note" x="604" y="348" text-anchor="start">Each piece is sent once, by the FIRST trainer rank</text>
+<text class="note" x="604" y="364" text-anchor="start">that holds it (t0 or t1); copy B stays idle. D0 and D1</text>
+<text class="note" x="604" y="380" text-anchor="start">each get half, then swap halves (dashed: all-gather).</text>
+<text class="ok" x="604" y="400" text-anchor="start">Needs: both sides&#x27; TP/PP, per role.</text>
+<text class="ph" x="10" y="462" text-anchor="start">3 · mcore: SHARD to shard, Megatron-Core&#x27;s plan</text>
+<text class="note" x="20" y="478" text-anchor="start">PP 0 · copy A (DP 0)</text>
+<text class="note" x="158" y="478" text-anchor="start">copy B (DP 1)</text>
+<text class="note" x="310" y="478" text-anchor="start">PP 1 · later layers, not W</text>
+<rect class="tb" x="20" y="484" width="58" height="26" rx="4"/>
+<text class="rk" x="49.0" y="501" text-anchor="middle">t0</text>
+<text class="note" x="49.0" y="523" text-anchor="middle">rows 0–4095</text>
+<rect class="tb" x="84" y="484" width="58" height="26" rx="4"/>
+<text class="rk" x="113.0" y="501" text-anchor="middle">t1</text>
+<text class="note" x="113.0" y="523" text-anchor="middle">4096–8191</text>
+<rect class="tb" x="158" y="484" width="58" height="26" rx="4"/>
+<text class="rk" x="187.0" y="501" text-anchor="middle">t2</text>
+<text class="note" x="187.0" y="523" text-anchor="middle">rows 0–4095</text>
+<rect class="tb" x="222" y="484" width="58" height="26" rx="4"/>
+<text class="rk" x="251.0" y="501" text-anchor="middle">t3</text>
+<text class="note" x="251.0" y="523" text-anchor="middle">4096–8191</text>
+<rect class="dead" x="310" y="484" width="58" height="26" rx="4"/>
+<text class="numd" x="339.0" y="501" text-anchor="middle">t4</text>
+<rect class="dead" x="374" y="484" width="58" height="26" rx="4"/>
+<text class="numd" x="403.0" y="501" text-anchor="middle">t5</text>
+<rect class="dead" x="448" y="484" width="58" height="26" rx="4"/>
+<text class="numd" x="477.0" y="501" text-anchor="middle">t6</text>
+<rect class="dead" x="512" y="484" width="58" height="26" rx="4"/>
+<text class="numd" x="541.0" y="501" text-anchor="middle">t7</text>
+<rect class="pb" x="20" y="576" width="58" height="26" rx="4"/>
+<text class="rk" x="49.0" y="593" text-anchor="middle">r8</text>
+<text class="note" x="49.0" y="615" text-anchor="middle">0–2047</text>
+<rect class="pb" x="84" y="576" width="58" height="26" rx="4"/>
+<text class="rk" x="113.0" y="593" text-anchor="middle">r9</text>
+<text class="note" x="113.0" y="615" text-anchor="middle">2048–4095</text>
+<rect class="pb" x="148" y="576" width="58" height="26" rx="4"/>
+<text class="rk" x="177.0" y="593" text-anchor="middle">r10</text>
+<text class="note" x="177.0" y="615" text-anchor="middle">4096–6143</text>
+<rect class="pb" x="212" y="576" width="58" height="26" rx="4"/>
+<text class="rk" x="241.0" y="593" text-anchor="middle">r11</text>
+<text class="note" x="241.0" y="615" text-anchor="middle">6144–8191</text>
+<rect class="db" x="290" y="576" width="58" height="26" rx="4"/>
+<text class="rk" x="319.0" y="593" text-anchor="middle">r12</text>
+<text class="note" x="319.0" y="615" text-anchor="middle">0–4095</text>
+<rect class="db" x="354" y="576" width="58" height="26" rx="4"/>
+<text class="rk" x="383.0" y="593" text-anchor="middle">r13</text>
+<text class="note" x="383.0" y="615" text-anchor="middle">4096–8191</text>
+<rect class="db" x="432" y="576" width="58" height="26" rx="4"/>
+<text class="rk" x="461.0" y="593" text-anchor="middle">r14</text>
+<text class="note" x="461.0" y="615" text-anchor="middle">0–4095</text>
+<rect class="db" x="496" y="576" width="58" height="26" rx="4"/>
+<text class="rk" x="525.0" y="593" text-anchor="middle">r15</text>
+<text class="note" x="525.0" y="615" text-anchor="middle">4096–8191</text>
+<text class="note" x="20" y="630" text-anchor="start">prefill P0 (TP 4)</text>
+<text class="note" x="290" y="630" text-anchor="start">decode D0</text>
+<text class="note" x="432" y="630" text-anchor="start">decode D1</text>
+<rect class="grp" x="8" y="464" width="580" height="162" rx="8"/>
+<path d="M49.0,528 L49.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M187.0,528 L113.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M113.0,528 L177.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M251.0,528 L241.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M55.0,528 L319.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M251.0,528 L383.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M55.0,528 L461.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<path d="M251.0,528 L525.0,574" stroke="var(--orange)" stroke-width="1.4" fill="none" marker-end="url(#mo)"/>
+<text class="fam" x="604" y="484" text-anchor="start">1 group of 16 (orange box), point to point</text>
+<text class="note" x="604" y="502" text-anchor="start">Every rank shares its own parallel groups in one</text>
+<text class="note" x="604" y="518" text-anchor="start">all-gather; Megatron-Core plans every send. Each</text>
+<text class="note" x="604" y="534" text-anchor="start">engine rank receives exactly its rows, no all-gather.</text>
+<text class="note" x="604" y="554" text-anchor="start">Sender: destination rank mod 2 picks trainer copy A</text>
+<text class="note" x="604" y="570" text-anchor="start">or B; both copies share the work (pairs follow this</text>
+<text class="note" x="604" y="586" text-anchor="start">rule, not run). Every parameter goes this way.</text>
+<text class="ok" x="604" y="606" text-anchor="start">Needs from NeMo RL: each engine&#x27;s offset.</text>
+<rect class="tb" x="10" y="680" width="16" height="12" rx="3"/>
+<text class="note" x="32" y="691" text-anchor="start">trainer rank (TP 2, PP 2, DP 2)</text>
+<rect class="pb" x="240" y="680" width="16" height="12" rx="3"/>
+<text class="note" x="262" y="691" text-anchor="start">prefill rank</text>
+<rect class="db" x="470" y="680" width="16" height="12" rx="3"/>
+<text class="note" x="492" y="691" text-anchor="start">decode rank</text>
+<rect class="grp" x="700" y="680" width="16" height="12" rx="3"/>
+<text class="note" x="722" y="691" text-anchor="start">one NCCL group</text>
+<text class="note" x="10" y="712" text-anchor="start">W [8192, 4096] = [output features, input features], split by rows under TP. Labels under boxes: the rows of W that rank holds or needs.</text>
 </svg></div>
 <table class="mx">
 <tr><th>backend</th><th>1 · packed broadcast</th><th>2 · nccl_reshard</th><th>3 · mcore</th><th>who knows the layout</th></tr>
@@ -294,7 +366,7 @@ table.mx th{background:var(--surface);font-weight:600}
 <tr><td>Megatron + Dynamo P/D (this stack)</td><td><span class="y">✓</span></td><td><span class="n">✗</span> <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_config.py#L275-L281">refused</a></td><td><span class="y">✓</span> nccl or gloo</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L737-L745">RefitMembership</a> widths (offsets only); MCore for 3</td></tr>
 <tr><td>vLLM P/D (#4920)</td><td><span class="y">✓</span></td><td><span class="n">✗</span> <a href="https://github.com/NVIDIA-NeMo/RL/blob/89b790474e5d9fed8df849baffd5918e6d782890/nemo_rl/models/generation/vllm/config.py#L1164">refused</a></td><td class="na">n/a</td><td>its own init_collective</td></tr>
 </table>
-<p><b>Two families.</b> <b>Whole weight</b> (1): every engine rank gets every tensor and drops the rows it does not hold, so the engine's TP does not matter to the sender. Only rank numbers are needed. <b>Shard to shard</b> (2 and 3): an M-to-N transfer, like one DTensor to another, where each piece goes only to the ranks that hold it. Building those groups and the send plan needs the parallel layout of both the trainer and the engines. The two shard-to-shard ways differ only in who knows that layout. <code>nccl_reshard</code> gets it from NeMo RL: TRT-LLM's <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L931-L968"><code>get_nccl_reshard_layouts()</code></a> returns one layout per role, and the synchronizer builds one group per role and trainer PP stage. <code>mcore</code> gets it from Megatron-Core: every rank shares its own parallel groups in one all-gather, so NeMo RL passes only rank offsets. Behind Dynamo, <code>nccl_reshard</code> is refused by a config check, and would also fail: the synchronizer reads <code>generation.worker_group</code>, which <code>MegatronDynamoGeneration</code> <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L645-L655">raises on</a>, and it reads one shared layout from config, not one per role.</p>
+<p>Read each panel top to bottom: the trainer's rows of W at the top, what each engine rank must end up with at the bottom, and every transfer of W in between. <b>Two families.</b> <b>Whole weight</b> (1): every engine rank gets every tensor and drops the rows it does not hold, so the engine's TP does not matter to the sender. Only rank numbers are needed. <b>Shard to shard</b> (2 and 3): an M-to-N transfer, like one DTensor to another, where each piece goes only to the ranks that hold it. Building those groups and the send plan needs the parallel layout of both the trainer and the engines. The two shard-to-shard ways differ only in who knows that layout. <code>nccl_reshard</code> gets it from NeMo RL: TRT-LLM's <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/trtllm/trtllm_generation.py#L931-L968"><code>get_nccl_reshard_layouts()</code></a> returns one layout per role, and the synchronizer builds one group per role and trainer PP stage. <code>mcore</code> gets it from Megatron-Core: every rank shares its own parallel groups in one all-gather, so NeMo RL passes only rank offsets. Behind Dynamo, <code>nccl_reshard</code> is refused by a config check, and would also fail: the synchronizer reads <code>generation.worker_group</code>, which <code>MegatronDynamoGeneration</code> <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L645-L655">raises on</a>, and it reads one shared layout from config, not one per role.</p>
 <p><b>Details that change the picture.</b> <code>nccl_reshard</code> sends only part of the model shard to shard: MoE experts on TRT-LLM, plus dense layers on Megatron. The rest still goes whole over the misc group. <code>mcore</code> sends every parameter shard to shard, as Megatron's own shards rather than HF tensors. Its <code>mcore_generation_config.refit_backend</code> (<code>nccl</code>, <code>gloo</code>, <code>nccl_m2n</code>, <code>nvshmem</code>) only picks how the bytes move; the plan is the same for all four (<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/megatron/megatron_worker.py#L1665-L1677">copy service</a>). Defaults: <code>refit_transport: null</code> everywhere, which means the packed broadcast when not colocated and CUDA IPC when colocated. Colocated Megatron must set <code>mcore</code> (<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/weight_sync/megatron_weight_synchronizer.py#L74-L85">check</a>). Behind Dynamo, the stack allows <code>mcore</code> because "each engine joins the refit group at its own offset" (commit <code>3843ef69</code>). It gives no reason for refusing <code>nccl_reshard</code>.</p>
 
 <h2>Engines of different widths: what #4801 changes</h2>
