@@ -80,7 +80,7 @@ svg a text{text-decoration:underline;fill:var(--accent);font:12px ui-monospace,M
 
 <h1>Why every prefill/decode engine fails to build at the pinned Megatron-LM</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">PR #4912</a> (2 of 6) ·
-RL head <code>1cb4fef4</code> · Megatron-LM pinned at <code>e0a4bfed</code> (through Megatron-Bridge <code>ae0a1b02</code>)</p>
+RL head <code>1cb4fef4</code> (cited code unchanged at <code>44035e16</code>) · Megatron-LM pinned at <code>e0a4bfed</code> (through Megatron-Bridge <code>ae0a1b02</code>)</p>
 
 <div class="status"><dl>
   <dt>Before</dt>
@@ -161,7 +161,7 @@ A dataclass refuses unknown keyword arguments, so the call raises before the eng
 only compares the returned dict. It never hands that dict to a real <code>InferenceConfig</code>. The
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L30-L42">"is the Dynamo integration installed" check</a>
 also passes at the pin, because the module it imports does exist there.</p>
-<p class="cref">💬 review comment C3 — dynamo_worker_mixin.py:80 (link added once the review is staged)</p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4672549057">review comment C3 — dynamo_worker_mixin.py:80</a></p>
 
 <h2>The fix — proposed, not in the PR</h2>
 <p class="where"><b>Where the fix lands: Megatron-Bridge first, then RL.</b>
