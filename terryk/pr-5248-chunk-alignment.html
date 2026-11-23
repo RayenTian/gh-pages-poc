@@ -237,6 +237,8 @@ trainer.train(chunk)                               <span class="cm"># 6 samples 
   <span class="cref" data-c="C1"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284318">review comment C1 · single_controller.py:2810</a></span></li>
   <li><b><code>weight_fifo</code> streaming can now hang.</b> That sampler only takes groups from the oldest weight version, so a leftover group there can never fill a multiple. Before the PR this failed at once; now it waits for the stall watchdog.
   <span class="cref" data-c="C2"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284337">review comment C2 · config.py:2035</a></span></li>
+  <li><b>A step that loses a prompt.</b> With a drop budget and <code>on_dropped_prompt: shrink</code>, a step of 18 that loses one prompt has 17 groups. With a multiple of 3 it crashes in the sampler (main crashed too, at the split). Rounding every shrunk step down to a whole multiple — 15 here — lets <code>min_step_batch_fraction</code> decide whether it trains or stops cleanly.
+  <span class="cref" data-c="C5"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670813458">review comment C5 · config.py:2012</a></span></li>
 </ul>
 
 <div class="hl"><b>So what.</b> On main, a streaming GRPO chunk crashes whenever the ready sample count does not divide by the DP size. Packing does not save it, because the even-split check runs first. With this PR the chunk is always a whole multiple of <code>m</code> groups, so the split always succeeds. The cost is that up to <code>m − 1</code> ready groups wait one more chunk, and at the end of data a tail smaller than <code>m</code> is not trained.</div>
