@@ -306,7 +306,7 @@ main <code>5e271174</code> (vLLM + Dynamo from <a href="https://github.com/NVIDI
 <h2>What this means for #4801 and the rest of the stack</h2>
 <p>#4801 sets the config and layout shape every later PR builds on, so its parts are cheap to fix now:</p>
 <ul>
-  <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651584020"><b>C13</b></a>: commit the stack to main's adapter pattern in the PR description.</li>
+  
   <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583837"><b>C10</b></a>: import <code>dynamo_enabled</code> and the shared frontend fields from <code>dynamo/config.py</code>, instead of a second schema.</li>
   <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583893"><b>C11</b></a>: build roles and widths on #4920's shared layout module, and add Megatron to its allowed backends (otherwise the two PRs refuse each other).</li>
   <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583948"><b>C12</b></a>: keep per-role layouts in <code>mcore_generation_config</code>, as TRT-LLM and #4920 keep them in their own blocks.</li>
@@ -315,7 +315,7 @@ main <code>5e271174</code> (vLLM + Dynamo from <a href="https://github.com/NVIDI
 </ul>
 <p>The engine-side asks are staged on the later PRs, for their own reviews:</p>
 <ul>
-  <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4651585304">#5023 C1</a>: base the Megatron adapter on <code>DynamoEngineAdapter</code>, not Megatron-LM's <code>MegatronLLMEngine</code>.</li>
+  <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4651585304">#5023 C1</a>: base the Megatron adapter on <code>DynamoEngineAdapter</code>, not Megatron-LM's <code>MegatronLLMEngine</code>, and add the prefill/decode hooks (<code>serve_prefill</code>, <code>serve_rollout(handoff=)</code>, <code>release_handoff</code>) to the shared base there.</li>
   <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">#5025 C1</a>: send rollouts through main's <code>rollout_client</code>, so the worker builds the sampling settings and errors match native generation.</li>
   <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/5097#discussion_r4651585451">#5097 C1</a>: <code>setup_token_capture</code> lacks three required arguments, so token capture fails at startup with a <code>TypeError</code>.</li>
   <li><a href="https://github.com/NVIDIA-NeMo/RL/pull/5097#discussion_r4651585463">#5097 C2</a>: write routed experts from the engine's final record, as native Megatron does.</li>
