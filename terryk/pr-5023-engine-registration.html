@@ -76,12 +76,12 @@ th{background:var(--surface2)}
   document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
 <div class="wrap">
 <h1>How a Megatron prefill/decode engine registers with the Dynamo frontend, next to how a vLLM engine does</h1>
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">PR #5023</a> (part 3 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">#4912</a>) · permalinks at head <code>868942a0</code>, base <code>1cb4fef4</code></p>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">PR #5023</a> (part 3 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">#4912</a>) · code links pinned at <code>868942a0</code> (base <code>1cb4fef4</code>); the review comments are on head <code>596b2662</code>, which adds merges from main, including the move to Dynamo 1.8</p>
 
 <div class="status"><dl>
   <dt>Before</dt><dd>The Megatron prefill and decode engines were built and refit, but nothing registered them with a Dynamo frontend. No etcd, NATS or frontend ran for them.</dd>
   <dt>This PR</dt><dd>The driver starts etcd, NATS and the frontend. At the first refit, rank 0 of each engine runs Megatron-LM's own Dynamo adapter inside its process, and the driver waits until the frontend lists both the prefill and the decode engine.</dd>
-  <dt>Status</dt><dd><span class="verdict open">New path, still switched off. Review open.</span> Startup still refuses <code>backend: megatron</code> with <code>dynamo: true</code>; part 5 (#5025) turns it on. The review asks for a lock-file fix and six smaller changes (links below).</dd>
+  <dt>Status</dt><dd><span class="verdict open">New path, still switched off. Review open.</span> Startup still refuses <code>backend: megatron</code> with <code>dynamo: true</code>; part 5 (#5025) turns it on. The review asks for one design change (C1: build the adapter on the same base as vLLM) and three smaller fixes (links below).</dd>
 </dl></div>
 
 <nav class="chain">
@@ -165,8 +165,8 @@ th{background:var(--surface2)}
 <text x="500" y="384" class="mono">waits for ZMQ "ready" on :4000, then talks to</text>
 <text x="500" y="400" class="mono">the engine's coordinator through InferenceClient</text>
 <text x="500" y="422" class="mono">component  "prefill" | "backend"  (by role)</text>
-<text x="500" y="440" class="mono o">endpoint   "generate"  (literal)          C4</text>
-<text x="500" y="458" class="mono o">planes     .get("DYN_…", default)         C4</text>
+<text x="500" y="440" class="mono">endpoint   "generate"  (literal)</text>
+<text x="500" y="458" class="mono">planes     .get("DYN_…", default)</text>
 <text x="500" y="476" class="mono">DYN_SYSTEM_PORT  "4001"  (picked here)</text>
 <text x="500" y="498" class="mono dim">endpoint_types "completions"</text>
 
@@ -184,20 +184,20 @@ th{background:var(--surface2)}
 <!-- legend -->
 <rect x="20" y="640" width="16" height="12" class="boxg"/>
 <text x="42" y="651" font-size="12">new in this PR</text>
-<text x="160" y="651" font-size="12" class="o">C4 = a review comment on that line</text>
-<text x="420" y="651" font-size="12" class="dim">①–④ match across the two columns; ① and ④ use the same code</text>
+<text x="160" y="651" font-size="12" class="o">③ right: C1 asks to replace this adapter</text>
+<text x="446" y="651" font-size="12" class="dim">①–④ match across the two columns; ① and ④ use the same code</text>
 </svg>
 </div>
 <p style="font-size:13.5px;color:var(--dim);margin:2px 0 10px">Inside ③ on the right, the second call in ② is <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L144-L191"><code>attach_dynamo_events</code></a>: rank 0 connects an event reporter to port 4000 and sends <code>ready {coordinator_address}</code>. Only after that does the adapter register the engine.</p>
 
-<p><b>Where they become one.</b> Both use the same <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/dynamo/managed_runtime.py#L358"><code>ManagedDynamoRuntime.start</code></a> for the services, the same <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/dynamo/managed_runtime.py#L160"><code>wait_for_engine_registrations</code></a> poll (this PR moves it out of the class so the controller's copy, which owns no service process, can run it over HTTP), and the same Dynamo Rust <code>Worker</code>. <b>What still differs after that:</b> the adapter class (NeMo-RL's vs. Megatron-LM's), when it starts (after load vs. at the first refit), how it reaches the engine (direct call vs. the coordinator), the component names, and how the plane and port settings are read (the C4 lines).</p>
+<p><b>Where they become one.</b> Both use the same <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/dynamo/managed_runtime.py#L358"><code>ManagedDynamoRuntime.start</code></a> for the services, the same <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/dynamo/managed_runtime.py#L160"><code>wait_for_engine_registrations</code></a> poll (this PR moves it out of the class so the controller's copy, which owns no service process, can run it over HTTP), and the same Dynamo Rust <code>Worker</code>. <b>What still differs after that:</b> the adapter class (NeMo-RL's vs. Megatron-LM's), when it starts (after load vs. at the first refit), how it reaches the engine (direct call vs. the coordinator), the component names, and how the plane and port settings are read.</p>
 
 <table>
 <tr><th>Question</th><th>vLLM</th><th>Megatron (this PR)</th></tr>
 <tr><td>Who starts the endpoint?</td><td>The driver, right after the engines load.</td><td>Whoever makes the first <code>resume_after_refit</code> call: the driver at setup, or the controller's copy. A repeat call returns the first call's ports (<a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L237-L246">L237-L246</a>).</td></tr>
 <tr><td>What crosses into the engine actor?</td><td><code>namespace</code>, <code>engine_env</code></td><td>Those, plus the model name, a start timeout and the ports other engines on the node took; back come the event and system ports and, for decode, a handoff owner id.</td></tr>
 <tr><td>What tells the driver it failed?</td><td><code>dynamo_endpoint_error</code> on each leader, polled during the wait.</td><td>The same, through <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_generation.py#L523-L563"><code>check_alive</code></a>, polled during the wait. A stopped endpoint cannot start again in that process.</td></tr>
-<tr><td>Why a separate adapter?</td><td>NeMo-RL owns the vLLM adapter.</td><td>Megatron-LM owns the prefill→decode KV handoff and its event protocol, so its own adapter carries them.</td></tr>
+<tr><td>Which adapter?</td><td>NeMo-RL's <code>DynamoEngineAdapter</code>, filled in by <code>DynamoVllmAdapter</code>.</td><td>Megatron-LM's own <code>MegatronLLMEngine</code>. The review (C1) asks for a NeMo-RL <code>DynamoMegatronAdapter</code> on the same base as vLLM instead, so both backends share one adapter shape.</td></tr>
 </table>
 
 <h2>The change, as pseudocode</h2>
@@ -224,21 +224,18 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd
 <span class="add">    if started: return same ports</span>
 <span class="add">    event, system = <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L263-L276">free ports in [4000, 4100)</a></span>
 <span class="add">    os.environ |= engine_env + {DYN_SYSTEM_PORT: system}</span>
-<span class="add">    cfg = <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L280-L304">Config</a>(external mode, role, component, …)</span>  <span class="cm"># C2, C4, C6</span>
+<span class="add">    cfg = <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L280-L304">Config</a>(external mode, role, component, …)</span>  <span class="cm"># C1: replace with a NeMo-RL adapter</span>
 <span class="add">    run on inference loop: <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L306-L325">Worker(MegatronLLMEngine(cfg)).run()</a></span></pre>
 <p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_generation.py#L906-L932"><code>_await_dynamo_fleet_ready</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_generation.py#L934-L1000"><code>start_endpoints</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L193-L338"><code>start_dynamo_endpoint</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L394-L409"><code>_report_dynamo_ready</code></a>.</p>
 
 <h2>What the review asks</h2>
 <div class="hl">
-<p style="margin:0 0 6px">The design holds up: the services are shared, the wait is one function both sides call, and the endpoint lifecycle has CPU tests. The one blocker is outside the code: <b>the relocked <code>uv.lock</code> fails <code>uv lock --check</code> with uv 0.13.6</b>, the version the Dockerfile pins, while the base lock passes (C1). The rest are small: test fakes that accept any argument name, so an upstream rename would only fail on a GPU (C2, C3); copied constants (C4); a config key with no effect on Megatron (C5); a wrong code comment (C6); and stale docstrings (C7).</p>
+<p style="margin:0 0 6px">The shared parts hold up: the services are one class, the wait is one function both sides call (the controller's copy too), and the endpoint lifecycle has CPU tests. The main ask is the adapter in ③ (C1): build a NeMo-RL <code>DynamoMegatronAdapter</code> on main's <code>DynamoEngineAdapter</code>, as vLLM does, instead of hosting Megatron-LM's <code>MegatronLLMEngine</code>. The design and what the later PRs then do are on the <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-pd-one-interface.html">one P/D interface page</a>. The other three are small: the controller test's fake worker accepts any argument name (C2), <code>render_workers</code> has no effect on Megatron (C3), and two docstrings are stale (C4).</p>
 <p class="cref">
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C1 · uv.lock:2</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C2 · test_megatron_dynamo_worker_mixin.py:183</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C3 · test_megatron_dynamo_generation.py:210</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C4 · dynamo_worker_mixin.py:285</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C5 · dynamo_config.py:81</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C6 · dynamo_worker_mixin.py:294</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C7 · dynamo_generation.py:1013</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4651585304">C1 · dynamo_worker_mixin.py:327</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C2 · test_megatron_dynamo_generation.py:213</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C3 · dynamo_config.py:80</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C4 · dynamo_generation.py:1019</a>
 </p>
 </div>
 </div>
