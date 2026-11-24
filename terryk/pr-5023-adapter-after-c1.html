@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PR #5023: the Dynamo adapter today, in this PR, and after C1</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:25px;line-height:1.3;margin:0 0 6px}
+h2{font-size:19px;margin:30px 0 8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface2);padding:1px 4px;border-radius:4px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--orange)}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:6px 12px;margin:0 0 14px;font-size:14px}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2);text-decoration:none}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 16px}
+.fig{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px;margin:10px 0;overflow-x:auto}
+svg{display:block;width:100%;min-width:900px;height:auto}
+svg text{font-family:-apple-system,"Segoe UI",Helvetica,sans-serif;fill:var(--text)}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+svg .dim{fill:var(--dim)}svg .g{fill:var(--green)}svg .r{fill:var(--red)}svg .o{fill:var(--orange)}
+svg .t{font-size:13px;font-weight:600}
+svg a text{text-decoration:underline;fill:var(--accent)}
+svg .box{fill:var(--bg);stroke:var(--border);stroke-width:1.2}
+svg .boxg{fill:var(--bg);stroke:var(--green);stroke-width:1.8}
+svg .boxr{fill:var(--bg);stroke:var(--red);stroke-width:1.6}
+svg .proc{fill:none;stroke:var(--dim);stroke-dasharray:5 4}
+svg .arr{stroke:var(--dim);stroke-width:1.5;fill:none;marker-end:url(#ah)}
+svg #ah path{fill:var(--dim)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--surface2)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.hl{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:16px 0}
+.cref{margin:4px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:3px 9px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12px ui-monospace,Menlo,monospace;margin:2px 4px 2px 0}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+<h1>Who answers a Dynamo request inside the engine: vLLM today, Megatron in this PR, and Megatron after C1</h1>
+<p class="sub">Stack: <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801">#4801</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">#4912</a> → <b><a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">#5023</a></b> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5097">#5097</a> · main at <code>5e271174</code>, this PR at <code>c396aafa</code>, the C1 draft at <code>d40ae141</code></p>
+
+<div class="status"><dl>
+  <dt>vLLM today</dt><dd>On main, each vLLM engine answers Dynamo through NeMo-RL's own adapter, which calls the native vLLM worker. Token capture, routed experts and generation cuts all go through that worker.</dd>
+  <dt>This PR</dt><dd>Each Megatron engine answers through Megatron-LM's adapter instead. It reaches the engine through the engine's coordinator, over sockets, and #5097 later has to turn routed experts and generation cuts off on that path.</dd>
+  <dt>After C1</dt><dd><span class="verdict open">Proposed, not in Laura's PR.</span> A NeMo-RL <code>DynamoMegatronAdapter</code> on the same base class as vLLM, calling the native Megatron worker. A draft shows it as real code: <a href="https://github.com/terrykong/RL/pull/58">terrykong/RL#58</a>.</dd>
+</dl></div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5023-engine-registration.html">#5023 · how engines register</a>
+  <span class="here">#5023 · the adapter, before and after C1</span>
+</nav>
+<p class="chainnote">Two pages for this PR. The ★ page links every page in the stack.</p>
+
+<p class="bg"><b>Background.</b> Dynamo's frontend sends each request to a <span class="tip" tabindex="0" data-tip="dynamo.common.backend.Worker. It registers the engine, takes requests from the frontend, and hands each one to an adapter object.">Worker</span> running inside an engine process. The Worker hands it to an <i>adapter</i>, the class that knows how to run a request on that engine. On main, NeMo-RL writes that class once (<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/engine_adapter.py#L83"><code>DynamoEngineAdapter</code></a>) and vLLM fills in four methods. In prefill/decode serving, one engine reads the prompt and hands its KV cache to a second engine that writes the answer; the handoff is the step this stack adds. Dotted words have a short explanation: hover or tap them.</p>
+
+<h2>One request, three ways</h2>
+<p>Same example in all three columns: one completion request, prompt token ids <code>[1, 2, 3]</code>, 2 new tokens. The Megatron columns use one prefill and one decode engine.</p>
+
+<div class="fig">
+<svg viewBox="0 0 960 560" role="img" aria-label="Three columns: vLLM adapter on main, Megatron-LM adapter in this PR, NeMo-RL Megatron adapter after C1">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z"/></marker></defs>
+<text x="16" y="20" class="t">vLLM on main</text>
+<text x="334" y="20" class="t">Megatron in this PR</text>
+<text x="652" y="20" class="t">Megatron after C1 (draft)</text>
+
+<!-- frontend row -->
+<rect class="box" x="10" y="30" width="300" height="44" rx="6"/>
+<text x="20" y="49" font-size="12">Dynamo frontend</text>
+<text x="20" y="66" class="mono">{prompt:[1,2,3], max_tokens:2}</text>
+<rect class="box" x="328" y="30" width="300" height="44" rx="6"/>
+<text x="338" y="49" font-size="12">frontend: prefill leg, then decode leg</text>
+<text x="338" y="66" class="mono">{prompt:[1,2,3], max_tokens:2}</text>
+<rect class="box" x="646" y="30" width="304" height="44" rx="6"/>
+<text x="656" y="49" font-size="12">frontend: prefill leg, then decode leg</text>
+<text x="656" y="66" class="mono">{prompt:[1,2,3], max_tokens:2}</text>
+<path class="arr" d="M160,74 V100"/><path class="arr" d="M478,74 V100"/><path class="arr" d="M798,74 V100"/>
+
+<!-- engine process -->
+<rect class="proc" x="10" y="100" width="300" height="300"/>
+<rect class="proc" x="328" y="100" width="300" height="300"/>
+<rect class="proc" x="646" y="100" width="304" height="300"/>
+<text x="18" y="115" class="dim" font-size="11">vLLM worker process (Ray actor, GPU)</text>
+<text x="336" y="115" class="dim" font-size="11">Megatron rank 0 process (Ray actor, GPU)</text>
+<text x="654" y="115" class="dim" font-size="11">Megatron rank 0 process (Ray actor, GPU)</text>
+
+<rect class="box" x="18" y="122" width="284" height="56" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/vllm/adapter.py#L203"><text x="28" y="142" class="t">DynamoVllmAdapter (NeMo-RL)</text></a>
+<text x="28" y="162" class="mono dim">on DynamoEngineAdapter</text>
+<rect class="boxr" x="336" y="122" width="284" height="56" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c396aafa3bf26795df4ee4e3f2aedc5e550b805f/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L307-L327"><text x="346" y="142" class="t">MegatronLLMEngine (Megatron-LM)</text></a>
+<text x="346" y="162" class="mono dim">its own class, not NeMo-RL's base</text>
+<rect class="boxg" x="654" y="122" width="288" height="56" rx="6"/>
+<a href="https://github.com/terrykong/RL/blob/d40ae1417031a7a965381c1667b081e8c777bb14/nemo_rl/models/generation/dynamo/megatron/adapter.py#L69-L287"><text x="664" y="142" class="t">DynamoMegatronAdapter (NeMo-RL)</text></a>
+<text x="664" y="162" class="mono dim">on DynamoEngineAdapter, like vLLM</text>
+
+<path class="arr" d="M160,178 V204"/><path class="arr" d="M478,178 V204"/><path class="arr" d="M798,178 V204"/>
+<text x="168" y="196" class="mono dim">serve_rollout(req)</text>
+<text x="486" y="196" class="mono dim">ZMQ socket to the coordinator</text>
+<text x="806" y="196" class="mono dim">serve_prefill / serve_rollout</text>
+
+<rect class="box" x="18" y="206" width="284" height="72" rx="6"/>
+<text x="28" y="226" class="t">native vLLM worker</text>
+<text x="28" y="246" class="mono">generate([1,2,3]) → [8, 2]</text>
+<text x="28" y="264" class="mono g">capture, routed experts, cuts: yes</text>
+<rect class="box" x="336" y="206" width="284" height="72" rx="6"/>
+<text x="346" y="226" class="t">engine coordinator → engine ranks</text>
+<text x="346" y="246" class="mono">InferenceClient request → [8, 2]</text>
+<text x="346" y="264" class="mono r">routed experts, cuts: refused (#5097)</text>
+<rect class="box" x="654" y="206" width="288" height="72" rx="6"/>
+<text x="664" y="226" class="t">native Megatron worker</text>
+<text x="664" y="246" class="mono">prefill: pin KV → handoff; decode → [8, 2]</text>
+<text x="664" y="264" class="mono g">capture, cuts: as native Megatron</text>
+
+<!-- registration / ports -->
+<rect class="box" x="18" y="290" width="284" height="102" rx="6"/>
+<text x="28" y="309" class="t">registration and ports</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/engine_adapter.py#L186-L221"><text x="28" y="328" class="mono">start_dynamo_endpoint(adapter)</text></a>
+<text x="28" y="346" class="mono">DYN_SYSTEM_PORT "0" (OS picks)</text>
+<text x="28" y="364" class="mono">no event port</text>
+<text x="28" y="382" class="mono dim">one step, on the actor's loop</text>
+<rect class="boxr" x="336" y="290" width="284" height="102" rx="6"/>
+<text x="346" y="309" class="t">registration and ports</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c396aafa3bf26795df4ee4e3f2aedc5e550b805f/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L194-L340"><text x="346" y="328" class="mono">start_dynamo_endpoint + attach</text></a>
+<text x="346" y="346" class="mono r">DYN_SYSTEM_PORT 4001 (picked, C5)</text>
+<text x="346" y="364" class="mono r">event port 4000 (picked, C5)</text>
+<text x="346" y="382" class="mono dim">two steps: start, then "ready" event</text>
+<rect class="boxg" x="654" y="290" width="288" height="102" rx="6"/>
+<text x="664" y="309" class="t">registration and ports</text>
+<a href="https://github.com/terrykong/RL/blob/d40ae1417031a7a965381c1667b081e8c777bb14/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L128-L199"><text x="664" y="328" class="mono">main's start_dynamo_endpoint(adapter)</text></a>
+<text x="664" y="346" class="mono">DYN_SYSTEM_PORT "0" (OS picks)</text>
+<text x="664" y="364" class="mono">no event port</text>
+<text x="664" y="382" class="mono dim">one step, as vLLM</text>
+
+<!-- base class hooks -->
+<rect class="box" x="10" y="414" width="940" height="96" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/engine_adapter.py#L83-L172"><text x="20" y="434" class="t">DynamoEngineAdapter (main) — what a backend fills in</text></a>
+<text x="20" y="456" class="mono">start · serve_rollout · abort · kv_event_sources</text>
+<text x="20" y="476" class="mono g">+ serve_prefill · serve_rollout(handoff=) · release_handoff   ← new optional P/D hooks (C1)</text>
+<text x="20" y="497" class="mono dim">vLLM fills the first four today; Megatron fills all of them after C1; vLLM can add the P/D hooks later</text>
+
+<!-- legend -->
+<rect x="20" y="526" width="16" height="12" class="boxg"/><text x="42" y="537" font-size="12">proposed in C1</text>
+<rect x="160" y="526" width="16" height="12" class="boxr"/><text x="182" y="537" font-size="12">what C1 and C5 ask to replace</text>
+<text x="420" y="537" font-size="12" class="dim">output [8, 2] is the same in all three; the path to it differs</text>
+</svg>
+</div>
+
+<table>
+<tr><th></th><th>vLLM on main</th><th>Megatron in this PR</th><th>Megatron after C1</th></tr>
+<tr><td>Who owns the adapter class</td><td>NeMo-RL</td><td>Megatron-LM; #5097 subclasses it</td><td>NeMo-RL, same base as vLLM</td></tr>
+<tr><td>How a request reaches the engine</td><td>direct call into the worker</td><td>through the coordinator, over sockets</td><td>direct call into the worker</td></tr>
+<tr><td>Steps to register</td><td>1</td><td>2 (start, then attach + "ready")</td><td>1</td></tr>
+<tr><td>Ports NeMo-RL picks</td><td>none</td><td>2 per engine, picked then bound later (C5)</td><td>none</td></tr>
+<tr><td>Capture, routed experts, cuts</td><td>native worker</td><td>outside the native worker; routed experts and cuts refused in #5097</td><td>native worker, so the same as Megatron without Dynamo (which does not return routed experts today either)</td></tr>
+<tr><td>Where P/D handoff lives</td><td>(no P/D on main)</td><td>inside Megatron-LM's adapter</td><td>three hooks on the shared base; Megatron-LM's KV functions called from them</td></tr>
+</table>
+
+<h2>The change, as pseudocode</h2>
+<p class="pclbl">Rank 0 serves the engine — this PR</p>
+<pre class="pc"><span class="who"># Ray call on rank 0; the adapter runs as a task on the engine's inference loop</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/c396aafa3bf26795df4ee4e3f2aedc5e550b805f/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L194">start_dynamo_endpoint</a>(namespace, engine_env, …):
+    event, system = <a href="https://github.com/NVIDIA-NeMo/RL/blob/c396aafa3bf26795df4ee4e3f2aedc5e550b805f/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L264-L278">pick free ports in [4000, 4100)</a>   <span class="cm"># released, bound later (C5)</span>
+    os.environ |= engine_env + {DYN_SYSTEM_PORT: system}
+    cfg = <a href="https://github.com/NVIDIA-NeMo/RL/blob/c396aafa3bf26795df4ee4e3f2aedc5e550b805f/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L281-L305">Config</a>(external mode, role, event port, …)
+    run on inference loop: <a href="https://github.com/NVIDIA-NeMo/RL/blob/c396aafa3bf26795df4ee4e3f2aedc5e550b805f/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L307-L327">Worker(MegatronLLMEngine(cfg)).run()</a>
+<span class="who"># second Ray call, every rank</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/c396aafa3bf26795df4ee4e3f2aedc5e550b805f/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L145">attach_dynamo_events</a>(addr):
+    reporter.connect(addr); reporter.send("ready", coordinator address)</pre>
+<p class="pclbl">After C1 (draft)</p>
+<pre class="pc"><span class="who"># Ray call on rank 0; same function vLLM registers through</span>
+def start_dynamo_endpoint(namespace, engine_env, …):
+<span class="del">    event, system = pick free ports in [4000, 4100)</span>
+<span class="del">    cfg = Config(external mode, role, event port, …)</span>
+<span class="add">    adapter = <a href="https://github.com/terrykong/RL/blob/d40ae1417031a7a965381c1667b081e8c777bb14/nemo_rl/models/generation/dynamo/megatron/adapter.py#L69-L287">DynamoMegatronAdapter</a>(self, role)</span>      <span class="cm"># calls this worker directly</span>
+<span class="add">    <a href="https://github.com/terrykong/RL/blob/d40ae1417031a7a965381c1667b081e8c777bb14/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L128-L199">engine_adapter.start_dynamo_endpoint</a>(adapter, engine_env)</span>  <span class="cm"># DYN_SYSTEM_PORT stays "0"</span>
+<span class="del">def attach_dynamo_events(addr): …</span>                     <span class="cm"># gone: no event socket</span></pre>
+<p class="pcref">Real code: this PR's <a href="https://github.com/NVIDIA-NeMo/RL/blob/c396aafa3bf26795df4ee4e3f2aedc5e550b805f/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L194-L340"><code>start_dynamo_endpoint</code></a>; main's <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/engine_adapter.py#L186-L221"><code>start_dynamo_endpoint</code></a>; the draft's <a href="https://github.com/terrykong/RL/pull/58">diff</a>.</p>
+
+<h2>What the review asks, and what the draft shows</h2>
+<div class="hl">
+<p style="margin:0 0 6px">C1 asks for the right-hand column: one adapter shape for every backend, so Megatron runs capture and generation cuts through its own worker the way vLLM does, and the later PRs shrink (#5025 uses main's <code>rollout_client</code>, #5097 drops its two refusals). C5 asks that the two picked ports not come along. The draft PR is there so the difference is visible as code, not to be merged.</p>
+<p style="margin:6px 0">What in the draft is real and what is not: <code>start</code>, <code>serve_rollout</code> (plain and decode-with-handoff), <code>serve_prefill</code>, <code>abort</code> and <code>kv_event_sources</code> call real Megatron code. Two steps are stubs, <code>release_handoff</code> and the decode-side claim, because Megatron-LM keeps the RELEASE_KV / CLAIM_KV messages in private methods of <code>MegatronLLMEngine</code>; the draft names them, and they need one small upstream change that turns them into functions. The CPU unit tests pass (75) against stand-ins for the Linux-only Dynamo package; nothing ran on a GPU.</p>
+<p class="cref">
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4651585304">C1 · dynamo_worker_mixin.py:327</a>
+<a href="https://github.com/terrykong/RL/pull/58">draft · terrykong/RL#58</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-pd-one-interface.html">design · one P/D interface</a>
+</p>
+</div>
+</div>
+</body>
+</html>

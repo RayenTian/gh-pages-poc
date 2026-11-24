@@ -157,7 +157,7 @@ svg a text{text-decoration:underline;fill:var(--accent);font:bold 14px -apple-sy
 <tr><td class="n"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">3 · #5023</a></td>
 <td>Runs Megatron-LM's Dynamo adapter inside each engine's rank 0, and starts etcd, NATS and the frontend from NeMo RL, so the engines register with the frontend after the first refit.</td>
 <td class="off">Frontend sees the engines; still refused at setup.</td>
-<td><a class="chip" href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5023-engine-registration.html">how an engine registers</a></td></tr>
+<td><a class="chip" href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5023-engine-registration.html">how an engine registers</a><a class="chip" href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5023-adapter-after-c1.html">the adapter, before and after C1</a></td></tr>
 <tr><td class="n"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">4 · #5024</a></td>
 <td>Orders refit so in-flight KV handoffs finish first (stop new prefills, drain pinned blocks, suspend, resume), and makes shutdown release prefill's pinned blocks.</td>
 <td class="off">Refit is safe with traffic; still refused at setup.</td>
