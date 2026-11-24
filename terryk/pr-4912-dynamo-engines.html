@@ -198,7 +198,7 @@ pushes new weights from the trainer into every engine after each step. Dotted wo
 <p><b>Where they meet:</b> each Dynamo engine <i>is</i> a plain <code>MegatronGeneration</code> built from a copied config, so the worker code is the same. They split in exactly three
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/megatron_worker.py#L358-L376">hooks on the worker</a> —
 extra config fields, which engine class to build, and where the coordinator listens. The plain worker returns the old answers; <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L45-L106"><code>MegatronDynamoGenerationMixin</code></a> returns the Dynamo ones.</p>
-<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4672549057">review comment C3 — dynamo_worker_mixin.py:80</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4672549071">C4 — lm_policy.py:324</a></p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4672549057">review comment C3 — dynamo_worker_mixin.py:80</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4672926891">C10 — one worker class</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4673684069">C13 — names</a></p>
 
 <table>
 <tr><th></th><th>Before (<code>MegatronGeneration</code>)</th><th>This PR (<code>MegatronDynamoGeneration</code>)</th></tr>
