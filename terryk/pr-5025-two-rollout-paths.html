@@ -76,7 +76,7 @@ th{background:var(--surface2)}
 <div class="wrap">
 
 <h1>How one Megatron rollout reaches the engine: directly, or through the Dynamo frontend</h1>
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">PR #5025</a> (part 5 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a>) · permalinks at head <code>00d52a2c</code>, base <code>9df434a7</code></p>
+<p class="sub">NVIDIA-NeMo/RL · <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801">#4801</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">#4912</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">#5023</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a> → <b>#5025</b> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5097">#5097</a> · this page: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">PR #5025</a>, reviewed against #5024 · permalinks at head <code>00d52a2c</code>, base <code>9df434a7</code></p>
 
 <div class="status"><dl>
   <dt>Before</dt><dd>With <code>backend: megatron</code> and <code>dynamo: true</code>, startup refused the config: the prefill and decode engines were built and registered with the Dynamo frontend, but nothing sent them rollouts.</dd>
@@ -86,12 +86,9 @@ th{background:var(--surface2)}
 
 <nav class="chain">
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-dynamo-paths.html">#4801 · where the switch sits</a>
   <span class="here">#5025 · direct vs. through Dynamo</span>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-two-backends.html">#5097 · two backends, one chat engine</a>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-faults-as-400.html">#5097 · server faults answered as 400</a>
 </nav>
-<p class="chainnote">One page for this PR. The other chips are pages for part 1 and part 6 of the same stack.</p>
+<p class="chainnote">One page for this PR. The ★ page links the pages for every PR in the stack.</p>
 
 <p class="bg"><b>Background.</b> A <i>rollout</i> is one prompt sent to the inference engine to get a completion back, with the log-probability of each new token. <span class="tip" tabindex="0" data-tip="Dynamo is NVIDIA's serving layer. Its frontend is an OpenAI-style HTTP server that routes each request to a registered engine.">Dynamo</span>'s frontend can split one request across two engines: a <i>prefill</i> engine reads the prompt and builds its KV cache, then hands that cache to a <i>decode</i> engine over <span class="tip" tabindex="0" data-tip="NVIDIA's GPU-to-GPU transfer library. Here it copies the prompt's KV cache from the prefill engine to the decode engine.">NIXL</span>, which writes the answer. PRs 1–4 of this stack built those engines. Dotted words have a short explanation: hover or tap them.</p>
 
