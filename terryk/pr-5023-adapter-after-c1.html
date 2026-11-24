@@ -81,15 +81,16 @@ th{background:var(--surface2)}
 <div class="status"><dl>
   <dt>vLLM today</dt><dd>On main, each vLLM engine answers Dynamo through NeMo-RL's own adapter, which calls the native vLLM worker. Token capture, routed experts and generation cuts all go through that worker.</dd>
   <dt>This PR</dt><dd>Each Megatron engine answers through Megatron-LM's adapter instead. It reaches the engine through the engine's coordinator, over sockets, and #5097 later has to turn routed experts and generation cuts off on that path.</dd>
-  <dt>After C1</dt><dd><span class="verdict open">Proposed, not in Laura's PR.</span> A NeMo-RL <code>DynamoMegatronAdapter</code> on the same base class as vLLM, calling the native Megatron worker. A draft shows it as real code: <a href="https://github.com/terrykong/RL/pull/58">terrykong/RL#58</a>.</dd>
+  <dt>After C1</dt><dd><span class="verdict open">Proposed, not in the PR.</span> A NeMo-RL <code>DynamoMegatronAdapter</code> on the same base class as vLLM, calling the native Megatron worker. A draft shows it as real code: <a href="https://github.com/terrykong/RL/pull/58">terrykong/RL#58</a>.</dd>
 </dl></div>
 
 <nav class="chain">
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5023-engine-registration.html">#5023 · how engines register</a>
   <span class="here">#5023 · the adapter, before and after C1</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5023-class-composition.html">#5023 · every class, side by side</a>
 </nav>
-<p class="chainnote">Two pages for this PR. The ★ page links every page in the stack.</p>
+<p class="chainnote">Three pages for this PR. The ★ page links every page in the stack.</p>
 
 <p class="bg"><b>Background.</b> Dynamo's frontend sends each request to a <span class="tip" tabindex="0" data-tip="dynamo.common.backend.Worker. It registers the engine, takes requests from the frontend, and hands each one to an adapter object.">Worker</span> running inside an engine process. The Worker hands it to an <i>adapter</i>, the class that knows how to run a request on that engine. On main, NeMo-RL writes that class once (<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/dynamo/engine_adapter.py#L83"><code>DynamoEngineAdapter</code></a>) and vLLM fills in four methods. In prefill/decode serving, one engine reads the prompt and hands its KV cache to a second engine that writes the answer; the handoff is the step this stack adds. Dotted words have a short explanation: hover or tap them.</p>
 
@@ -218,10 +219,11 @@ def start_dynamo_endpoint(namespace, engine_env, …):
 
 <h2>What the review asks, and what the draft shows</h2>
 <div class="hl">
-<p style="margin:0 0 6px">C1 asks for the right-hand column: one adapter shape for every backend, so Megatron runs capture and generation cuts through its own worker the way vLLM does, and the later PRs shrink (#5025 uses main's <code>rollout_client</code>, #5097 drops its two refusals). C5 asks that the two picked ports not come along. The draft PR is there so the difference is visible as code, not to be merged.</p>
+<p style="margin:0 0 6px">C1 asks for the right-hand column: one adapter shape for every backend, so Megatron runs capture and generation cuts through its own worker the way vLLM does, and the later PRs shrink (#5025 uses main's <code>rollout_client</code>, #5097 drops its two refusals). <a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4676447865">C5</a> asks that the two picked ports not come along. The draft PR is there so the difference is visible as code, not to be merged.</p>
 <p style="margin:6px 0">What in the draft is real and what is not: <code>start</code>, <code>serve_rollout</code> (plain and decode-with-handoff), <code>serve_prefill</code>, <code>abort</code> and <code>kv_event_sources</code> call real Megatron code. Two steps are stubs, <code>release_handoff</code> and the decode-side claim, because Megatron-LM keeps the RELEASE_KV / CLAIM_KV messages in private methods of <code>MegatronLLMEngine</code>; the draft names them, and they need one small upstream change that turns them into functions. The CPU unit tests pass (75) against stand-ins for the Linux-only Dynamo package; nothing ran on a GPU.</p>
 <p class="cref">
 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4651585304">C1 · dynamo_worker_mixin.py:327</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4676447865">C5 · dynamo_worker_mixin.py:264</a>
 <a href="https://github.com/terrykong/RL/pull/58">draft · terrykong/RL#58</a>
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-pd-one-interface.html">design · one P/D interface</a>
 </p>

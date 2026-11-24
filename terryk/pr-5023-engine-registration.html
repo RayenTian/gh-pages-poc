@@ -88,8 +88,9 @@ th{background:var(--surface2)}
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
   <span class="here">#5023 · how engines register</span>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5023-adapter-after-c1.html">#5023 · the adapter, before and after C1</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5023-class-composition.html">#5023 · every class, side by side</a>
 </nav>
-<p class="chainnote">Two pages for this PR. The ★ page links every page in the stack.</p>
+<p class="chainnote">Three pages for this PR. The ★ page links every page in the stack.</p>
 
 <p class="bg"><b>Background.</b> <span class="tip" tabindex="0" data-tip="NVIDIA's serving layer. A frontend process takes OpenAI-style HTTP requests and routes each one to a registered engine.">Dynamo</span> needs three services: <span class="tip" tabindex="0" data-tip="A key-value store. Engines write their address here, and the frontend reads it to find them.">etcd</span> (where engines list themselves), <span class="tip" tabindex="0" data-tip="A message bus Dynamo uses for events, such as which KV-cache blocks an engine holds.">NATS</span> (events) and the frontend (HTTP). Each engine runs a Dynamo <span class="tip" tabindex="0" data-tip="dynamo.common.backend.Worker. It takes an adapter object (an LLMEngine) and serves it: registers in etcd, takes requests, hands them to the adapter.">Worker</span> wrapped around an adapter that knows how to talk to that engine. In <i>prefill/decode</i> serving, one engine reads the prompt (prefill) and hands its KV cache to a second engine that writes the answer (decode). Dotted words have a short explanation: hover or tap them.</p>
 
