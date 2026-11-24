@@ -231,12 +231,12 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd
 
 <h2>What the review asks</h2>
 <div class="hl">
-<p style="margin:0 0 6px">The shared parts hold up: the services are one class, the wait is one function both sides call (the controller's copy too), and the endpoint lifecycle has CPU tests. The main ask is the adapter in ③ (C1): build a NeMo-RL <code>DynamoMegatronAdapter</code> on main's <code>DynamoEngineAdapter</code>, as vLLM does, instead of hosting Megatron-LM's <code>MegatronLLMEngine</code>. The design and what the later PRs then do are on the <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-pd-one-interface.html">one P/D interface page</a>. The other three are small: the controller test's fake worker accepts any argument name (C2), <code>render_workers</code> has no effect on Megatron (C3), and two docstrings are stale (C4).</p>
+<p style="margin:0 0 6px">The shared parts hold up: the services are one class, the wait is one function both sides call (the controller's copy too), and the endpoint lifecycle has CPU tests. The main ask is the adapter in ③ (C1): build a NeMo-RL <code>DynamoMegatronAdapter</code> on main's <code>DynamoEngineAdapter</code>, as vLLM does, instead of hosting Megatron-LM's <code>MegatronLLMEngine</code>. The design and what the later PRs then do are on the <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-pd-one-interface.html">one P/D interface page</a>. The other three are small: the controller test's fake worker accepts any argument name (C2), after #4801, Megatron's config should not carry <code>render_workers</code> or <code>session_affinity_ttl_secs</code> (they do nothing until #5097 turns chat on), so each backend passes them to the runtime instead (C3), and two docstrings are stale (C4).</p>
 <p class="cref">
 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4651585304">C1 · dynamo_worker_mixin.py:327</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C2 · test_megatron_dynamo_generation.py:213</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C3 · dynamo_config.py:80</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">C4 · dynamo_generation.py:1019</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4673957869">C2 · test_megatron_dynamo_generation.py:213</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4673958029">C3 · dynamo_config.py:78</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023#discussion_r4673958259">C4 · dynamo_generation.py:1019</a>
 </p>
 </div>
 </div>
