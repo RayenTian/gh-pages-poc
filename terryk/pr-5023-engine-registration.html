@@ -76,7 +76,7 @@ th{background:var(--surface2)}
   document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
 <div class="wrap">
 <h1>How a Megatron prefill/decode engine registers with the Dynamo frontend, next to how a vLLM engine does</h1>
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">PR #5023</a> (part 3 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">#4912</a>) · code links pinned at <code>868942a0</code> (base <code>1cb4fef4</code>); the review comments are on head <code>596b2662</code>, which adds merges from main, including the move to Dynamo 1.8</p>
+<p class="sub">Stack: <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801">#4801</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">#4912</a> → <b><a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">#5023</a></b> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a> → <a href="https://github.com/NVIDIA-NeMo/RL/pull/5097">#5097</a> · this page: part 3 of 6, reviewed against #4912 · code links pinned at <code>868942a0</code>; the review comments are on head <code>c396aafa</code>, which adds merges from main, including the move to Dynamo 1.8</p>
 
 <div class="status"><dl>
   <dt>Before</dt><dd>The Megatron prefill and decode engines were built and refit, but nothing registered them with a Dynamo frontend. No etcd, NATS or frontend ran for them.</dd>
@@ -86,12 +86,9 @@ th{background:var(--surface2)}
 
 <nav class="chain">
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-dynamo-paths.html">#4801 · where the switch sits</a>
   <span class="here">#5023 · how engines register</span>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5024-fleet-order.html">#5024 · fleet order</a>
-  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5025-two-rollout-paths.html">#5025 · direct vs. through Dynamo</a>
 </nav>
-<p class="chainnote">One page for this PR. The other chips are pages for other parts of the same stack.</p>
+<p class="chainnote">One page for this PR. The ★ page links every page in the stack.</p>
 
 <p class="bg"><b>Background.</b> <span class="tip" tabindex="0" data-tip="NVIDIA's serving layer. A frontend process takes OpenAI-style HTTP requests and routes each one to a registered engine.">Dynamo</span> needs three services: <span class="tip" tabindex="0" data-tip="A key-value store. Engines write their address here, and the frontend reads it to find them.">etcd</span> (where engines list themselves), <span class="tip" tabindex="0" data-tip="A message bus Dynamo uses for events, such as which KV-cache blocks an engine holds.">NATS</span> (events) and the frontend (HTTP). Each engine runs a Dynamo <span class="tip" tabindex="0" data-tip="dynamo.common.backend.Worker. It takes an adapter object (an LLMEngine) and serves it: registers in etcd, takes requests, hands them to the adapter.">Worker</span> wrapped around an adapter that knows how to talk to that engine. In <i>prefill/decode</i> serving, one engine reads the prompt (prefill) and hands its KV cache to a second engine that writes the answer (decode). Dotted words have a short explanation: hover or tap them.</p>
 
