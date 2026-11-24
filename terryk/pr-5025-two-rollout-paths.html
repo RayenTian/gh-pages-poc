@@ -76,12 +76,12 @@ th{background:var(--surface2)}
 <div class="wrap">
 
 <h1>How one Megatron rollout reaches the engine: directly, or through the Dynamo frontend</h1>
-<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">PR #5025</a> (part 5 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a>) · permalinks at head <code>62868966</code>, base <code>d2e22762</code></p>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">PR #5025</a> (part 5 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a>) · permalinks at head <code>00d52a2c</code>, base <code>9df434a7</code></p>
 
 <div class="status"><dl>
   <dt>Before</dt><dd>With <code>backend: megatron</code> and <code>dynamo: true</code>, startup refused the config: the prefill and decode engines were built and registered with the Dynamo frontend, but nothing sent them rollouts.</dd>
   <dt>This PR</dt><dd>Turns the switch on. Each rollout is posted to the frontend as one HTTP completion request with token IDs in and token IDs plus log-probabilities out.</dd>
-  <dt>Status</dt><dd><span class="verdict open">New path, turned on by this PR. Review open.</span> The output matches the direct path where the trainer reads it. The open items are a second rollout client next to main's (<a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">C1</a>), a wrong startup error for Gym configs (C7), and no CI run of the new path (C8, C16). See the end of the page.</dd>
+  <dt>Status</dt><dd><span class="verdict open">New path, turned on by this PR. Review open.</span> The output matches the direct path where the trainer reads it. The open items are a second rollout client next to main's (<a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">C1</a>), a Megatron-LM pin that lacks a field every Dynamo engine needs (C17), a wrong startup error for Gym configs (C7), and no CI run of the new path (<a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4674208408">C3</a>, C16). See the end of the page.</dd>
 </dl></div>
 
 <nav class="chain">
@@ -96,7 +96,7 @@ th{background:var(--surface2)}
 <p class="bg"><b>Background.</b> A <i>rollout</i> is one prompt sent to the inference engine to get a completion back, with the log-probability of each new token. <span class="tip" tabindex="0" data-tip="Dynamo is NVIDIA's serving layer. Its frontend is an OpenAI-style HTTP server that routes each request to a registered engine.">Dynamo</span>'s frontend can split one request across two engines: a <i>prefill</i> engine reads the prompt and builds its KV cache, then hands that cache to a <i>decode</i> engine over <span class="tip" tabindex="0" data-tip="NVIDIA's GPU-to-GPU transfer library. Here it copies the prompt's KV cache from the prefill engine to the decode engine.">NIXL</span>, which writes the answer. PRs 1–4 of this stack built those engines. Dotted words have a short explanation: hover or tap them.</p>
 
 <h2>Two paths to one Megatron rollout</h2>
-<p>Both paths start from the same call, <code>generate_async</code>, made by the trainer's rollout loop for one prompt. The direct path makes a <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/megatron_generation.py#L618-L638">Ray call to one Megatron worker</a>, which runs prefill and decode in one engine. The new path builds an OpenAI completion request in <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L309-L362"><code>generate_through_frontend</code></a> and posts it over HTTP. The two meet again in the rollout loop, which reads only the new tokens and their log-probabilities. The example below is the PR's own unit test: prompt <code>[1, 2, 3]</code> padded to 4, one new token <code>8</code> with log-probability <code>-0.5</code>.</p>
+<p>Both paths start from the same call, <code>generate_async</code>, made by the trainer's rollout loop for one prompt. The direct path makes a <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/megatron_generation.py#L618-L638">Ray call to one Megatron worker</a>, which runs prefill and decode in one engine. The new path builds an OpenAI completion request in <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L309-L362"><code>generate_through_frontend</code></a> and posts it over HTTP. The two meet again in the rollout loop, which reads only the new tokens and their log-probabilities. The example below is the PR's own unit test: prompt <code>[1, 2, 3]</code> padded to 4, one new token <code>8</code> with log-probability <code>-0.5</code>.</p>
 
 <div class="fig">
 <svg viewBox="0 0 960 660" role="img" aria-label="Two lanes: direct Megatron path and Dynamo frontend path, meeting in the rollout loop">
@@ -108,11 +108,11 @@ th{background:var(--surface2)}
 <text x="20" y="50" class="dim" font-size="11">driver process (rollout loop)</text>
 <text x="490" y="50" class="dim" font-size="11">driver process (rollout loop)</text>
 <rect class="box" x="20" y="58" width="444" height="72" rx="6"/>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/megatron_generation.py#L618"><text x="30" y="78" class="t">① MegatronGeneration.generate_async</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/megatron_generation.py#L618"><text x="30" y="78" class="t">① MegatronGeneration.generate_async</text></a>
 <text x="30" y="98" class="mono">in: input_ids [[1,2,3,0]]  input_lengths [3]</text>
 <text x="30" y="117" class="mono dim">→ Ray streaming call to worker 0</text>
 <rect class="box" x="490" y="58" width="450" height="72" rx="6"/>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L1122"><text x="500" y="78" class="t">① MegatronDynamoGeneration.generate_async</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_generation.py#L1122"><text x="500" y="78" class="t">① MegatronDynamoGeneration.generate_async</text></a>
 <text x="500" y="98" class="mono">in: input_ids [[1,2,3,0]]  input_lengths [3]</text>
 <text x="500" y="117" class="mono dim">→ generate_through_frontend(), one prompt</text>
 <path class="arr" d="M242,130 V162"/><path class="arr" d="M715,130 V162"/>
@@ -120,11 +120,11 @@ th{background:var(--surface2)}
 <text x="20" y="166" class="dim" font-size="11">Megatron worker (Ray actor, GPU)</text>
 <text x="490" y="166" class="dim" font-size="11">still the driver: builds the HTTP body</text>
 <rect class="box" x="20" y="172" width="444" height="76" rx="6"/>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/megatron_worker.py#L1283-L1314"><text x="30" y="192" class="t">② _build_sampling_params</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/megatron_worker.py#L1283-L1314"><text x="30" y="192" class="t">② _build_sampling_params</text></a>
 <text x="30" y="212" class="mono">SamplingParams(temperature=1.0, top_k=0,</text>
 <text x="30" y="230" class="mono">  top_p=1.0, num_tokens=16, termination_id=eod)</text>
 <rect class="box" x="490" y="172" width="450" height="76" rx="6"/>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L230-L256"><text x="500" y="192" class="t">② completion_payload</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L230-L256"><text x="500" y="192" class="t">② completion_payload</text></a>
 <text x="500" y="212" class="mono">{prompt:[1,2,3], max_tokens:2, temperature:1.0,</text>
 <text x="500" y="230" class="mono">  top_k:-1, logprobs:0, stop_token_ids:[2]}</text>
 <path class="arr" d="M242,248 V280"/>
@@ -147,56 +147,56 @@ th{background:var(--surface2)}
 <text x="500" y="374" class="mono">  {token_logprobs:[-0.5]}}], nvext:{completion_token_ids:[8]}}</text>
 <path class="arr" d="M242,396 V420"/><path class="arr" d="M715,396 V420"/>
 <rect class="box" x="20" y="424" width="444" height="96" rx="6"/>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/megatron_worker.py#L1385-L1464"><text x="30" y="444" class="t">④ _parse_result_to_batched_data_dict</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/megatron_worker.py#L1385-L1464"><text x="30" y="444" class="t">④ _parse_result_to_batched_data_dict</text></a>
 <text x="30" y="464" class="mono">output_ids [[1,2,3,8,0]]   width 4 padded + 1</text>
 <text x="30" y="483" class="mono">logprobs   [[0,0,0,-0.5,0]]</text>
 <text x="30" y="502" class="mono">unpadded_sequence_lengths [4]   (no truncated)</text>
 <rect class="boxr" x="490" y="424" width="450" height="96" rx="6"/>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L259-L306"><text x="500" y="444" class="t">④ parse_completion_response + single_sample_output</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L259-L306"><text x="500" y="444" class="t">④ parse_completion_response + single_sample_output</text></a>
 <text x="500" y="464" class="mono">output_ids [[1,2,3,8]]     width 3 + 1</text>
 <text x="500" y="483" class="mono">logprobs   [[0,0,0,-0.5]]</text>
 <text x="500" y="502" class="mono">unpadded_sequence_lengths [4]   <tspan class="r">truncated [False]</tspan></text>
 <path class="arr" d="M242,520 V556"/><path class="arr" d="M715,520 V556"/>
 <rect class="boxg" x="20" y="560" width="920" height="66" rx="6"/>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/experience/rollout_manager.py#L927-L937"><text x="30" y="582" class="t">⑤ both meet in the rollout loop (rollout_manager.py)</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/experience/rollout_manager.py#L927-L937"><text x="30" y="582" class="t">⑤ both meet in the rollout loop (rollout_manager.py)</text></a>
 <text x="30" y="604" class="mono">output_ids[0, 3:4] → [8]     logprobs[0, 3:4] → [-0.5]     same on both paths</text>
 <text x="30" y="648" font-size="11.5"><tspan class="g">■ green</tspan> = the two paths agree here   <tspan class="r">■ red</tspan> = differs between the paths   <tspan class="dim">dashed box = one OS process or group of them</tspan></text>
 </svg>
 </div>
-<p class="pcref"><code>max_tokens:2</code> is the configured 16 cut to what fits: the test's <code>max_model_len</code> is 5 and the prompt is 3 tokens (<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L218-L227"><code>allowed_new_tokens</code></a>). <code>top_k:-1</code> and <code>top_k=0</code> both mean "off" in their own API.</p>
+<p class="pcref"><code>max_tokens:2</code> is the configured 16 cut to what fits: the test's <code>max_model_len</code> is 5 and the prompt is 3 tokens (<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L218-L227"><code>allowed_new_tokens</code></a>). <code>top_k:-1</code> and <code>top_k=0</code> both mean "off" in their own API.</p>
 
 <h2>The change, as pseudocode</h2>
 <p class="pclbl">Rollout call, before (#5024)</p>
 <pre class="pc"><span class="who"># driver, rollout event loop</span>
-async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/d2e227622c05e8b9f26ddae72533a8f60e7b1fca/nemo_rl/models/generation/megatron/dynamo_generation.py#L1100">generate_async</a>(data):
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L1100">generate_async</a>(data):
     raise NotImplementedError("do not serve rollouts yet")</pre>
 <p class="pclbl">Rollout call, after</p>
 <pre class="pc"><span class="who"># driver, rollout event loop; one call per prompt, many run at once</span>
-async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L1122-L1137">generate_async</a>(data):
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_generation.py#L1122-L1137">generate_async</a>(data):
 <span class="del">    raise NotImplementedError("do not serve rollouts yet")</span>
 <span class="add">    if data is empty: return</span>
 <span class="add">    url = random.choice(frontend_urls)</span>                 <span class="cm"># every frontend reaches the whole fleet</span>
-<span class="add">    out = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L309-L362">generate_through_frontend</a>(cfg, url, data)</span>
+<span class="add">    out = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L309-L362">generate_through_frontend</a>(cfg, url, data)</span>
 <span class="add">    out["gen_leader_worker_idx"] = [0]</span>                    <span class="cm"># same as the direct path</span>
 <span class="add">    yield 0, out</span>
 
 <span class="who"># generate_through_frontend, same event loop</span>
-<span class="add">body = <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L230-L256">completion_payload</a>(prompt ids, max_tokens = min(16, 5 - 3))</span>
-<span class="add">for attempt in 1..3:</span>                                    <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L180-L197">post_completion</a></span>
+<span class="add">body = <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L230-L256">completion_payload</a>(prompt ids, max_tokens = min(16, 5 - 3))</span>
+<span class="add">for attempt in 1..3:</span>                                    <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L180-L197">post_completion</a></span>
 <span class="add">    resp = await POST url + "/completions"</span>               <span class="cm"># new aiohttp session each try</span>
-<span class="add">    if not <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L100-L109">is_retryable</a>(resp): break</span>                <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">C1</a>: timeouts retried, unlike main's client</span>
+<span class="add">    if not <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L100-L109">is_retryable</a>(resp): break</span>                <span class="cm"># <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">C1</a>: timeouts retried, unlike main's client</span>
 <span class="add">    sleep 1 s</span>
 <span class="add">ids, lps, truncated = parse(resp)</span>                      <span class="cm"># nvext.completion_token_ids, token_logprobs</span>
 <span class="add">return single_sample_output(...)</span></pre>
-<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L62-L85"><code>async_http_post_json</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L112-L177"><code>parse_completion_response</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L259-L306"><code>single_sample_output</code></a>. The vLLM Dynamo path already has its own client for this in <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/dynamo/rollout_client.py#L37-L162"><code>rollout_client.py</code></a>.</p>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L62-L85"><code>async_http_post_json</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L112-L177"><code>parse_completion_response</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_rollouts.py#L259-L306"><code>single_sample_output</code></a>. The vLLM Dynamo path already has its own client for this in <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/dynamo/rollout_client.py#L37-L162"><code>rollout_client.py</code></a>.</p>
 
 <p class="pclbl">Startup check, before → after</p>
 <pre class="pc"><span class="who"># driver, setup_single_controller(), before anything is built</span>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/algorithms/single_controller_utils/setup.py#L1328">validate_single_controller_config</a>(cfg)                 <span class="cm"># C7: its penalty checks call should_use_nemo_gym()</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/algorithms/single_controller_utils/setup.py#L1328">validate_single_controller_config</a>(cfg)                 <span class="cm"># C7: its penalty checks call should_use_nemo_gym()</span>
 ...
-if token_capture.enabled and not <a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/algorithms/single_controller_utils/setup.py#L1611-L1616">should_use_nemo_gym</a>(cfg): …  <span class="cm"># C7: asserts expose_http_server first</span>
+if token_capture.enabled and not <a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/algorithms/single_controller_utils/setup.py#L1611-L1616">should_use_nemo_gym</a>(cfg): …  <span class="cm"># C7: asserts expose_http_server first</span>
 ...
-<span class="add">MegatronDynamoGeneration.<a href="https://github.com/NVIDIA-NeMo/RL/blob/6286896695939e43dc5ca5a6290da99327aa9968/nemo_rl/models/generation/megatron/dynamo_generation.py#L333-L374">validate_settings</a>(cfg)</span>       <span class="cm"># moved up from after the Gym check</span>
+<span class="add">MegatronDynamoGeneration.<a href="https://github.com/NVIDIA-NeMo/RL/blob/00d52a2cd3a589cbd348a0f898185047aa25ab61/nemo_rl/models/generation/megatron/dynamo_generation.py#L333-L374">validate_settings</a>(cfg)</span>       <span class="cm"># moved up from after the Gym check</span>
 <span class="del">    raise NotImplementedError("not served by MegatronGeneration yet")</span>
 <span class="add">    if env.should_use_nemo_gym:            raise NotImplementedError</span>  <span class="cm"># follow-up PR 6</span>
 <span class="add">    if policy.is_vlm:                       raise ValueError</span>
@@ -211,11 +211,12 @@ use_nemo_gym = should_use_nemo_gym(cfg)</pre>
 <tr><td><code>truncated</code></td><td>not set</td><td>set from <code>finish_reason == "length"</code> (noted in the author's own review)</td></tr>
 <tr><td><code>ignore_eos: true</code></td><td>honoured with <code>termination_id=-1</code></td><td>dropped from the request (covered by <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">C1</a>)</td></tr>
 <tr><td>a failed request</td><td>a Ray error</td><td>retried up to 3 times, timeouts too; <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">C1</a> asks to use main's rollout client instead</td></tr>
-<tr><td>CI</td><td>run in L1</td><td>functional test written, not in any lane (C8); its preflight still expects ai-dynamo 1.5.1 (C16)</td></tr>
+<tr><td>CI</td><td>run in L1</td><td>functional test written, not in any lane until the Megatron-LM pin moves (<a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4674208408">C3</a>); its preflight still expects ai-dynamo 1.5.1 (C16)</td></tr>
 </table>
 
-<div class="hl"><b>So what.</b> The new path gives the trainer the same tokens and log-probabilities as the direct one, so a reviewer can judge it as "the same rollout, over HTTP". Before merge: run the 3-GPU functional test and add it to L1, since the pinned Megatron-LM already has the Dynamo integration (C8). Move the startup check to the start of setup, so Gym configs get the clear error (C7). Send rollouts through main's rollout client and delete this module (<a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">C1</a>), so retries, errors and sampling settings match native Megatron generation. Fix the functional test's ai-dynamo version check first, since the base now pins 1.8 (C16).</div>
-<div id="crefs"></div>
+<div class="hl"><b>So what.</b> The new path gives the trainer the same tokens and log-probabilities as the direct one, so a reviewer can judge it as "the same rollout, over HTTP". Before merge: the pinned Megatron-LM has no <code>InferenceConfig.disaggregation_role</code>, so a run dies at the first refit; make the worker's startup check catch that (C17), and add the 3-GPU functional test to L1 once the pin moves (<a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4674208408">C3</a>). Move the startup check to the start of setup, so Gym configs get the clear error (C7). Send rollouts through main's rollout client and delete this module (<a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">C1</a>), so retries, errors and sampling settings match native Megatron generation. Fix the functional test's ai-dynamo version check first, since the base now pins 1.8 (C16).</div>
+<div id="crefs"><p class="cref">Review comments: <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4651585376">C1 · dynamo_rollouts.py:309</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4687110443">C17 · dynamo_generation.py:334</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4687110246">C7 · setup.py:1831</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4674208408">C3 · L1_Functional_Tests_Dynamo.sh:54</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025#discussion_r4687111083">C16 · functional test:39-40</a></p>
+<p class="pcref">These links open for everyone once the review is published.</p></div>
 
 </div>
 </body>
