@@ -72,7 +72,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <div class="status"><dl>
 <dt>Before</dt><dd>PR 3's shutdown stopped every engine in index order, then the frontend, NATS and etcd.</dd>
 <dt>This PR</dt><dd>Stops the decode engines one by one. Then, for each decode engine, it makes one call that tells the prefill engines "this decode engine is gone, let go of the KV blocks you kept for it". Only then does it stop prefill.</dd>
-<dt>Status</dt><dd><span class="verdict open">Open — not fixed in this PR.</span> Raised as review comment C3, which asks to delete the report step, with nothing in its place.</dd>
+<dt>Status</dt><dd><span class="verdict open">Open — not fixed in this PR.</span> Raised as review comment C3, which asks to delete the report step, with nothing in its place, and to stop every engine at once as vLLM does (C11).</dd>
 </dl></div>
 
 <nav class="chain">
@@ -107,7 +107,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <rect class="bdc" x="150" y="192" width="24" height="26"/>
 <rect class="bpf" x="176" y="192" width="24" height="26"/>
 <line class="mark" x1="188" y1="184" x2="188" y2="232"/>
-<text x="212" y="210" class="tgrn">stop D0–D2, then P0: same pins freed, no wait</text>
+<text x="212" y="210" class="tgrn">stop D0–D2 and P0 at once: same blocks freed, no wait</text>
 
 <line class="ax" x1="150" y1="260" x2="900" y2="260"/>
 <text x="150" y="278" class="dim mono">0 s</text>
@@ -130,10 +130,9 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <pre class="pc"><span class="who"># driver, MegatronDynamoGeneration.shutdown</span>
 <span class="del">owners = read handoff owner from each decode rank 0</span>
 <span class="del">for d in decode: stop(d)</span>
-<span class="add">stop(all decode engines at once)</span>                          <span class="cm"># C11; first, so no decode is mid-pull (C3)</span>
+<span class="add">stop(every engine at once)</span>                                <span class="cm"># C3 + C11: cleanup ≤30 s, then kill; no role order</span>
 <span class="del">for owner in owners: prefill0.confirm_decode_terminated(owner)</span>
-<span class="del">for p in prefill: stop(p)</span>
-<span class="add">stop(all prefill engines at once)</span>                         <span class="cm"># C11; frees every kept block</span>
+<span class="del">for p in prefill: stop(p)</span>                                 <span class="cm"># stopping prefill frees every kept block</span>
 stop frontend, NATS, etcd</pre>
 <p class="pcref">Delete too: <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1334"><code>_prefill_coordinator_addresses</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1428"><code>_handoff_owners</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1455"><code>_confirm_decode_terminated</code></a>, and the worker's <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L407"><code>confirm_decode_terminated</code></a>.</p>
 <p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688633297">review comment C3 — dynamo_generation.py:1381</a></p>
@@ -144,8 +143,8 @@ stop frontend, NATS, etcd</pre>
 <li>The SingleController never calls the generation fleet's shutdown. The engines die when the Ray job ends.</li>
 <li>vLLM behind Dynamo (<a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/models/generation/vllm/vllm_generation.py#L1813-L1830"><code>VllmGeneration.shutdown</code></a>) asks every worker to clean up at once, waits at most <a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/distributed/worker_groups.py#L1292-L1336">30 s</a>, kills them all, then stops the services. No per-engine order, no report.</li>
 </ul>
-<p>Two things still need an explicit stop: the frontend, NATS and etcd, which run as <a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/models/generation/dynamo/managed_runtime.py#L223">their own processes</a> outside Ray, and the engines' placement groups, if the Ray cluster outlives the run. C3 and C11 ask for less than vLLM's model (they keep decode first); copying vLLM's one-wave kill would be simpler still.</p>
-<div class="warn"><b>So what.</b> With one prefill coordinator that does not answer, shutdown waits about (number of decode engines) × 610 s: 30.5 min for 3 decode engines, over 5 hours for 32, about 3.5 days for 500. It buys nothing, because stopping prefill frees the same blocks. Drop the step; batching the calls would cap the wait but still free nothing. Decode still stops first, but all decode engines can stop at once, then all prefill engines (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5024-fleet-order.html#scale">at 1,000 engines</a>, C11).</div>
+<p>Two things still need an explicit stop: the frontend, NATS and etcd, which run as <a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/models/generation/dynamo/managed_runtime.py#L223">their own processes</a> outside Ray, and the engines' placement groups, if the Ray cluster outlives the run. C3 and C11 ask for exactly vLLM's model: one cleanup wave across every engine, then kill, then the services. A decode engine killed while copying from a prefill engine that is being killed too has nothing left to wait for, so no role order is needed.</p>
+<div class="warn"><b>So what.</b> With one prefill coordinator that does not answer, shutdown waits about (number of decode engines) × 610 s: 30.5 min for 3 decode engines, over 5 hours for 32, about 3.5 days for 500. It buys nothing, because stopping prefill frees the same blocks. Drop the step; batching the calls would cap the wait but still free nothing. With the step gone, every engine can stop at once, with no role order (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5024-fleet-order.html#scale">at 1,000 engines</a>, C11).</div>
 </div>
 </body>
 </html>
