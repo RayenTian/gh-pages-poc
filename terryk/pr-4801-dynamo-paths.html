@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NVIDIA-NeMo/RL #4801 — where the Megatron Dynamo switch sits next to today's Dynamo path and #4905</title>
+<title>NVIDIA-NeMo/RL #4801 — the Megatron Dynamo switch next to main's vLLM Dynamo path</title>
 <style>
 :root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
   --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
@@ -50,6 +50,9 @@ li{margin:3px 0}
 svg{max-width:100%;height:auto;display:block;margin:14px 0}
 svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
 svg .ok{fill:var(--surface);stroke:var(--green);stroke-width:1.8}
+svg .gone{fill:var(--surface);stroke:var(--dim);stroke-width:1.3;stroke-dasharray:2 3;opacity:.75}
+svg .lg-gone{fill:none;stroke:var(--dim);stroke-width:2;stroke-dasharray:2 3}
+svg .okt{fill:var(--green);font:bold 12px -apple-system,sans-serif}
 svg .plan{fill:var(--surface);stroke:var(--orange);stroke-width:1.8;stroke-dasharray:5 3}
 svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
 svg .gate{fill:var(--surface2);stroke:var(--border);stroke-width:1.3}
@@ -65,6 +68,22 @@ svg a text{text-decoration:underline;fill:var(--accent);font:12px ui-monospace,M
 svg .lg-ok{fill:none;stroke:var(--green);stroke-width:2}
 svg .lg-plan{fill:none;stroke:var(--orange);stroke-width:2;stroke-dasharray:5 3}
 svg .lg-bad{fill:none;stroke:var(--red);stroke-width:2}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
   document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -79,23 +98,31 @@ svg .lg-bad{fill:none;stroke:var(--red);stroke-width:2}
   document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
 <div class="wrap">
 
-<h1>Where the Megatron Dynamo switch in #4801 sits next to today's Dynamo path and #4905</h1>
+<h1>Where the Megatron Dynamo switch in #4801 sits next to main's vLLM Dynamo path</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4801">PR #4801</a> (first of five:
 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">#4912</a> →
 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">#5023</a> →
 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a> →
 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a>) ·
-related open stack <a href="https://github.com/NVIDIA-NeMo/RL/pull/4978">#4978</a> →
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/4905">#4905</a> ·
-permalinks pinned to head <code>8b38bd7f</code>, main <code>95095b71</code>, #4905 <code>44671d3b</code></p>
+builds on the merged <a href="https://github.com/NVIDIA-NeMo/RL/pull/4905">#4905</a> ·
+permalinks pinned to head <code>1a2eca34</code>; the removed path links to main before #4905 (<code>95095b71</code>)</p>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
+  <span class="here">#4801 next to main's Dynamo</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-refit-widths.html">how refit works</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-pd-one-interface.html">one P/D interface</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4905-one-chat-path.html">the vLLM design it should mirror</a>
+</nav>
+<p class="chainnote">Pages on this design, one question each. This one: how the Megatron switch fits next to main's Dynamo path.</p>
 
 <div class="status"><dl>
   <dt>Before</dt>
-  <dd>Dynamo means <code>backend: dynamo</code>: a separate generation class that starts Dynamo's own vLLM workers. Nothing reads a <code>dynamo</code> flag.</dd>
+  <dd>On main, <code>dynamo: true</code> means NeMo RL's own vLLM workers behind a Dynamo frontend (<a href="https://github.com/NVIDIA-NeMo/RL/pull/4905">#4905</a>, merged). Main's config check allows it only for <code>backend: vllm</code>.</dd>
   <dt>This PR</dt>
-  <dd>Adds the config for <code>backend: megatron</code> + <code>dynamo: true</code>, the engine-width math, and refit support for shards of different widths. The switch itself is refused until <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a>.</dd>
+  <dd>Lets <code>dynamo: true</code> also mean Megatron prefill/decode engines, adds their config and engine-width math, and teaches refit about shards of different widths. The switch itself is refused until <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a>.</dd>
   <dt>Status</dt>
-  <dd><span class="verdict open">Open — safe on main alone, but it clashes with the open #4905 on the same config keys.</span> The merge order is not written down yet (review comment C1).</dd>
+  <dd><span class="verdict open">Open — the backend checks now agree; two things are left.</span> Main still rejects this PR's <code>control_timeout_s</code> as "removed" (review comment C9), and part of the Megatron config is a hand copy of main's (C10).</dd>
 </dl></div>
 
 <div class="bg"><b>Background.</b> <span class="tip" tabindex="0" data-tip="NVIDIA's inference serving layer. One frontend process takes requests and routes each one to a registered engine worker.">Dynamo</span>
@@ -105,20 +132,19 @@ runs prompt reading and answer writing on different engines. A
 <span class="tip" tabindex="0" data-tip="After every training step the trainer pushes its new weights into every inference engine over one NCCL group.">refit</span>
 pushes new weights from the trainer into the engines after every step. Dotted words have a short explanation: hover or tap them.</div>
 
-<h2>Three ways to put Dynamo in front of the engines</h2>
-<p>All three end at the same Dynamo frontend. They differ in <b>who owns the engine workers</b> and in <b>which backend the <code>dynamo</code> flag belongs to</b>. Main has the first one. <a href="https://github.com/NVIDIA-NeMo/RL/pull/4905">#4905</a> replaces it with the second. This stack adds the third.</p>
+<h2>Three ways Dynamo has fronted NeMo RL's engines</h2>
+<p>All three end at a Dynamo frontend. They differ in <b>who owns the engine workers</b>. The first was removed by #4905. The second is main today. This stack adds the third, using the same <code>dynamo: true</code> switch.</p>
 
-<svg viewBox="0 0 940 470" role="img" aria-label="Three Dynamo paths and the clash between #4801 and #4905">
+<svg viewBox="0 0 940 470" role="img" aria-label="Three Dynamo paths; two items still open between #4801 and main">
 <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--dim)"/></marker></defs>
-<!-- headers -->
-<text class="hdr" x="20" y="22">main today</text>
+<text class="hdr" x="20" y="22">before #4905 — removed</text>
 <text class="hdr2" x="20" y="38">backend: dynamo</text>
-<text class="hdr" x="330" y="22">#4905 — open</text>
+<text class="hdr" x="330" y="22">main today (#4905)</text>
 <text class="hdr2" x="330" y="38">vLLM behind Dynamo</text>
 <text class="hdr" x="640" y="22">#4801 stack — this PR</text>
 <text class="hdr2" x="640" y="38">Megatron prefill/decode behind Dynamo</text>
 <!-- row 1: config -->
-<rect class="box" x="10" y="48" width="290" height="62" rx="7"/>
+<rect class="gone" x="10" y="48" width="290" height="62" rx="7"/>
 <text class="lbl" x="22" y="70">backend: dynamo</text>
 <text class="lbl" x="22" y="90">dynamo_cfg: {engine: …}</text>
 <rect class="box" x="320" y="48" width="290" height="62" rx="7"/>
@@ -128,87 +154,95 @@ pushes new weights from the trainer into the engines after every step. Dotted wo
 <text class="lbl" x="642" y="68">backend: megatron</text>
 <text class="lbl" x="642" y="85">dynamo: true</text>
 <text class="lbl" x="642" y="102">disaggregation: 1 P + 2 D</text>
-<!-- arrows -->
 <path class="arr" d="M155,110 L155,128"/><path class="arr" d="M465,110 L465,128"/><path class="arr" d="M780,110 L780,128"/>
 <!-- row 2: backend check -->
-<rect class="gate" x="10" y="130" width="290" height="58" rx="7"/>
-<text class="note" x="22" y="150">no flag check; picks the class by name</text>
+<rect class="gone" x="10" y="130" width="290" height="58" rx="7"/>
+<text class="note" x="22" y="150">no flag; picked the class by name</text>
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/95095b7124f9b2526c12be772b04fac918ba0a47/nemo_rl/models/generation/__init__.py#L109-L112"><text x="22" y="172">resolve_generation_class</text></a>
-<rect class="gate" x="320" y="130" width="290" height="58" rx="7"/>
-<text class="note" x="332" y="150">raise unless backend == "vllm"</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/44671d3bf5f017fbef5e7455f5686cf994ef9106/nemo_rl/models/generation/__init__.py#L153-L158"><text x="332" y="172">configure_generation_config</text></a>
-<rect class="gate" x="630" y="130" width="300" height="58" rx="7"/>
-<text class="note" x="642" y="150">raise unless backend == "megatron"</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/8b38bd7fae2e3b66907dae770d297b40b256a376/nemo_rl/models/generation/__init__.py#L89-L94"><text x="642" y="172">resolve_generation_class</text></a>
+<rect class="ok" x="320" y="130" width="610" height="58" rx="7"/>
+<text class="okt" x="332" y="150">Both checks allow vllm and megatron (reconciled in this PR)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L170-L176"><text x="332" y="172">configure_generation_config</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L100-L106"><text x="642" y="172">resolve_generation_class</text></a>
 <path class="arr" d="M155,188 L155,206"/><path class="arr" d="M465,188 L465,206"/><path class="arr" d="M780,188 L780,206"/>
 <!-- row 3: class -->
-<rect class="ok" x="10" y="208" width="290" height="58" rx="7"/>
+<rect class="gone" x="10" y="208" width="290" height="58" rx="7"/>
 <a href="https://github.com/NVIDIA-NeMo/RL/blob/95095b7124f9b2526c12be772b04fac918ba0a47/nemo_rl/models/generation/dynamo/dynamo_generation.py#L148"><text x="22" y="230">DynamoGeneration</text></a>
-<text class="note" x="22" y="252">starts Dynamo's own vLLM workers</text>
+<text class="note" x="22" y="252">started Dynamo's own vLLM workers</text>
 <rect class="ok" x="320" y="208" width="290" height="58" rx="7"/>
 <text class="lbl" x="332" y="230">VllmGeneration</text>
 <text class="note" x="332" y="252">NeMo RL's own vLLM workers join</text>
 <rect class="plan" x="630" y="208" width="300" height="58" rx="7"/>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/8b38bd7fae2e3b66907dae770d297b40b256a376/nemo_rl/models/generation/megatron/megatron_generation.py#L262-L279"><text x="642" y="230">MegatronGeneration</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L262-L279"><text x="642" y="230">MegatronGeneration</text></a>
 <text class="note" x="642" y="252">refuses for now; #5025 builds the fleet</text>
 <path class="arr" d="M155,266 L155,284"/><path class="arr" d="M465,266 L465,284"/><path class="arr" d="M780,266 L780,284"/>
 <!-- row 4: frontend -->
-<rect class="ok" x="10" y="286" width="290" height="50" rx="7"/>
+<rect class="gone" x="10" y="286" width="290" height="50" rx="7"/>
 <text class="lbl" x="22" y="316">frontend → dynamo.vllm</text>
 <rect class="ok" x="320" y="286" width="290" height="50" rx="7"/>
 <text class="lbl" x="332" y="316">frontend → NeMo RL vLLM</text>
 <rect class="plan" x="630" y="286" width="300" height="50" rx="7"/>
 <text class="lbl" x="642" y="316">frontend → Megatron P + D</text>
-<!-- clash box -->
+<!-- still open -->
 <rect class="bad" x="320" y="358" width="610" height="76" rx="8"/>
-<text class="redt" x="334" y="379">If #4801 and #4905 both merge as written</text>
-<text class="redn" x="334" y="399">megatron + dynamo: stopped by #4905's vLLM-only check</text>
-<text class="redn" x="334" y="418">vllm + dynamo: stopped by #4801's megatron-only check</text>
-<text class="xg" x="606" y="166">✕</text><text class="xg" x="916" y="166">✕</text>
+<text class="redt" x="334" y="379">Still open between this PR and main</text>
+<text class="redn" x="334" y="399">C9: main rejects dynamo_cfg.control_timeout_s as "removed"</text>
+<text class="redn" x="334" y="418">C10: Megatron frontend args copy main's by hand</text>
 <!-- legend -->
-<rect class="lg-ok" x="20" y="366" width="16" height="12" rx="2"/><text class="note" x="44" y="377">runs (main, or in #4905)</text>
-<rect class="lg-plan" x="20" y="388" width="16" height="12" rx="2"/><text class="note" x="44" y="399">planned, later in the stack</text>
-<rect class="lg-bad" x="20" y="410" width="16" height="12" rx="2"/><text class="note" x="44" y="421">clash between the two PRs</text>
-<text class="note" x="20" y="458">Underlined names link to the code. ✕ = the check that rejects the other PR's backend.</text>
+<rect class="lg-ok" x="20" y="358" width="16" height="12" rx="2"/><text class="note" x="44" y="369">runs on main / agreed</text>
+<rect class="lg-plan" x="20" y="378" width="16" height="12" rx="2"/><text class="note" x="44" y="389">planned, later in the stack</text>
+<rect class="lg-bad" x="20" y="398" width="16" height="12" rx="2"/><text class="note" x="44" y="409">still open</text>
+<rect class="lg-gone" x="20" y="418" width="16" height="12" rx="2"/><text class="note" x="44" y="429">removed by #4905</text>
+<text class="note" x="20" y="458">Underlined names link to the code.</text>
 </svg>
 
-<p>The two checks sit in different functions, so git merges both PRs with no conflict in these files. Only <code>test_grpo.py</code> conflicts. #4905 also
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/44671d3bf5f017fbef5e7455f5686cf994ef9106/nemo_rl/utils/outdated_config_checks.py#L206-L208">rejects <code>dynamo_cfg.control_timeout_s</code> as removed</a>, for every backend. This PR
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/8b38bd7fae2e3b66907dae770d297b40b256a376/nemo_rl/models/generation/megatron/dynamo_config.py#L73">adds that key</a> for Megatron.
-Part of the new config is the same code as #4905's: the frontend arguments
-(<a href="https://github.com/NVIDIA-NeMo/RL/blob/8b38bd7fae2e3b66907dae770d297b40b256a376/nemo_rl/models/generation/megatron/dynamo_config.py#L47-L61"><code>MegatronDynamoFrontendArgs</code></a> ↔
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/44671d3bf5f017fbef5e7455f5686cf994ef9106/nemo_rl/models/generation/dynamo/config.py#L27-L41"><code>DynamoFrontendArgs</code></a>),
-the startup and request timeouts, and <code>dynamo_enabled</code>. Main has no small shared module to import them from yet: main's
-<code>dynamo/config.py</code> still holds the old <code>backend: dynamo</code> schema. #4905 turns that file into one.</p>
-<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4472808519">review comment C1 — generation/__init__.py:89</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4472808569">C3 — grpo.py:733</a></p>
+<p><b>C9.</b> This PR adds <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L84"><code>dynamo_cfg.control_timeout_s</code></a> for Megatron. #4905 put the same key on main's
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/utils/outdated_config_checks.py#L220-L223">list of removed keys</a>, and
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/utils/outdated_config_checks.py#L263-L269">the check</a> ignores the backend. It runs first at startup
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/examples/run_grpo_single_controller.py#L118"><code>run_grpo_single_controller.py</code></a>), so a Megatron config that sets the field stops with "refit and pause use the vLLM backend's own controls".</p>
+<p><b>C10.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L47-L72"><code>MegatronDynamoFrontendArgs</code></a> repeats five fields of main's
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/dynamo/config.py#L34-L87"><code>DynamoFrontendArgs</code></a>, and <code>dynamo_enabled</code> is defined twice. This PR's Dynamo 1.8 commit already had to copy main's changes over by hand.</p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4672410215">review comment C9 — dynamo_config.py:83</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4651583837">C10 — dynamo_config.py:47</a></p>
 
-<h2>What this PR changes now: refit with shards of different widths</h2>
-<p>The refit NCCL group lists the trainer ranks first, then each engine's ranks, shard by shard. Until now every shard had the same width, so shard <i>i</i> started at <code>i × width</code>. A prefill engine at TP 4 next to decode engines at TP 2 breaks that. <a href="https://github.com/NVIDIA-NeMo/RL/blob/8b38bd7fae2e3b66907dae770d297b40b256a376/nemo_rl/weight_sync/membership.py#L47-L59"><code>RefitMembership.worker_offset()</code></a> adds up the earlier widths instead, dead shards included, because the worker list never shrinks.</p>
-<div class="mono">workers_per_shard = (4, 2, 2)      # 1 prefill at TP 4, 2 decode at TP 2; 8 workers
-workers:   0 1 2 3 | 4 5 | 6 7
-shard:     0       | 1   | 2
-worker_offset(0, 1, 2) = 0, 4, 6   # an equal-width rule (i × 2) would give 0, 2, 4: wrong
-shard 0 dies → refit ranks after the trainers: shard 1 → 0..1, shard 2 → 2..3</div>
-<p>All four call sites switch to it: the Megatron path and three vLLM paths. With equal widths the result is the same as before:</p>
-<pre class="diff"><span class="hunk">@@ vllm_generation.py L1039 · rebuild_collective</span>
-         for shard_idx, rank_prefix in rank_prefixes.items():
-<span class="del">-            leader_idx = shard_idx * membership.workers_per_shard
-</span><span class="add">+            leader_idx = membership.worker_offset(shard_idx)
-</span>             if leader_idx &gt;= len(workers):</pre>
-<p>Only the plan and <code>worker_offset</code> are tested with uneven widths. The callers are still tested only with equal widths (C5). No caller passes uneven widths until <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a>'s engine fleet does.</p>
-<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4472808602">review comment C5 — vllm_generation.py:1039</a></p>
+<h2>What happens at startup with <code>dynamo: true</code> — before, after, and the C9 fix (proposed)</h2>
+<p>Three checks run in order on the driver before any engine starts. Before this PR, a Megatron config with <code>dynamo: true</code> stopped at the second one. After it, the config gets through the backend checks and is refused on purpose by <code>MegatronGeneration</code> until #5025 builds the engines. On the way, it now requires P/D: there is no Megatron + Dynamo without disaggregation, while vLLM + Dynamo on main has no P/D yet.</p>
+<p class="pclbl">Startup, before (main)</p>
+<pre class="pc"><span class="who"># driver, run_grpo_single_controller.py, in this order</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/examples/run_grpo_single_controller.py#L118">check_outdated_config</a>(config)                       <span class="cm"># dynamo_cfg.control_timeout_s: &#x27;was removed&#x27;</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/__init__.py#L144">configure_generation_config</a>(gen)
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/__init__.py#L163-L168">if gen.dynamo and gen.backend != &quot;vllm&quot;</a>: raise  <span class="cm"># megatron + dynamo stops here</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/__init__.py#L169">if gen.dynamo_cfg and not gen.dynamo</a>: raise
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/models/generation/__init__.py#L95">resolve_generation_class</a>(gen)                       <span class="cm"># picks the class by backend name</span>
+    .<a href="https://github.com/NVIDIA-NeMo/RL/blob/5e2711744e885ef5dcb93a3c62e9083f37269126/nemo_rl/algorithms/single_controller_utils/setup.py#L1834">validate_settings</a>(master)                      <span class="cm"># MegatronGeneration: no Dynamo branch</span></pre>
+<p class="pclbl">Startup, after (this PR)</p>
+<pre class="pc"><span class="who"># driver, same order</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/examples/run_grpo_single_controller.py#L118">check_outdated_config</a>(config)                                     <span class="cm"># C9: still rejects control_timeout_s</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L151">configure_generation_config</a>(gen)
+<span class="del">    if gen.dynamo and gen.backend != &quot;vllm&quot;: raise</span>
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L170-L176">if gen.dynamo and gen.backend not in (&quot;vllm&quot;, &quot;megatron&quot;)</a>: raise</span>
+    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L177">if gen.dynamo_cfg and not gen.dynamo</a>: raise
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L95">resolve_generation_class</a>(gen)
+<span class="add">    <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L100-L106">if gen.dynamo and backend not in (&quot;vllm&quot;, &quot;megatron&quot;)</a>: raise</span>  <span class="cm"># same check, a second copy</span>
+    .<a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/algorithms/single_controller_utils/setup.py#L1834">validate_settings</a>(master)                                    <span class="cm"># MegatronGeneration</span>
+<span class="add">        <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L262-L263">if gen.dynamo</a>:</span>
+<span class="add">            <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L219">validate_megatron_dynamo_generation</a>(gen)</span>              <span class="cm"># needs disaggregation on</span>
+<span class="add">            <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L275">raise NotImplementedError</a>(&quot;fleet not built&quot;)</span>          <span class="cm"># #5025 removes this</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/examples/run_grpo_single_controller.py#L118"><code>check_outdated_config</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L151"><code>configure_generation_config</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/__init__.py#L95"><code>resolve_generation_class</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/megatron_generation.py#L224"><code>MegatronGeneration.validate_settings</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L219"><code>validate_megatron_dynamo_generation</code></a> (the P/D requirement is at <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L233-L238">L233-L238</a>).</p>
+<p class="pclbl">The fix for C9, as pseudocode (proposed, not run)</p>
+<p class="where"><b>Where the fix lands: this PR's config, two lines.</b> Remove the key, as main did for vLLM. On main the caller passes each control call its timeout (<code>pause_generation_for_refit(timeout_s=…)</code>, filled by the SingleController from <code>async_rl.generation_fleet_health</code>). The engine calls that read the key come later in the stack, so that part is staged on #5024. Main's check, its test and its migration note stay as they are.</p>
+<pre class="pc"><span class="who"># this PR, dynamo_config.py</span>
+class <a href="https://github.com/NVIDIA-NeMo/RL/blob/1a2eca34b7af33f19e49612cb5daa672e12276da/nemo_rl/models/generation/megatron/dynamo_config.py#L75-L84">MegatronDynamoCfg</a>(BaseModel):
+    startup_timeout_s: PositiveFloat = 600.0
+    request_timeout_s: PositiveFloat | None = None
+<span class="del">    control_timeout_s: PositiveFloat = 600.0</span>   <span class="cm"># main already rejects this key</span>
 
-<h2>Merge order — proposed, not in the PR</h2>
-<p>Nothing below is implemented. Each PR is fine alone on main, so the two authors only need to agree which lands second. The second one has to:</p>
-<ul>
-  <li>keep <b>one</b> backend check that allows both <code>vllm</code> and <code>megatron</code>, instead of two checks that each allow one;</li>
-  <li>keep <code>control_timeout_s</code> out of #4905's removed-keys list for <code>backend: megatron</code>;</li>
-  <li>define the frontend arguments, timeouts and <code>dynamo_enabled</code> once, in <code>nemo_rl/models/generation/dynamo/config.py</code>; the Megatron config adds only <code>control_timeout_s</code> and the per-role layouts;</li>
-  <li>limit the legacy <code>grpo.py</code> refusal to Megatron.</li>
-</ul>
-<p>The larger overlap is at the end of this stack, not in this PR. <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a> rewrites <code>dynamo/managed_runtime.py</code> and keeps <code>DynamoGeneration</code> running from a copied runtime file. #4905 deletes <code>DynamoGeneration</code> and also rewrites that runtime. Merging those two touches 11 of the same files.</p>
+<span class="who"># #5024, MegatronDynamoGeneration (staged there)</span>
+<span class="del">    timeout_s = self._control_timeout_s if timeout_s is None else timeout_s</span>
+<span class="add">    deadline = None if timeout_s is None else time.monotonic() + timeout_s</span>   <span class="cm"># caller decides, as on main</span></pre>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4801#discussion_r4672410215">review comment C9 — dynamo_config.py:83</a></p>
 
-<div class="hl"><b>So what.</b> This PR is groundwork. It does nothing at run time on main, and it is safe to merge alone. The risk is a quiet one: it and #4905 give <code>dynamo: true</code> opposite meanings, and git will not flag it. Write the order into the PR description before either one lands. The review links work for others only after the review is published.</div>
+<p>This PR also changes how refit numbers engines of different widths. That, and how all three refit transports work, is on <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-refit-widths.html">one refit page</a>.</p>
+
+<div class="hl"><b>So what.</b> This PR is groundwork: nothing new runs on main, and it now agrees with main on which backends may set <code>dynamo: true</code>. Two things to settle before #5025 turns the switch on: fix C9 by removing <code>control_timeout_s</code>, or every Megatron Dynamo config that sets it fails at startup with a vLLM error; and decide whether Megatron + Dynamo should exist without P/D, as vLLM + Dynamo does today. The review links work for others only after the review is published.</div>
 
 </div>
 </body>

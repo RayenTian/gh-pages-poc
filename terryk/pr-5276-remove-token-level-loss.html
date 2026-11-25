@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5276 — removing token_level_loss</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3;padding-right:90px}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700} .verdict.good{color:var(--green)}
+.bg{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.bg p{margin:4px 0}
+.hl{border-left:4px solid var(--green);background:var(--surface);padding:10px 14px;margin:18px 0 0;border-radius:0 8px 8px 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600} .pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim);font-weight:400} .pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.two{display:grid;grid-template-columns:1fr;gap:0 14px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface);font-size:12.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.03em}
+.tw{overflow-x:auto}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .chunk{fill:none;stroke:var(--border);stroke-width:1.2;stroke-dasharray:5 4}
+svg .okbox{fill:var(--surface);stroke:var(--green);stroke-width:1.2}
+svg .tok{fill:var(--surface2);stroke:var(--dim);stroke-width:1}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .c-txt{fill:var(--text);font:10.5px ui-monospace,Menlo,monospace}
+svg .tk{fill:var(--accent)} svg .sq{fill:var(--orange)} svg .ok{fill:var(--green)}
+svg .arr{fill:none;stroke:var(--dim);stroke-width:1.3}
+svg a text,svg .lnk{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+.verdict.prop{color:var(--orange)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+svg .proc{fill:none;stroke:var(--dim);stroke-width:1.2;stroke-dasharray:6 4}
+svg .store{fill:var(--surface2);stroke:var(--border);stroke-width:1.2}
+svg .new{stroke:var(--green);stroke-width:2}
+svg .bad{stroke:var(--red);stroke-width:2}
+svg .segP{fill:var(--accent);fill-opacity:.35;stroke:var(--accent)}
+svg .segQ{fill:var(--orange);fill-opacity:.35;stroke:var(--orange)}
+svg .seg-t{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .rd{fill:var(--red)} svg .gr{fill:var(--green)}
+svg .step{fill:var(--orange);font:bold 13px -apple-system,sans-serif}
+svg .err{fill:var(--red);font:12px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Removing <code>token_level_loss</code>: old configs now stop at startup and say what to write instead</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5276">PR #5276</a> · refactor(loss) · stacked on <a href="https://github.com/NVIDIA-NeMo/RL/pull/4947">#4947</a> · permalinks pinned to <a href="https://github.com/NVIDIA-NeMo/RL/tree/4c133f32135cc8c1f7513e95a3477eb9d535a332"><code>4c133f32</code></a></p>
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-one-reducer.html">1 · one reducer (#4946)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-streaming-average.html">2 · streaming average (#4946)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4947-group-token-mean.html">3 · group average (#4947)</a>
+  <span class="here">4 · old key removed (#5276)</span>
+</nav>
+<p class="chainnote">Four pages on #4946 and the two PRs stacked after it — this one: what happens to configs that still use the old key.</p>
+<div class="status"><dl>
+<dt>Before</dt><dd><code>loss_fn.token_level_loss: true/false</code> still works on main, with a <code>FutureWarning</code> (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-one-reducer.html">page 1</a>).</dd>
+<dt>This PR</dt><dd>Removes the key. Any config that still has it, even with value <code>null</code>, fails at startup with the fix in the error. Moves all 31 checked-in configs to <code>loss_fn.normalization</code>.</dd>
+<dt>Status</dt><dd><span class="verdict prop">Proposed — open, not reviewed yet.</span> It lands after #4947; its "Files changed" tab also shows #4947's diff until that merges.</dd>
+</dl></div>
+
+<h2>What an old config sees</h2>
+
+<svg viewBox="0 0 940 268" role="img" aria-label="A config with token_level_loss: true warns and runs today; after this PR it stops at startup with the fix in the message">
+<text x="10" y="20" class="hdr">A user config that still says</text>
+<text x="210" y="20" class="lbl">loss_fn.token_level_loss: true</text>
+
+<text x="10" y="54" class="lbl-b">Today (#4946 on main)</text>
+<rect x="10" y="64" width="160" height="50" rx="6" class="box"/>
+<text x="20" y="84" class="lbl">YAML</text><text x="20" y="102" class="note">token_level_loss: true</text>
+<path d="M170 89 H 200" class="arr"/>
+<rect x="200" y="64" width="250" height="50" rx="6" class="box"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L280"><text x="210" y="84">resolved_normalization</text></a>
+<text x="210" y="102" class="note">true → "global_token_mean"</text>
+<path d="M450 89 H 480" class="arr"/>
+<rect x="480" y="64" width="210" height="50" rx="6" class="box"/>
+<text x="490" y="84" class="lbl">ClippedPGLossFn</text><text x="490" y="102" class="note">prints a FutureWarning</text>
+<path d="M690 89 H 720" class="arr"/>
+<rect x="720" y="64" width="210" height="50" rx="6" class="okbox"/>
+<text x="730" y="84" class="lbl ok">trains</text><text x="730" y="102" class="note">same average as before</text>
+
+<text x="10" y="148" class="lbl-b">After #5276</text>
+<rect x="10" y="158" width="160" height="50" rx="6" class="box"/>
+<text x="20" y="178" class="lbl">YAML</text><text x="20" y="196" class="note">token_level_loss: true</text>
+<path d="M170 183 H 200" class="arr"/>
+<rect x="200" y="158" width="250" height="50" rx="6" class="box new"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/utils/outdated_config_checks.py#L344"><text x="210" y="178">check_outdated_config</text></a>
+<text x="210" y="196" class="note">first line of every entrypoint</text>
+<path d="M450 183 H 480" class="arr"/>
+<rect x="480" y="158" width="450" height="50" rx="6" class="box bad"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/utils/outdated_config_checks.py#L334"><text x="490" y="178">ValueError, nothing starts:</text></a>
+<text x="490" y="196" class="err">"…Set loss_fn.normalization=global_token_mean</text>
+<text x="10" y="236" class="note">The message goes on: "…for true or sequence_mean for false, and remove token_level_loss. If its value is null, just remove the key."</text>
+<text x="10" y="256" class="note">Green border = new check. Red = the run stops. Code that builds ClippedPGLossConfig directly gets the same error from a validator.</text>
+</svg>
+<div class="tw"><table>
+<tr><th>Old config line</th><th>Write instead</th></tr>
+<tr><td><code>token_level_loss: true</code></td><td><code>normalization: global_token_mean</code> (or leave both out: it is the default)</td></tr>
+<tr><td><code>token_level_loss: false</code></td><td><code>normalization: sequence_mean</code></td></tr>
+<tr><td><code>token_level_loss: null</code></td><td>delete the line (the shipped YAMLs had this after #4946)</td></tr>
+</table></div>
+<p>This follows the repo's rule for removed config: one <code>reject_outdated_*</code> function in <a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/utils/outdated_config_checks.py#L334"><code>outdated_config_checks.py</code></a>, called before the config is built, so the user sees how to migrate instead of a schema error.</p>
+
+<h2>What changed in the code</h2>
+<p class="where"><b>Where it lands: RL only.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/utils/outdated_config_checks.py#L334"><code>outdated_config_checks.py</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/algorithms/loss/loss_functions.py#L273"><code>loss_functions.py</code></a>, 31 YAMLs, docs, two test scripts' command-line overrides, and the numeric golden file (selector only).</p>
+<p class="pclbl">Before (#4946)</p>
+<pre class="pc"><span class="who"># ClippedPGLossConfig (pydantic), #4946</span>
+normalization: Literal[…] | None = None
+token_level_loss: bool | None = None            <span class="cm"># deprecated alias</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L280">resolved_normalization</a>():
+    if normalization is not None:
+        if token_level_loss is not None: raise  <span class="cm"># both set</span>
+        return normalization
+    return "sequence_mean" if token_level_loss is False else "global_token_mean"
+<span class="who"># ClippedPGLossFn.__init__</span>
+if cfg.token_level_loss is not None: warn(FutureWarning)</pre>
+<p class="pclbl">After</p>
+<pre class="pc"><span class="who"># entrypoint, before the config is built</span>
+<span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/utils/outdated_config_checks.py#L368">check_outdated_config</a>(config):</span>
+<span class="add">    if "token_level_loss" in config["loss_fn"]: <a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/utils/outdated_config_checks.py#L334">raise ValueError</a>(how to migrate)  <span class="cm"># even when null</span></span>
+<span class="who"># ClippedPGLossConfig (pydantic)</span>
+normalization: Literal[…] | None = None
+<span class="del">token_level_loss: bool | None = None</span>
+<span class="add">@model_validator <a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/algorithms/loss/loss_functions.py#L273">reject_removed_loss_selector</a>: same check on extra keys           <span class="cm"># direct construction</span></span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/algorithms/loss/loss_functions.py#L278">resolved_normalization</a>():
+<span class="add">    return normalization or "global_token_mean"                                   <span class="cm"># no alias left</span></span>
+<span class="del">if cfg.token_level_loss is not None: warn(FutureWarning)</span></pre>
+
+<h2>The one catch: bootstrap snapshots</h2>
+<p>Before a run saves its first trainer checkpoint, it can resume from a <span class="tip" tabindex="0" data-tip="A rollout snapshot taken before the first trainer checkpoint. Resuming from it restarts generation without redoing finished rollouts.">bootstrap snapshot</span>. That snapshot stores a fingerprint of the whole config: <a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/algorithms/rollout_checkpointing/manifest.py#L378">every key counts</a> unless it is on a short skip list. A snapshot saved by #4946's code holds <code>loss_fn.token_level_loss: null</code>. After this PR that key does not exist, so the fingerprints differ and the resume is refused, with <a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/nemo_rl/algorithms/rollout_checkpointing/manifest.py#L423">a diff line</a> like <code>loss_fn.token_level_loss: None -&gt; &lt;missing&gt;</code>. The training math is the same; only the config's shape changed.</p>
+<p>The fix, from the <a href="https://github.com/NVIDIA-NeMo/RL/blob/4c133f32135cc8c1f7513e95a3477eb9d535a332/docs/guides/grpo.md#L473">GRPO guide</a> this PR updates: resume that snapshot with the NeMo-RL version and config that wrote it, let it save a trainer checkpoint, then upgrade. Runs that already have a trainer checkpoint are not affected.</p>
+
+<div class="hl"><b>So what.</b> After #5276 there is one way to pick the average: <code>loss_fn.normalization</code>. Before upgrading, search your own configs and command lines for <code>token_level_loss</code> and replace it using the table above. If a run is still before its first trainer checkpoint, let it reach one on the old version first.</div>
+
+</div>
+</body>
+</html>

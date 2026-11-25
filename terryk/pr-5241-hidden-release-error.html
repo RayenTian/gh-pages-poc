@@ -83,6 +83,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 </nav>
 <p class="chainnote">Two pages on this PR. This one: an error the new phase runner loses.</p>
 
+<p>A <b>TQ capture</b> copies TransferQueue's state into memory while the barrier is held, so the slow disk write can happen after rollouts resume. The copy (the "view") stays in the storage actors' memory until it is written and released.</p>
 <p>A TQ capture keeps a <span class="tip" tabindex="0" data-tip="A frozen copy of TQ's state that the storage actors keep in memory until it is written and released.">view</span> on the storage actors. If the code cannot confirm the view was released, it raises <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/data_plane/adapters/tq_simple_checkpoint.py#L360-L366"><code>CheckpointReleaseError</code></a>: "storage actors may still retain it, so stop checkpointing". The snapshot pump <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L1228-L1237">retries</a> an <code>OSError</code> or a timeout, and stops only on other errors. So which error comes out of the phase runner decides whether a possibly held view triggers another snapshot.</p>
 
 <h2>Two ways the release error is lost</h2>
@@ -121,10 +122,10 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <rect class="ok" x="830" y="290" width="14" height="12"/><text class="note" x="850" y="300">fine</text>
 </svg>
 <p>Case A needs two failures at once, for example a full disk while the capture's own cleanup fails. It could not happen before, because a failing check meant the capture never started. Case B is a plain regression. Trainer checkpoints go through the <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L666">same runner</a> but are not retried, so case A matters less there.</p>
-<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5241">review comment C1 — snapshots.py:480</a></p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5241#discussion_r4626486032">review comment C1 — snapshots.py:475</a></p>
 
 <h2>The fix, as pseudocode (proposed, not in the PR)</h2>
-<p class="where"><b>Where the fix lands: RL only, one function.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L464-L500"><code>_run_capture_phases</code></a> in <code>snapshots.py</code>, plus two tests in <code>test_checkpointing.py</code>. Nothing below is implemented.</p>
+<p class="where"><b>Where the fix lands: RL only, one function.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L464-L501"><code>_run_capture_phases</code></a> in <code>snapshots.py</code>, plus two tests in <code>test_checkpointing.py</code>. Nothing below is implemented.</p>
 <pre class="pc"><span class="who"># controller event loop, barrier held</span>
 tasks = {name: create_task(phase) for name, phase in phases}
 <span class="add">def raise_release_error(done):</span>                <span class="cm"># "stop checkpointing" beats any other error</span>
@@ -142,7 +143,7 @@ if failed:
 <span class="add">    raise_release_error(failed)</span>              <span class="cm"># case A</span>
     release the capture's view if it has one
     failed[0].result()                        <span class="cm"># first phase error, as today</span></pre>
-<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L464-L500"><code>_run_capture_phases</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L503-L510"><code>_release_captured_view</code></a>.</p>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L464-L501"><code>_run_capture_phases</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/96c48d509517ddd1f7bd74a5947b5db4f4be472d/nemo_rl/algorithms/rollout_checkpointing/snapshots.py#L503-L510"><code>_release_captured_view</code></a>.</p>
 
 <div class="warn"><b>So what.</b> A held storage view keeps memory on the TQ storage actors until released. <code>CheckpointReleaseError</code> exists so a run stops instead of piling up more views. In both cases above it is replaced by an error that either retries or looks like a normal shutdown. The fix is a few lines and keeps everything else the PR does.</div>
 </div>

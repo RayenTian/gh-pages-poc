@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #4947 — group_token_mean: every prompt group counts the same</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3;padding-right:90px}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700} .verdict.good{color:var(--green)}
+.bg{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.bg p{margin:4px 0}
+.hl{border-left:4px solid var(--green);background:var(--surface);padding:10px 14px;margin:18px 0 0;border-radius:0 8px 8px 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600} .pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim);font-weight:400} .pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.two{display:grid;grid-template-columns:1fr;gap:0 14px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface);font-size:12.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.03em}
+.tw{overflow-x:auto}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .chunk{fill:none;stroke:var(--border);stroke-width:1.2;stroke-dasharray:5 4}
+svg .okbox{fill:var(--surface);stroke:var(--green);stroke-width:1.2}
+svg .tok{fill:var(--surface2);stroke:var(--dim);stroke-width:1}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .c-txt{fill:var(--text);font:10.5px ui-monospace,Menlo,monospace}
+svg .tk{fill:var(--accent)} svg .sq{fill:var(--orange)} svg .ok{fill:var(--green)}
+svg .arr{fill:none;stroke:var(--dim);stroke-width:1.3}
+svg a text,svg .lnk{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+.verdict.prop{color:var(--orange)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+svg .proc{fill:none;stroke:var(--dim);stroke-width:1.2;stroke-dasharray:6 4}
+svg .store{fill:var(--surface2);stroke:var(--border);stroke-width:1.2}
+svg .new{stroke:var(--green);stroke-width:2}
+svg .bad{stroke:var(--red);stroke-width:2}
+svg .segP{fill:var(--accent);fill-opacity:.35;stroke:var(--accent)}
+svg .segQ{fill:var(--orange);fill-opacity:.35;stroke:var(--orange)}
+svg .seg-t{fill:var(--text);font:11px ui-monospace,Menlo,monospace}
+svg .rd{fill:var(--red)} svg .gr{fill:var(--green)}
+svg .step{fill:var(--orange);font:bold 13px -apple-system,sans-serif}
+svg .err{fill:var(--red);font:12px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>What <code>group_token_mean</code> adds: every prompt group counts the same, however long its answers are</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4947">PR #4947</a> · feat(loss) · built on <a href="https://github.com/NVIDIA-NeMo/RL/pull/4946">#4946</a> (merged) · permalinks pinned to <a href="https://github.com/NVIDIA-NeMo/RL/tree/818d7bfe7bfbb7190f8f003c390a1a18af105ad3"><code>818d7bfe</code></a></p>
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-one-reducer.html">1 · one reducer (#4946)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-streaming-average.html">2 · streaming average (#4946)</a>
+  <span class="here">3 · group average (#4947)</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5276-remove-token-level-loss.html">4 · old key removed (#5276)</a>
+</nav>
+<p class="chainnote">Four pages on #4946 and the two PRs stacked after it — this one: what the third average adds and where it can run.</p>
+<div class="status"><dl>
+<dt>Before</dt><dd>Two averages: <code>global_token_mean</code> (every token counts the same, so long answers weigh more) and <code>sequence_mean</code> (every answer counts the same).</dd>
+<dt>This PR</dt><dd>Adds a third, <code>group_token_mean</code>: take the token mean inside each prompt group, then give every group the same weight. Single-controller GRPO with Megatron only.</dd>
+<dt>Status</dt><dd><span class="verdict prop">Proposed — open, not merged.</span> Off unless you set <code>loss_fn.normalization: group_token_mean</code>.</dd>
+</dl></div>
+
+<div class="bg">
+<p><b>Background.</b> GRPO answers each prompt several times (<span class="tip" tabindex="0" data-tip="grpo.num_generations_per_prompt: how many answers are sampled for each prompt. The answers to one prompt form a prompt group.">num_generations_per_prompt</span>) and scores each answer against the others for the same prompt. Those answers form a <i>prompt group</i>. <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-one-reducer.html">Page 1</a> shows the reducer object that picks the average; <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-streaming-average.html">page 2</a> shows how the trainer divides once per step. This page adds a third reducer to that slot. Dotted words have a short explanation: hover or tap them.</p>
+</div>
+
+<h2>How much each answer counts, in each mode</h2>
+
+<svg viewBox="0 0 940 300" role="img" aria-label="Share of the loss each of four answers carries under the three averages">
+<text x="10" y="20" class="hdr">4 answers to 2 prompts (2 answers each)</text>
+<text x="10" y="36" class="note">each square = one token's loss value</text>
+<text x="10" y="74" class="lbl-b tk">P</text><path d="M26 56 V 104" class="arr"/>
+<text x="10" y="158" class="lbl-b sq">Q</text><path d="M26 140 V 188" class="arr"/>
+<text x="42" y="72" class="lbl-b">A</text><rect x="58" y="56" width="22" height="22" rx="3" class="tok"/><text x="69" y="71" class="c-txt" text-anchor="middle">.3</text><rect x="84" y="56" width="22" height="22" rx="3" class="tok"/><text x="95" y="71" class="c-txt" text-anchor="middle">.3</text><rect x="110" y="56" width="22" height="22" rx="3" class="tok"/><text x="121" y="71" class="c-txt" text-anchor="middle">.3</text><rect x="136" y="56" width="22" height="22" rx="3" class="tok"/><text x="147" y="71" class="c-txt" text-anchor="middle">.3</text><text x="168" y="71" class="note">4 tok</text><text x="42" y="98" class="lbl-b">B</text><rect x="58" y="82" width="22" height="22" rx="3" class="tok"/><text x="69" y="97" class="c-txt" text-anchor="middle">.9</text><text x="90" y="97" class="note">1 tok</text><text x="42" y="156" class="lbl-b">C</text><rect x="58" y="140" width="22" height="22" rx="3" class="tok"/><text x="69" y="155" class="c-txt" text-anchor="middle">.4</text><rect x="84" y="140" width="22" height="22" rx="3" class="tok"/><text x="95" y="155" class="c-txt" text-anchor="middle">.6</text><rect x="110" y="140" width="22" height="22" rx="3" class="tok"/><text x="121" y="155" class="c-txt" text-anchor="middle">.4</text><rect x="136" y="140" width="22" height="22" rx="3" class="tok"/><text x="147" y="155" class="c-txt" text-anchor="middle">.6</text><rect x="162" y="140" width="22" height="22" rx="3" class="tok"/><text x="173" y="155" class="c-txt" text-anchor="middle">.5</text><rect x="188" y="140" width="22" height="22" rx="3" class="tok"/><text x="199" y="155" class="c-txt" text-anchor="middle">.5</text><text x="220" y="155" class="note">6 tok</text><text x="42" y="182" class="lbl-b">D</text><rect x="58" y="166" width="22" height="22" rx="3" class="tok"/><text x="69" y="181" class="c-txt" text-anchor="middle">.7</text><rect x="84" y="166" width="22" height="22" rx="3" class="tok"/><text x="95" y="181" class="c-txt" text-anchor="middle">.7</text><rect x="110" y="166" width="22" height="22" rx="3" class="tok"/><text x="121" y="181" class="c-txt" text-anchor="middle">.7</text><text x="142" y="181" class="note">3 tok</text>
+<text x="10" y="216" class="note">group P: 4 + 1 = 5 tokens</text>
+<text x="10" y="232" class="note">group Q: 6 + 3 = 9 tokens</text>
+
+<text x="340" y="20" class="hdr">share of the loss each answer carries</text>
+<text x="340" y="52" class="lbl-b">global_token_mean <tspan class="note">— every token counts the same</tspan></text>
+<rect x="340.0" y="60" width="120.0" height="28" class="segP"/><text x="400.0" y="78" class="seg-t" text-anchor="middle">A 29%</text><rect x="460.0" y="60" width="30.0" height="28" class="segP"/><text x="475.0" y="78" class="seg-t" text-anchor="middle">B 7%</text><rect x="490.0" y="60" width="180.0" height="28" class="segQ"/><text x="580.0" y="78" class="seg-t" text-anchor="middle">C 43%</text><rect x="670.0" y="60" width="90.0" height="28" class="segQ"/><text x="715.0" y="78" class="seg-t" text-anchor="middle">D 21%</text>
+<text x="340" y="102" class="note">group P 36% · group Q 64%: the prompt with longer answers dominates</text>
+<text x="340" y="128" class="lbl-b">sequence_mean <tspan class="note">— every answer counts the same</tspan></text>
+<rect x="340.0" y="136" width="105.0" height="28" class="segP"/><text x="392.5" y="154" class="seg-t" text-anchor="middle">A 25%</text><rect x="445.0" y="136" width="105.0" height="28" class="segP"/><text x="497.5" y="154" class="seg-t" text-anchor="middle">B 25%</text><rect x="550.0" y="136" width="105.0" height="28" class="segQ"/><text x="602.5" y="154" class="seg-t" text-anchor="middle">C 25%</text><rect x="655.0" y="136" width="105.0" height="28" class="segQ"/><text x="707.5" y="154" class="seg-t" text-anchor="middle">D 25%</text>
+<text x="340" y="178" class="note">B's one token carries as much as C's six</text>
+<text x="340" y="204" class="lbl-b gr">group_token_mean <tspan class="note">— new: every prompt group counts the same</tspan></text>
+<rect x="340.0" y="212" width="168.0" height="28" class="segP"/><text x="424.0" y="230" class="seg-t" text-anchor="middle">A 40%</text><rect x="508.0" y="212" width="42.0" height="28" class="segP"/><text x="529.0" y="230" class="seg-t" text-anchor="middle">B 10%</text><rect x="550.0" y="212" width="140.0" height="28" class="segQ"/><text x="620.0" y="230" class="seg-t" text-anchor="middle">C 33%</text><rect x="690.0" y="212" width="70.0" height="28" class="segQ"/><text x="725.0" y="230" class="seg-t" text-anchor="middle">D 17%</text>
+<text x="340" y="254" class="note">group P 50% · group Q 50%; inside a group, every token counts the same</text>
+
+<text x="775" y="52" class="note">loss</text>
+<text x="775" y="80" class="lbl">7.2 / 14 = 0.514</text>
+<text x="775" y="156" class="lbl">2.4 / 4 = 0.600</text>
+<text x="775" y="224" class="lbl gr">(0.42 + 0.567) / 2</text>
+<text x="775" y="242" class="lbl gr">= 0.493</text>
+<rect x="340" y="272" width="12" height="12" class="segP"/><text x="358" y="282" class="note">group P</text>
+<rect x="420" y="272" width="12" height="12" class="segQ"/><text x="438" y="282" class="note">group Q</text>
+<text x="510" y="282" class="note">Numbers from running #4947's three reducer classes on CPU.</text>
+</svg>
+<div class="tw"><table>
+<tr><th></th><th>global_token_mean</th><th>sequence_mean</th><th>group_token_mean (new)</th></tr>
+<tr><td>Weight on each token</td><td>1</td><td>1 / tokens in its answer</td><td>1 / tokens in its prompt group, made <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L784">once per chunk</a> and stored with the rows</td></tr>
+<tr><td>Divide by</td><td>all tokens (14)</td><td>all answers (4)</td><td>prompt groups (2)</td></tr>
+<tr><td>Code</td><td colspan="3">All three go through the same <code>reduce()</code> call from #4946. The new <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L360"><code>GroupTokenMeanReduction</code></a> is the token mean with each token scaled by its weight and the divisor swapped for the group count. The PR's GPU test checks exactly that against a token-mean run on scaled masks.</td></tr>
+<tr><td>Runs on</td><td>every trainer</td><td>every trainer</td><td>single-controller GRPO + Megatron (table below)</td></tr>
+</table></div>
+<p>Where they split: the group divisor is neither a token count nor an answer count, so it has to be built up chunk by chunk. That is the third count and the <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/wrapper.py#L49"><code>StreamingObjectiveLoss</code></a> wrapper that #4946 added and left unused. The one-call <code>train()</code> path never gets that count, so <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L451"><code>loss_divisor()</code></a> raises there.</p>
+
+<h2>Where the weights come from</h2>
+<p class="where"><b>Where it lands: RL only.</b> New code in <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L286"><code>interfaces.py</code></a> (the weights and the reducer) and one call in the <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L784">advantage step</a>. The column is registered with the data store in <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/single_controller.py#L516"><code>single_controller.py</code></a>. <b>No worker change:</b> the worker already does everything through the reducer.</p>
+<p>Each row needs <code>1 / tokens in its group</code>. Only the advantage step can make it: there, every chunk still holds whole prompt groups. Later the chunk is split across DP ranks and packed, and a group's answers can end up on different GPUs.</p>
+<p class="pclbl">Advantage step, after (same example: chunk 1 = group P, chunk 2 = group Q)</p>
+<pre class="pc"><span class="who"># advantage step: controller process, once per chunk (whole prompt groups, before the DP split)</span>
+adv = grpo_advantages(rewards, prompt_ids)                           <span class="cm"># unchanged</span>
+<span class="add">w = <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L784">R.prepare_batch</a>(sample_ids, token_mask, sample_mask,             <span class="cm"># {} for the other two averages</span></span>
+<span class="add">                    group_indices=prompt_ids,</span>
+<span class="add">                    expected_group_size=num_generations_per_prompt)  <span class="cm"># a partial group is an error</span></span>
+<span class="who">#   inside <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L286">group_token_mean_weights</a>:</span>
+<span class="add">    lengths = token_mask[:, 1:].sum(-1) * sample_mask                <span class="cm"># A 4, B 1 | C 6, D 3</span></span>
+<span class="add">    totals  = <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L349">scatter_add</a>(lengths, by group)                         <span class="cm"># P 5 | Q 9</span></span>
+<span class="add">    w       = <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L355">1 / totals[group of row]</a>                               <span class="cm"># A .2, B .2 | C .111, D .111 (0 if empty)</span></span>
+tq.put(rows, advantages<span class="add">, <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/single_controller_utils/advantage_stage.py#L795">+ w</a></span>)                                        <span class="cm"># new column: group_token_mean_inverse_tokens</span></pre>
+<p class="pclbl">Megatron worker: the hooks #4946 added, now in use</p>
+<pre class="pc"><span class="who"># Megatron worker, train_microbatch: once per chunk, every DP rank (no new worker code)</span>
+c = <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2252">R.local_counts</a>(chunk)                   <span class="cm"># sum(len·w): P 4×.2 + 1×.2 = 1;  Q 6/9 + 3/9 = 1</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2255">loss_fn = StreamingObjectiveLoss(loss_fn)</a>   <span class="cm"># only for this reducer</span>
+actor = <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L466">R.reduce</a>(v, w, d=1)  →  sum(v · w)  <span class="cm"># P 2.1 × .2 = .42;  Q 5.1 / 9 = .567</span>
+<span class="who"># finish_train_step: once per optimizer step</span>
+objective = all_reduce_over_DP(c)           <span class="cm"># 1 + 1 = 2 groups</span>
+n = <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2474">R.loss_divisor</a>(toks, seqs, objective)   <span class="cm"># returns objective = 2</span>
+grads *= 1 / n                              <span class="cm"># loss (.42 + .567) / 2 = .493</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L286"><code>group_token_mean_weights</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L360"><code>GroupTokenMeanReduction</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2229"><code>_train_microbatch_body</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2434"><code>_finish_train_step_body</code></a>.</p>
+
+<h2>Where you can use it</h2>
+<div class="tw"><table>
+<tr><th>Case</th><th>What happens</th></tr>
+<tr><td>Trainer</td><td>Single-controller GRPO, Megatron, no on-policy distillation. Anything else (PPO, the older GRPO loop, the DTensor backend) fails at setup; on the single-controller path the <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/single_controller_utils/config.py#L1973">check runs before the cluster starts</a>.</td></tr>
+<tr><td>Loss options</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/algorithms/loss/interfaces.py#L391">Rejected</a>: GSPO-style sequence-level ratios, OPD-full, positive-example NLL, and in-loss sequence filtering. Each would change masks or add a term that does not share the group weights.</td></tr>
+<tr><td>MoE router losses, attached MTP heads</td><td>Rejected by the <a href="https://github.com/NVIDIA-NeMo/RL/blob/818d7bfe7bfbb7190f8f003c390a1a18af105ad3/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1988">same check as <code>sequence_mean</code></a>: their gradients need the token count, and the group count is not it.</td></tr>
+<tr><td>A group missing answers</td><td>Error: every group must have exactly <code>num_generations_per_prompt</code> rows, or its total would be wrong.</td></tr>
+<tr><td>Groups where every answer got the same reward</td><td>Still count as one group in the divisor, even though their advantage is 0 and they add no gradient. Tokens that importance-weight rejection drops also stay in the count.</td></tr>
+</table></div>
+
+<div class="hl"><b>So what.</b> <code>group_token_mean</code> gives each prompt an equal say, as <code>sequence_mean</code> gives each answer, but inside a prompt it still weighs every token the same. Use it when some prompts get much longer answers than others and you don't want those prompts to dominate the step. It is opt-in. The PR's 300-step comparison runs are in <a href="https://github.com/NVIDIA-NeMo/RL/pull/4947#discussion_r4470025847">this review thread</a>.</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5138 — reuse captured tokens after a system message only when the prompt's start is unchanged</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 14px;font-size:14px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .boxr{fill:var(--surface);stroke:var(--red);stroke-width:1.8}
+svg .boxg{fill:var(--surface);stroke:var(--green);stroke-width:1.8}
+svg .t{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .tb{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .d{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .g{fill:var(--green);font:bold 12.5px ui-monospace,Menlo,monospace}
+svg .r{fill:var(--red);font:bold 12.5px ui-monospace,Menlo,monospace}
+svg .o{fill:var(--orange);font:bold 12.5px ui-monospace,Menlo,monospace}
+svg .hdr{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .ln{stroke:var(--dim);stroke-width:1.3;fill:none}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.hl{border-left:4px solid var(--green);background:var(--surface);padding:10px 14px;margin:16px 0;border-radius:0 8px 8px 0}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Reusing saved tokens after an added system message: only when the prompt's start did not move</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5138">NVIDIA-NeMo/RL #5138</a> · depends on <a href="https://github.com/NVIDIA-NeMo/Gym/pull/5771">Gym #5771</a> · permalinks pinned to head <code>439d37b0</code></p>
+
+<div class="status">
+<dl>
+  <dt>Before</dt>
+  <dd>When an agent added a system message after the model's answer (Claude Code does this for token-budget updates), Gym refused to link the call to the earlier one. Every such call started over as a new root, so its saved tokens were never reused.</dd>
+  <dt>This PR</dt>
+  <dd>Turns on Gym's <code>allow_system_suffix</code> for forest training on native vLLM, and adds an RL check: reuse the saved tokens only if the full prompt starts with the history exactly as rendered on its own. Otherwise, start a new root.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict good">The check is correct.</span> The review found no case where it reuses tokens it should not. <span class="verdict open">Not yet safe to merge:</span> the Gym version RL pins rejects the new key (see page 2).</dd>
+</dl>
+</div>
+
+<nav class="chain">
+  <span class="here">1 · the prefix check</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5138-landing-with-5158.html">2 · landing it, and #5158</a>
+</nav>
+<p class="chainnote">Two pages on this PR, one question each. This one: what the new check protects against. Dotted words have a short explanation: hover or tap them.</p>
+
+<div class="bg"><b>Background.</b> In multi-turn training, RL keeps the <span class="tip" tabindex="0" data-tip="The exact token ids the model produced (and was shown) in an earlier call of the same conversation. Rendering the same text again can give different ids.">saved tokens</span> of each model call. On the next call, the vLLM chat server renders the whole chat with the template, then <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/openai_server_utils.py#L74">splices</a> the saved tokens over the history part, so training sees exactly what the model saw. The splice finds the cut by <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/openai_server_utils.py#L170">counting end-of-turn tokens</a>, not by position. A call that cannot be spliced safely becomes a <span class="tip" tabindex="0" data-tip="A call stored as its own fresh full prompt, with no parent. Training is still correct; the earlier tokens are just not shared.">new root</span>.</div>
+
+<p>Some chat templates move every system message to the top of the prompt. If a system message arrives after the answer, the template renders it <i>before</i> the history. Counting end-of-turn tokens then cuts in the wrong place: the system message is cut away and the history appears twice. The PR's fix is one comparison in <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/vllm/chat_server.py#L298-L307"><code>_render_chat_call</code></a>: does the full render start with the history render? Only <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/capture_context.py#L70-L75"><code>decide_capture_input</code></a> reads the answer, and only when the new messages include a system message.</p>
+
+<svg viewBox="0 0 940 470" role="img" aria-label="Same conversation, two templates: the check passes when the system message stays at the end and fails when the template moves it to the top">
+  <text class="hdr" x="14" y="22">Same call, two chat templates · token ids are made up and small</text>
+  <text class="d" x="14" y="42">10 = user "task" · 31 = answer (template) · 77 = token the model made · 2 = turn end · 99 = system "budget" · 7 = "assistant:"</text>
+
+  <rect class="box" x="14" y="56" width="912" height="56" rx="8"/>
+  <text class="tb" x="26" y="77">Inputs both lanes share</text>
+  <text class="t" x="26" y="99">saved tokens [10, 77, 31, 2]     history render (up to the last answer) [10, 31, 2]</text>
+
+  <!-- lane A -->
+  <rect class="boxg" x="14" y="126" width="448" height="330" rx="8"/>
+  <text class="tb" x="26" y="148">A · template keeps the system message at the end</text>
+  <text class="t" x="26" y="174">full render</text>
+  <text class="t" x="26" y="194">[10, 31, 2, 99, 2, 7]</text>
+  <line class="ln" x1="238" y1="204" x2="238" y2="222"/>
+  <text class="t" x="26" y="240">check: full[:3] == history?</text>
+  <text class="g" x="26" y="260">[10, 31, 2] == [10, 31, 2]  → stable</text>
+  <line class="ln" x1="238" y1="270" x2="238" y2="288"/>
+  <text class="t" x="26" y="306">splice saved tokens over the history</text>
+  <text class="g" x="26" y="328">[10, 77, 31, 2, 99, 2, 7]</text>
+  <text class="d" x="26" y="350">system message kept, saved tokens reused</text>
+  <text class="d" x="26" y="392">Before this PR: Gym refused this call,</text>
+  <text class="d" x="26" y="410">so it became a new root with no reuse.</text>
+  <a href="https://github.com/NVIDIA-NeMo/Gym/blob/461f7e6cdc1182c372c6e6637a0b6ee087cc1854/nemo_gym/models/token_capture/sink.py#L423-L428"><text x="26" y="432">Gym sink.py L423-L428 (the gate)</text></a>
+
+  <!-- lane B -->
+  <rect class="box" x="478" y="126" width="448" height="330" rx="8"/>
+  <text class="tb" x="490" y="148">B · template moves system messages to the top</text>
+  <text class="t" x="490" y="174">full render</text>
+  <text class="t" x="490" y="194">[99, 2, 10, 31, 2, 7]</text>
+  <rect class="boxr" x="490" y="212" width="200" height="226" rx="6"/>
+  <text class="r" x="500" y="232">gate on, no check</text>
+  <text class="t" x="500" y="254">cut after 1st turn end</text>
+  <text class="t" x="500" y="274">[10,77,31,2]</text>
+  <text class="t" x="500" y="292">+ [10,31,2,7]</text>
+  <text class="r" x="500" y="318">99 is gone,</text>
+  <text class="r" x="500" y="336">history twice</text>
+  <text class="d" x="500" y="362">What this PR</text>
+  <text class="d" x="500" y="378">prevents. Never</text>
+  <text class="d" x="500" y="394">shipped: the gate</text>
+  <text class="d" x="500" y="410">was off before.</text>
+  <rect class="boxg" x="704" y="212" width="210" height="226" rx="6"/>
+  <text class="g" x="714" y="232">with the check</text>
+  <text class="t" x="714" y="254">full[:3] = [99,2,10]</text>
+  <text class="t" x="714" y="274">≠ [10, 31, 2]</text>
+  <text class="o" x="714" y="296">→ not stable</text>
+  <text class="t" x="714" y="320">new root, full prompt:</text>
+  <text class="g" x="714" y="342">[99,2,10,31,2,7]</text>
+  <text class="d" x="714" y="366">correct prompt;</text>
+  <text class="d" x="714" y="382">no reuse this call</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/capture_context.py#L70-L75"><text x="714" y="410">capture_context.py</text></a>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/capture_context.py#L70-L75"><text x="714" y="426">L70-L75</text></a>
+</svg>
+
+<p>The numbers are the ones the PR's own test uses, in <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/tests/unit/models/generation/test_vllm_chat_template_wiring.py#L1077-L1153"><code>test_system_suffix_checks_rendered_prefix_before_capture</code></a>: lane A expects <code>[10, 77, 31, 2, 99, 2, 7]</code>, and lane B expects the full render unchanged as a new root. The red box is the splice run by hand on lane B's tokens.</p>
+
+<h2>The change, as pseudocode</h2>
+<p class="pclbl">Render step, before (base <code>9a7640c</code>)</p>
+<pre class="pc"><span class="who"># vLLM chat server, once per chat call (event loop); Dynamo's render pool runs the same method</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/9a7640c71cf4832596261fcf9810e20867c4eeb1/nemo_rl/models/generation/vllm/chat_server.py#L207">_render_chat_call</a>(request, messages, admission):
+    full = <a href="https://github.com/NVIDIA-NeMo/RL/blob/9a7640c71cf4832596261fcf9810e20867c4eeb1/nemo_rl/models/generation/vllm/chat_server.py#L243">render</a>(messages)
+    if managed_capture:
+        decision = <a href="https://github.com/NVIDIA-NeMo/RL/blob/9a7640c71cf4832596261fcf9810e20867c4eeb1/nemo_rl/models/generation/vllm/chat_server.py#L271">resolve_capture_input</a>(admission, messages)  <span class="cm"># Gym never sent a system suffix</span>
+    if decision.serving.mode == "token_in":                       <span class="cm"># only calls that will splice</span>
+        history = <a href="https://github.com/NVIDIA-NeMo/RL/blob/9a7640c71cf4832596261fcf9810e20867c4eeb1/nemo_rl/models/generation/vllm/chat_server.py#L300">render</a>(messages[:last_answer + 1])
+    return full, history, decision</pre>
+
+<p class="pclbl">Render step, after</p>
+<pre class="pc"><span class="who"># same place, same thread</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/vllm/chat_server.py#L207">_render_chat_call</a>(request, messages, admission):
+    full = <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/vllm/chat_server.py#L242">render</a>(messages)
+<span class="add">    if admission.mode in ("candidate", "token_in"):</span>            <span class="cm"># moved up: now before the decision</span>
+<span class="add">        history = <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/vllm/chat_server.py#L287">render</a>(messages[:last_answer + 1])</span>
+    if managed_capture:
+<span class="add">        stable = bool(history) and full[:len(history)] == history</span>  <span class="cm"># the new check</span>
+        decision = <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/vllm/chat_server.py#L298">resolve_capture_input</a>(admission, messages<span class="add">, stable</span>)
+<span class="del">    if decision.serving.mode == "token_in": history = render(...)</span>
+    return full, history, decision</pre>
+
+<p class="pclbl">Decision, after (new lines only)</p>
+<pre class="pc"><span class="who"># called from the render step above</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/capture_context.py#L25">decide_capture_input</a>(admission, messages, <span class="add">rendered_prefix_is_stable=False</span>):
+    ...                                                   <span class="cm"># text mode, missing proof → root (unchanged)</span>
+    suffix_roles = roles of the new messages
+<span class="add">    if "system" in suffix_roles and not rendered_prefix_is_stable:</span>
+<span class="add">        warn("rewrites the rendered prefix"); return root</span>  <span class="cm"># root keeps any checkpoint cut</span>
+    ...                                                   <span class="cm"># boundary check, then token_in (unchanged)</span></pre>
+
+<p class="pclbl">Gym startup config, after</p>
+<pre class="pc"><span class="who"># Gym actor startup (one Ray actor per Gym stack)</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/environments/nemo_gym.py#L1233">_spinup</a>():
+    token_id_capture = {..., parent_resolution: "source_history" if forest else "fingerprint"}
+<span class="add">    if forest_training and backend == "vllm_worker":</span>          <span class="cm"># the only pair Gym #5771 accepts</span>
+<span class="add">        token_id_capture["allow_system_suffix"] = True</span>     <span class="cm"># C1: the pinned Gym rejects this key</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/vllm/chat_server.py#L207-L326"><code>_render_chat_call</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/capture_context.py#L25-L137"><code>decide_capture_input</code> / <code>resolve_capture_input</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/environments/nemo_gym.py#L1429-L1435"><code>_spinup</code></a>.</p>
+
+<h2>What the review checked, and what it asks for</h2>
+<p>The check matches what Gym #5771 asks of the serving side (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/461f7e6cdc1182c372c6e6637a0b6ee087cc1854/fern/versions/latest/pages/model-server/model-call-capture.mdx#L101">Gym doc</a>). Gym admits a call when every new message is a user, tool or system message. RL runs the check whenever a system message is among them, in any order. If the first <code>len(history)</code> tokens are unchanged, a moved system message would have to sit after the history, so the splice cannot cut it away. A template that renders the last answer differently once something follows it (Qwen3 with empty reasoning adds an empty think block only when the answer is last) fails the check and starts a new root. That is safe, and no worse than before.</p>
+<p>The asks are about landing, tests and docs, not the check:</p>
+<ul>
+<li><b>C1:</b> land with the Gym bump. At the current pin an existing unit test fails, and forest runs on vLLM fail at Gym startup (page 2).</li>
+<li><b>C2:</b> add a test that checks when <code>allow_system_suffix</code> is set.</li>
+<li><b>C3:</b> fix the guide's last sentence. Users cannot "leave the gate disabled"; RL sets it.</li>
+</ul>
+<!--CREFS-->
+
+<div class="hl"><b>So what.</b> With this PR, Claude Code's budget updates can keep reusing saved tokens whenever the template leaves the start of the prompt alone. When the template moves the system message, the call starts a new root instead of training on a prompt that lost the message. The one blocker is merge order: Gym bump first.</div>
+
+</div>
+</body>
+</html>

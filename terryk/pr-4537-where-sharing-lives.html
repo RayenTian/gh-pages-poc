@@ -69,6 +69,7 @@ svg .b{fill:var(--surface);stroke:var(--border)}
 svg .b-new{fill:var(--surface);stroke:var(--green);stroke-width:1.6}
 svg .b-bad{fill:var(--surface);stroke:var(--orange);stroke-width:2.2}
 svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:6px 0 14px;font-size:14px}
 
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -93,8 +94,11 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 
 <nav class="chain"><a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-batch-forming.html">how the batch is formed</a>
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-vs-forge-qwengyre.html">vs Forge and QwenGyre</a>
-<span class="here">where sharing should live</span></nav>
-<p class="chainnote">Three pages on this PR — this one: which component should own the prefix tree.</p>
+<span class="here">where sharing should live</span>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-what-rl-imports.html">what RL imports</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-who-calls-what.html">who calls what</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-row-order.html">row order fix</a></nav>
+<p class="chainnote">Six pages on this PR — this one: which component should own the prefix tree.</p>
 
 <div class="bg"><b>Background.</b> In the single-controller GRPO path, Gym runs the agent and records every model call with a link to the call it continued. <span class="tip" tabindex="0" data-tip="nemo_rl/environments/call_selection.py. returned_history keeps the calls the agent returned (the main path); all_captured keeps every recorded call, including branches and retries.">call_selection</span> decides which calls train. The <span class="tip" tabindex="0" data-tip="RolloutReassembler: a Ray actor that fetches each selected call's tokens, logprobs and routes from the data plane, joins them into whole rows, and writes those rows back.">rollout reassembler</span> builds the rows. With <span class="tip" tabindex="0" data-tip="token_capture.forest_training=true. One rollout can own several rows: a new row starts after each compaction, and each branch is its own row. Shared calls keep their loss in one row only.">forest training</span>, one rollout can own several rows, and the advantage stage gives all of them that rollout's single advantage. Dotted words have a short explanation: hover or tap them.</div>
 
@@ -218,7 +222,7 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <text class="lbl" x="334" y="264">+ prompt_lengths [300,300,300]</text>
 <text class="lbl" x="334" y="280">forest training refused</text>
 <rect class="b-bad" x="632" y="230" width="292" height="62" rx="6"/>
-<text class="lbl" x="642" y="248">SharedPrefixRolloutReassembler</text>
+<text class="lbl" x="642" y="248">same class, always</text>
 <text class="lbl" x="642" y="264">+ prefix_row [-1,0,0,-1]</text>
 <text class="lbl" x="642" y="280">+ prefix_len [0,340,300,0]</text>
 <text class="step" x="16" y="308">Advantage: one per rollout</text>
@@ -287,26 +291,24 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916a
 <span class="add">rows = <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/megatron/data.py#L1038">build_shared_prefix_rows</a>(ids, lengths, prompt_lengths, group_ids)</span>              <span class="cm"># megatron.rl: same group + same prompt tokens</span>
 <span class="add">units = <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1603">plan_shared_prefix_execution_units</a>(rows, budget, M)</span>                           <span class="cm"># stars, forests of stars, dense bins</span></pre>
 <p class="pclbl">Proposed — drafted in <a href="https://github.com/terrykong/RL/pull/30">terrykong/RL#30</a>, not in #4537</p>
-<pre class="pc"><span class="who"># reassembler actor: a subclass, picked by config (like selection_policy)</span>
-<span class="add">class SharedPrefixRolloutReassembler(RolloutReassembler):</span>
-<span class="add">    def row_extras(self, rows, selected_calls):</span>                               <span class="cm"># new hook on the base class</span>
-<span class="add">        # compare token IDs of the group's rows; parent links say where branches split</span>
-<span class="add">        prefix_row, prefix_len = longest_shared_prefix(rows, selected_calls)</span>  <span class="cm"># r1 → (r0, 340), r2 → (r0, 300)</span>
-<span class="add">        return {"prefix_row": prefix_row, "prefix_len": prefix_len}</span>           <span class="cm"># [-1, 0, 0, -1], [0, 340, 300, 0]</span>
+<pre class="pc"><span class="who"># reassembler actor: the same class, no flag, every run</span>
+<span class="add"># written on every row, whatever the packing; other consumers ignore them</span>
+<span class="add">prefix_row, prefix_len = longest_shared_prefix(group_rows)</span>   <span class="cm"># r1 → (r0, 340), r2 → (r0, 300)</span>
+<span class="add">batch.update(prefix_row=prefix_row, prefix_len=prefix_len)</span>   <span class="cm"># [-1, 0, 0, -1], [0, 340, 300, 0]</span>
 <span class="who"></span>
 <span class="who"># Megatron worker: reads the columns, keeps all of the PR's physical packing</span>
-<span class="add">tree = tree_from_prefix_columns(prefix_row, prefix_len)</span>                       <span class="cm"># replaces group id + prompt length</span>
-units = plan_shared_prefix_execution_units(tree, budget, M)                   <span class="cm"># unchanged: budget, TP/CP, 16 branches, DP</span>
+<span class="add">tree = tree_from_prefix_columns(prefix_row, prefix_len)</span>      <span class="cm"># replaces group id + prompt length</span>
+units = plan_shared_prefix_execution_units(tree, budget, M)  <span class="cm"># unchanged: budget, TP/CP, 16 branches, DP</span>
 <span class="who"></span>
 <span class="who"># DTensor / Automodel worker</span>
-<span class="add">ignore prefix columns  → dense rows</span>                                           <span class="cm"># always correct; a mask can come later</span></pre>
+<span class="add">ignore prefix columns  → dense rows</span>                          <span class="cm"># always correct; a mask can come later</span></pre>
 <p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/environments/call_selection.py#L325"><code>SELECTION_POLICIES</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L834"><code>finalize_group</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/data_plane/schema.py#L219"><code>LogicalRowTag</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/algorithms/single_controller_utils/logical_advantage.py#L122"><code>build_logical_owner_batch</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/experience/rollout_reassembler.py#L1346">PR column</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/megatron/data.py#L1038"><code>_build_shared_prefix_rows</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1603"><code>_plan_shared_prefix_execution_units</code></a>.</p>
 
 <h2>What moves, what stays, and what to watch</h2>
 <table>
 <tr><th>Piece</th><th>Main</th><th>This PR</th><th>Proposed</th></tr>
 <tr><td>Which calls train</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/environments/call_selection.py#L325"><code>call_selection</code></a></td><td>same</td><td>same — no change</td></tr>
-<tr><td>Which rows share which tokens</td><td>nobody</td><td>Megatron worker + <code>megatron.rl</code>, from group id + first-prompt length</td><td>reassembler subclass, from the call tree; any backend can read it</td></tr>
+<tr><td>Which rows share which tokens</td><td>nobody</td><td>Megatron worker + <code>megatron.rl</code>, from group id + first-prompt length</td><td>the reassembler, on every row and with no flag; any packing can read it</td></tr>
 <tr><td>Packing under the token budget, TP/CP padding, 16-branch cap, DP alignment, logprob scatter-back</td><td>dense packing</td><td>Megatron worker</td><td>Megatron worker — stays where the PR put it</td></tr>
 <tr><td>Rows and advantages</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/data_plane/schema.py#L219">owner tags</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/algorithms/single_controller_utils/logical_advantage.py#L122">one advantage per rollout</a></td><td>unchanged; forest refused</td><td>unchanged: the new columns are hints, and rows stay rows</td></tr>
 <tr><td>Rows per group and per DP rank</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/experience/rollout_reassembler.py#L1175">forest adds ownerless padding rows</a>; rollouts own different numbers of rows</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/data_plane/preshard.py#L155">whole groups per rank</a>, and every group in a chunk must have the same row count; never adds rows</td><td>accept groups of different sizes; run padding rows dense with zero loss</td></tr>
@@ -314,7 +316,7 @@ units = plan_shared_prefix_execution_units(tree, budget, M)                   <s
 </table>
 <p>Three things need care. <b>Loss:</b> in r1 the copy of A is context only, because r0 owns A's loss. When A becomes one shared node, its loss mask must come from r0. <b>Advantages:</b> the advantage stage reads <a href="https://github.com/NVIDIA-NeMo/RL/blob/defdaef486bea221e4789ce6916aea2ddfc2a5aa/nemo_rl/data_plane/schema.py#L219"><code>LogicalRowTag</code></a> per row, so the shared path must hand logprobs back to the original rows. It already does, by source-row index, and the new columns don't change that. <b>DP sharding:</b> forest groups differ in row count, so the equal-size rule in the group sharding has to go. Lifting the setup refusal alone is not enough.</p>
 <p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4611142845">review comment — rollout_reassembler.py:1346 (build the tree here)</a></p><p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4611143923">review comment — setup.py:1429 (support forest training)</a></p>
-<div class="hl"><b>So what.</b> The tree is already known when rows are built: the reassembler has every call's parent. Building it there, as a reassembler subclass, gives every backend the same explicit tree instead of one prompt length. That is what forest runs (compaction and branches) need, and what Automodel would read later. It saves little code: Megatron keeps its packing. Forest runs also need group sharding that accepts uneven groups, and deeper trees need Megatron's model code to run them.</div>
+<div class="hl"><b>So what.</b> The tree is already known when rows are built: the reassembler has every call's parent. Writing it there on every row, with no flag, gives every backend the same explicit tree instead of one prompt length. That is what forest runs (compaction and branches) need, and what Automodel would read later. It saves little code: Megatron keeps its packing. Forest runs also need group sharding that accepts uneven groups, and deeper trees need Megatron's model code to run them.</div>
 
 </div>
 </body>

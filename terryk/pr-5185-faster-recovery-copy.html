@@ -271,11 +271,11 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/d3e2af6c6f96593d683b94141620
 
 <p><b>C1 · cleanup.</b> The rewards are now filtered twice: once in the new comprehension and again in the old loop.
 The output is right, but the rule "keep only replay-owned groups" now lives in two places. The ask: let the old loop filter only the metrics.</p>
-<!--CREF-C1-->
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5185#discussion_r4626495800">review comment C1 — rollout_recovery.py:2339</a></p>
 <p><b>C2 · test gap.</b> The end-to-end test builds its "before" snapshot with the same copier it is testing.
 If the copier ever shared a list with the ledger, the snapshot would share it too, and the "ledger was not changed" check would still pass.
 The ask: take that snapshot with <code>copy.deepcopy</code>. With that one line, a broken copier fails the test.</p>
-<!--CREF-C2-->
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5185#discussion_r4626495813">review comment C2 — test_rollout_recovery_capture_copy.py:228</a></p>
 
 <div class="hl">Nearly all of the gain is the receipt copier plus skipping groups before copying them.
 The three hand-written reward functions save only 3–4 ms per 500 groups on Python 3.13; their tests keep them in step with the dataclasses.

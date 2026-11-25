@@ -82,7 +82,7 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,M
 <h1>Where a captured request's logprobs go, with and without packing</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5266">NVIDIA-NeMo/RL #5266</a>
 (“perf(vllm): add opt-in packed captured logprob histories”). NeMo-RL links pin the PR head
-<code>8299d55f</code>; vLLM links pin <code>v0.33.0</code> (<code>4ba787ec</code>).</p>
+<code>068d3921</code>; vLLM links pin <code>v0.33.0</code> (<code>4ba787ec</code>).</p>
 
 <div class="status"><dl>
 <dt>Before</dt><dd>With <code>flat_logprobs: true</code>, vLLM's own code stores each generated token's logprob. Per engine step it turns the numbers into Python lists, decodes each token to text, and appends to a <code>FlatLogprobs</code> object.</dd>
@@ -96,13 +96,13 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,M
 </nav>
 <p class="chainnote">Two pages on this PR, one question each. This one: what the new path does differently.</p>
 
-<div class="bg"><b>Background.</b> In RL training, each generated token needs the log-probability the generator gave it, so training can compare it to its own. NeMo-RL serves vLLM over HTTP. For <span class="tip" tabindex="0" data-tip="A request whose tokens and logprobs NeMo-RL records itself, through the Gym token-capture hook, instead of reading them from the HTTP reply.">captured</span> requests it reads the logprobs straight from vLLM's per-request state with <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/utils.py#L72"><code>extract_generation_logprobs</code></a>. The cost this PR attacks is CPU time on the generation actor while vLLM files those numbers away, one token at a time. Dotted words have a short explanation: hover or tap them.</div>
+<div class="bg"><b>Background.</b> In RL training, each generated token needs the log-probability the generator gave it, so training can compare it to its own. NeMo-RL serves vLLM over HTTP. For <span class="tip" tabindex="0" data-tip="A request whose tokens and logprobs NeMo-RL records itself, through the Gym token-capture hook, instead of reading them from the HTTP reply.">captured</span> requests it reads the logprobs straight from vLLM's per-request state with <a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/utils.py#L73"><code>extract_generation_logprobs</code></a>. The cost this PR attacks is CPU time on the generation actor while vLLM files those numbers away, one token at a time. Dotted words have a short explanation: hover or tap them.</div>
 
-<div class="fast"><b>Why it should be faster.</b> The GPU work is the same in both paths. The packed path skips three CPU steps per token: turning numpy rows into Python lists, decoding the token to text (vLLM's <a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/engine/logprobs.py#L97-L108"><code>convert_ids_list_to_tokens</code> + <code>_verify_tokens</code></a>), and one append per token. A multi-token step becomes one <code>frombytes</code> copy per column. Nothing reads the skipped text for captured requests: NeMo-RL already skips building the reply's logprob objects for them (<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/vllm_worker_async.py#L2390-L2401">vllm_worker_async.py:2390</a>). <b>The only numbers so far</b> are an older CPU-only synthetic run (8 requests × 131,072 tokens: 7.56 s → 6.07 s), not measured on this head and not as a share of a training step.</div>
+<div class="fast"><b>Why it should be faster.</b> The GPU work is the same in both paths. The packed path skips three CPU steps per token: turning numpy rows into Python lists, decoding the token to text (vLLM's <a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/v1/engine/logprobs.py#L97-L108"><code>convert_ids_list_to_tokens</code> + <code>_verify_tokens</code></a>), and one append per token. A multi-token step becomes one <code>frombytes</code> copy per column. Nothing reads the skipped text for captured requests: NeMo-RL already skips building the reply's logprob objects for them (<a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/chat_server.py#L612-L624">chat_server.py:612</a>). <b>The only numbers so far</b> are an older CPU-only synthetic run (8 requests × 131,072 tokens: 7.56 s → 6.07 s), not measured on this head and not as a share of a training step. <b>The ceiling moves on the next vLLM bump:</b> upstream <a href="https://github.com/vllm-project/vllm/pull/60542">vllm#60542</a> (merged, not yet released) gives native vLLM its own bulk append, but it still decodes the text. After that bump, only the decode step is left to save, so it needs measuring again.</div>
 
 <h2>One token, through both paths</h2>
 
-<p>One engine step makes one token for one captured request: token <code>7</code>, logprob <code>-0.5</code>, rank <code>4</code>. vLLM hands it over as <code>ids [1, 1]</code> = <code>[positions, columns]</code>. Column 0 is always the sampled token. The hook decides per request which path the request takes (<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L72-L80">patches.py:72-80</a>). Values below are from a real run of the PR's class.</p>
+<p>One engine step makes one token for one captured request: token <code>7</code>, logprob <code>-0.5</code>, rank <code>4</code>. vLLM hands it over as <code>ids [1, 1]</code> = <code>[positions, columns]</code>. Column 0 is always the sampled token. The hook decides per request which path the request takes (<a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/patches.py#L72-L80">patches.py:72-80</a>). Values below are from a real run of the PR's class.</p>
 
 <svg viewBox="0 0 940 470" role="img" aria-label="Two lanes: native vLLM path and packed path, from engine row to the value training reads; they converge at extract_generation_logprobs">
 <defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="ahd" d="M0,0 L8,4 L0,8 z"/></marker></defs>
@@ -125,7 +125,7 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,M
 <text class="lbl" x="500" y="136">② update() installed by PackedCaptureLogprobs</text>
 <text class="val" x="500" y="157">append_arrays(ids, values, ranks)</text>
 <text class="val" x="500" y="175">no .tolist(), no decode; 1 copy per column</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L87-L96"><text x="500" y="198">patches.py:87</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/patches.py#L87-L96"><text x="500" y="198">patches.py:87</text></a>
 
 <path class="arr" d="M220 210 L220 232"/><path class="arr" d="M700 210 L700 232"/>
 
@@ -139,14 +139,14 @@ svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,M
 <text class="lbl" x="500" y="256">③ stored in PackedSelectedLogprobs (arrays)</text>
 <text class="val" x="500" y="277">_ids q[7]  _values d[-0.5]  _ranks q[4]</text>
 <text class="val" x="500" y="295">no text kept (decoded_token is None)</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/packed_logprobs.py#L27-L45"><text x="500" y="318">packed_logprobs.py:24</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/packed_logprobs.py#L27-L45"><text x="500" y="318">packed_logprobs.py:27</text></a>
 
 <path class="arr" d="M220 330 L420 368"/><path class="arr" d="M700 330 L520 368"/>
 
 <rect class="hot" x="190" y="370" width="560" height="62" rx="8"/>
 <text class="lbl" x="204" y="392">④ extract_generation_logprobs — the two paths meet here</text>
 <text class="val" x="204" y="414">both return [-0.5]  →  training's generation logprobs</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/utils.py#L100-L103"><text x="580" y="424">utils.py:100</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/utils.py#L101-L104"><text x="580" y="424">utils.py:101</text></a>
 
 <rect class="new" x="14" y="446" width="14" height="12"/><text class="note" x="34" y="456">new in this PR</text>
 <rect class="hot" x="150" y="446" width="14" height="12"/><text class="note" x="170" y="456">where they converge</text>
@@ -164,16 +164,16 @@ def <a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a79
         <a href="https://github.com/vllm-project/vllm/blob/4ba787ec9959e566d3b587a796dff07673324da5/vllm/logprobs.py#L178">append_logprobs_for_next_position</a>(store, ids, vals, text, rank)</pre>
 <p class="pclbl">Per engine step, after (packed request)</p>
 <pre class="pc"><span class="who"># generation actor, vLLM output loop (one task)</span>
-<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L87">update</a>(rows):</span>                              <span class="cm"># set on this request only, at add_request</span>
+<span class="add">def <a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/patches.py#L87">update</a>(rows):</span>                              <span class="cm"># set on this request only, at add_request</span>
 <span class="add">    before = len(history)</span>
-<span class="add">    history.<a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/packed_logprobs.py#L51">append_arrays</a>(ids, vals, ranks)</span>  <span class="cm"># whole step at once; C3: rows can be wider</span>
+<span class="add">    history.<a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/packed_logprobs.py#L51">append_arrays</a>(ids, vals, ranks)</span>  <span class="cm"># whole step at once; C3: rows can be wider</span>
 <span class="add">    cumulative = history.cumulative_after(cumulative, start=before)</span>
 <span class="del">    for ids, vals, rank in rows: ... decode(ids) ...</span></pre>
-<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/patches.py#L40-L108"><code>PackedCaptureLogprobs</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/packed_logprobs.py#L27"><code>PackedSelectedLogprobs</code></a>, installed from <a href="https://github.com/NVIDIA-NeMo/RL/blob/8299d55fcf607d3984a2ab4df255feaaf0410057/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1097-L1108"><code>setup_token_capture</code></a> on every HTTP frontend.</p>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/patches.py#L40-L108"><code>PackedCaptureLogprobs</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/packed_logprobs.py#L27"><code>PackedSelectedLogprobs</code></a>, installed from <a href="https://github.com/NVIDIA-NeMo/RL/blob/068d392150db48ec5b246acfa39af76321533c72/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1081-L1092"><code>setup_token_capture</code></a> on every HTTP frontend.</p>
 
 <div class="hl"><b>So what.</b> Both paths hand training the same numbers, and for captured requests nothing reads the text the new path skips. So this is a pure CPU saving on the generation actor, if it holds up. Two things block it: a crash when another request in the same engine step asks for top-k logprobs (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5266-topk-crash.html">next page</a>), and no numbers yet on this head that show the saving as a share of a training step.</div>
-<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5266#discussion_r4610529740">review comment C3 — patches.py:91</a>
-<a href="https://github.com/NVIDIA-NeMo/RL/pull/5266#discussion_r4610529787">review comment C4 — config.py:124</a></p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5266#discussion_r4610529740">review comment C3 — patches.py:93</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5266#discussion_r4610529787">review comment C4 — config.py:118</a></p>
 
 </div>
 </body>

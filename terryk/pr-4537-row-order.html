@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PR 4537 row order</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--orange:#9a6700;--red:#cf222e;--purple:#8250df}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,Menlo,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700;color:var(--orange)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);color:var(--accent);font-size:12.5px;white-space:nowrap}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 16px}
+.bg{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:0 0 14px;font-size:14px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.hl{border-left:3px solid var(--green);background:var(--surface);padding:10px 16px;margin:18px 0;border-radius:0 8px 8px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:10px 0;display:block;overflow-x:auto}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+svg{max-width:100%;height:auto;display:block;margin:12px 0}
+svg .hdr{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .lane{fill:var(--text);font:bold 12.5px -apple-system,sans-serif;letter-spacing:.04em}
+svg .step{fill:var(--dim);font:bold 12px -apple-system,sans-serif}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .tot{fill:var(--text);font:bold 12px ui-monospace,Menlo,monospace}
+svg .sum{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .seglbl{fill:var(--bg);font:bold 10.5px ui-monospace,Menlo,monospace;pointer-events:none}
+svg .s-rep{fill:var(--orange);stroke:var(--bg);stroke-width:1}
+svg .s-once{fill:var(--accent);stroke:var(--bg);stroke-width:1}
+svg .s-gen{fill:var(--green);stroke:var(--bg);stroke-width:1}
+svg .s-ctx{fill:var(--dim);stroke:var(--bg);stroke-width:1}
+svg .s-sum{fill:var(--purple);stroke:var(--bg);stroke-width:1}
+svg .bad{fill:none;stroke:var(--red);stroke-width:1.5}
+svg .badt{fill:var(--red);font:bold 12.5px -apple-system,sans-serif}
+svg .b{fill:var(--surface);stroke:var(--border)}
+svg .b-new{fill:var(--surface);stroke:var(--green);stroke-width:1.6}
+svg .b-bad{fill:var(--surface);stroke:var(--orange);stroke-width:2.2}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:6px 0 14px;font-size:14px}
+
+
+svg .c0{fill:var(--accent)} svg .c1{fill:var(--green)} svg .c2{fill:var(--orange)} svg .c3{fill:var(--purple)}
+svg .cl{fill:var(--bg);font:bold 13px ui-monospace,Menlo,monospace}
+svg .t{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .d{fill:var(--dim);font:11px -apple-system,sans-serif}
+svg .m{fill:var(--text);font:bold 12px ui-monospace,Menlo,monospace}
+svg .g{fill:var(--green);font:bold 13px -apple-system,sans-serif}
+svg .r{fill:var(--red);font:bold 13px -apple-system,sans-serif}
+
+.verdict.good{color:var(--green)}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+function wire(){var b=document.getElementById('theme-toggle');if(!b)return;b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>What the small row-order change in preshard fixes, and why nothing broke before</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4537">NVIDIA-NeMo/RL #4537</a> at <code>1110db98</code>; main at <code>1fcd48de</code>. A side change in the PR, unrelated to shared prefixes.</p>
+
+<div class="status"><dl>
+<dt>Main</dt><dd><a href="https://github.com/NVIDIA-NeMo/RL/blob/1fcd48de48da70bd26125e1bc20821a913686019/nemo_rl/data_plane/preshard.py#L166-L176"><code>shard_meta_for_dp</code></a> returns a list meant for putting split-up rows back in order. It builds that list inverted. No caller reads it.</dd>
+<dt>This PR</dt><dd>Returns the list the right way round (<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/data_plane/preshard.py#L244-L249">preshard.py#L244-L249</a>). Every caller still ignores it.</dd>
+<dt>Status</dt><dd><span class="verdict good">Fixed by this PR — no behavior changes, because nothing used the value.</span></dd>
+</dl></div>
+
+<nav class="chain"><a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-batch-forming.html">how the batch is formed</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-vs-forge-qwengyre.html">vs Forge and QwenGyre</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-where-sharing-lives.html">where sharing should live</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-what-rl-imports.html">what RL imports</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-who-calls-what.html">who calls what</a>
+<span class="here">row order fix</span></nav>
+<p class="chainnote">Six pages on this PR — this one: a small side fix in how split rows are put back in order.</p>
+
+<div class="bg"><b>Background.</b> Before a forward pass, the driver splits the batch across data-parallel ranks. To keep work even, it can shuffle which rows go where. If the ranks' results come back joined rank after rank, they are no longer in the original order. <a href="https://github.com/NVIDIA-NeMo/RL/blob/1fcd48de48da70bd26125e1bc20821a913686019/nemo_rl/distributed/batched_data_dict.py#L459-L475"><code>BatchedDataDict.reorder_data(list)</code></a> puts them back. It needs one list: <b>for each slot in the joined result, which original row it came from</b>.</div>
+
+<svg viewBox="0 0 940 248" role="img" aria-label="Four rows split across two ranks, then put back in order: the PR's list restores the order, main's list scrambles it."><text class="t" x="16" y="31">① Rows in the order the driver had them</text>
+<text class="n" x="16" y="46">the order every later step expects</text>
+<rect class="c0" x="330" y="16" width="72" height="30" rx="5"/>
+<text class="cl" x="366" y="36" text-anchor="middle">r0</text>
+<rect class="c1" x="412" y="16" width="72" height="30" rx="5"/>
+<text class="cl" x="448" y="36" text-anchor="middle">r1</text>
+<rect class="c2" x="494" y="16" width="72" height="30" rx="5"/>
+<text class="cl" x="530" y="36" text-anchor="middle">r2</text>
+<rect class="c3" x="576" y="16" width="72" height="30" rx="5"/>
+<text class="cl" x="612" y="36" text-anchor="middle">r3</text>
+<text class="t" x="16" y="81">② Split by rank, then results joined</text>
+<text class="n" x="16" y="96">rank 0 gets r2, r0 · rank 1 gets r3, r1</text>
+<rect class="c2" x="330" y="66" width="72" height="30" rx="5"/>
+<text class="cl" x="366" y="86" text-anchor="middle">r2</text>
+<rect class="c0" x="412" y="66" width="72" height="30" rx="5"/>
+<text class="cl" x="448" y="86" text-anchor="middle">r0</text>
+<rect class="c3" x="494" y="66" width="72" height="30" rx="5"/>
+<text class="cl" x="530" y="86" text-anchor="middle">r3</text>
+<rect class="c1" x="576" y="66" width="72" height="30" rx="5"/>
+<text class="cl" x="612" y="86" text-anchor="middle">r1</text>
+<text class="d" x="668" y="79">source row of each slot:</text>
+<text class="m" x="668" y="94">[2, 0, 3, 1]</text>
+<text class="t" x="16" y="141">③ Put back with this PR's list</text>
+<text class="n" x="16" y="156">reorder_data([2, 0, 3, 1])</text>
+<rect class="c0" x="330" y="126" width="72" height="30" rx="5"/>
+<text class="cl" x="366" y="146" text-anchor="middle">r0</text>
+<rect class="c1" x="412" y="126" width="72" height="30" rx="5"/>
+<text class="cl" x="448" y="146" text-anchor="middle">r1</text>
+<rect class="c2" x="494" y="126" width="72" height="30" rx="5"/>
+<text class="cl" x="530" y="146" text-anchor="middle">r2</text>
+<rect class="c3" x="576" y="126" width="72" height="30" rx="5"/>
+<text class="cl" x="612" y="146" text-anchor="middle">r3</text>
+<text class="g" x="800" y="146">✓ original order</text>
+<text class="t" x="16" y="191">③ Put back with main's list</text>
+<text class="n" x="16" y="206">reorder_data([1, 3, 0, 2])</text>
+<rect class="c3" x="330" y="176" width="72" height="30" rx="5"/>
+<text class="cl" x="366" y="196" text-anchor="middle">r3</text>
+<rect class="c2" x="412" y="176" width="72" height="30" rx="5"/>
+<text class="cl" x="448" y="196" text-anchor="middle">r2</text>
+<rect class="c1" x="494" y="176" width="72" height="30" rx="5"/>
+<text class="cl" x="530" y="196" text-anchor="middle">r1</text>
+<rect class="c0" x="576" y="176" width="72" height="30" rx="5"/>
+<text class="cl" x="612" y="196" text-anchor="middle">r0</text>
+<text class="r" x="800" y="196">✗ scrambled</text>
+<text class="n" x="16" y="236">Colors follow each row. Values come from running the reorder_data logic on these 4 rows.</text></svg>
+
+<h2>The change, as pseudocode</h2>
+<p class="pclbl">Main</p>
+<div class="pc"><span class="who"># driver: shard_meta_for_dp, after splitting rows across ranks</span>
+src = [2, 0, 3, 1]          <span class="cm"># joined slot j came from original row src[j]</span>
+back = [0] * 4
+for slot, row in enumerate(src):
+    back[row] = slot        <span class="cm"># the inverse: [1, 3, 0, 2]</span>
+return per_rank_rows, back  <span class="cm"># comment says "same as _shard_for_logprob"; it isn't</span></div>
+<p class="pclbl">This PR</p>
+<div class="pc"><span class="who"># driver: shard_meta_for_dp</span>
+src = [2, 0, 3, 1]
+<span class="del">back = invert(src)</span>
+return per_rank_rows, <span class="add">src</span>  <span class="cm"># the form reorder_data expects</span></div>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/1fcd48de48da70bd26125e1bc20821a913686019/nemo_rl/data_plane/preshard.py#L166-L176">main preshard.py#L166</a> → <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/data_plane/preshard.py#L244-L249">PR preshard.py#L244</a>. The older non-TQ path already returns the right form: <a href="https://github.com/NVIDIA-NeMo/RL/blob/1fcd48de48da70bd26125e1bc20821a913686019/nemo_rl/distributed/batched_data_dict.py#L814-L827">shard_by_batch_size</a> returns <code>batch_sorted_indices</code>, and <a href="https://github.com/NVIDIA-NeMo/RL/blob/1fcd48de48da70bd26125e1bc20821a913686019/nemo_rl/models/policy/lm_policy.py#L823-L824">lm_policy.py#L824</a> passes it to <code>reorder_data</code>.</p>
+
+<h2>Why nothing broke</h2>
+<p>Every caller of <code>shard_meta_for_dp</code> drops the second value with <code>metas, _ = …</code>:
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/tq_policy.py#L521">tq_policy.py#L521</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/tq_policy.py#L647">#L647</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/tq_policy.py#L804">#L804</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/value/tq_value.py#L127">tq_value.py#L127</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/value/tq_value.py#L183">#L183</a>,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/value/tq_value.py#L243">#L243</a> and
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/teacher_worker_group.py#L376">teacher_worker_group.py#L376</a>.
+On the TQ path, each worker writes its results back under each row's own key, so order never matters there.</p>
+
+<p>Where the value came from: the first TransferQueue integration (<a href="https://github.com/NVIDIA-NeMo/RL/pull/2439">#2439</a>) copied the return shape of the older path, where <a href="https://github.com/NVIDIA-NeMo/RL/blob/1fcd48de48da70bd26125e1bc20821a913686019/nemo_rl/models/policy/lm_policy.py#L823-L824">lm_policy.py#L824</a> really does reorder gathered logprobs. The TQ path never needed it.</p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4638941649">review comment C20 — preshard.py:244 (delete the unused value)</a></p>
+
+<div class="hl"><b>So what.</b> This is a correct fix to a value nobody reads, so it can't change training. The review asks to delete the value instead: seven callers change from <code>metas, _ =</code> to <code>metas =</code>, and nothing else reads it. If a TQ path ever needs to restore order, it can add the value back with a test that uses it.</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5138 — landing order, and how it sits next to #5158 multi-harness routing</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .boxr{fill:var(--surface);stroke:var(--red);stroke-width:1.8}
+svg .boxg{fill:var(--surface);stroke:var(--green);stroke-width:1.8}
+svg .boxo{fill:var(--surface);stroke:var(--orange);stroke-width:1.8}
+svg .t{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .tb{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .d{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .g{fill:var(--green);font:bold 12px -apple-system,sans-serif}
+svg .r{fill:var(--red);font:bold 12px -apple-system,sans-serif}
+svg .o{fill:var(--orange);font:bold 12px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .ln{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg .lnr{stroke:var(--red);stroke-width:1.6;fill:none;stroke-dasharray:5 4}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface);font-weight:600}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.warn{border-left:4px solid var(--orange);background:var(--surface);padding:10px 14px;margin:16px 0;border-radius:0 8px 8px 0}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Can #5138 and #5158 land together, and in what order?</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5138">#5138</a> (head <code>439d37b0</code>) · <a href="https://github.com/NVIDIA-NeMo/RL/pull/5158">#5158</a> (head <code>18d98e61</code>) · Gym bump <a href="https://github.com/NVIDIA-NeMo/RL/pull/5336">#5336</a> · checked against main <code>1a78def0</code></p>
+
+<div class="status">
+<dl>
+  <dt>#5138</dt>
+  <dd>Lets an added system message reuse saved tokens, with a prefix check in the vLLM chat server (page 1). It also sets one new Gym key, <code>allow_system_suffix</code>.</dd>
+  <dt>#5158</dt>
+  <dd>Runs each GRPO prompt group of a taskset on one harness, picked by a weighted hash of the group's ID. It changes routing in the Gym environment only.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict good">No behavior conflict and no shared lines: they can land in either order.</span> <span class="verdict open">Two separate blockers:</span> #5138 must land after the Gym bump #5336 (C1), and #5158 already conflicts with current main, whether or not #5138 lands.</dd>
+</dl>
+</div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5138-system-suffix-check.html">1 · the prefix check</a>
+  <span class="here">2 · landing it, and #5158</span>
+</nav>
+<p class="chainnote">Two pages on #5138. #5158's own pages: <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5158-group-harness-routing.html">group harness routing</a>, <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5158-same-type-harnesses.html">same-type harnesses</a>, <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5158-resume-guard-gap.html">resume guard gap</a>. Dotted words have a short explanation: hover or tap them.</p>
+
+<p>Both PRs edit <code>nemo_rl/environments/nemo_gym.py</code>, but in different functions. #5138 adds one block inside the token-capture config in <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/environments/nemo_gym.py#L1429-L1435"><code>_spinup</code></a>. #5158 only <a href="https://github.com/NVIDIA-NeMo/RL/blob/18d98e61155358a76a20ef5a926127c26f83ffe6/nemo_rl/environments/nemo_gym.py#L1284">pops its own key</a> there, and does its real work in <a href="https://github.com/NVIDIA-NeMo/RL/blob/18d98e61155358a76a20ef5a926127c26f83ffe6/nemo_rl/environments/nemo_gym.py#L3364">routing</a>. It does not touch the chat server or the capture code. <code>git merge-tree</code> shows one conflict for #5158, in <a href="https://github.com/NVIDIA-NeMo/RL/blob/18d98e61155358a76a20ef5a926127c26f83ffe6/nemo_rl/environments/nemo_gym.py#L4208"><code>validate_dataset_agent_coverage</code></a>. The same conflict appears against main alone: main's <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/environments/nemo_gym.py#L4059"><code>agent_names</code> shortcut</a> (from #5001) changed those lines after #5158 branched.</p>
+
+<svg viewBox="0 0 940 400" role="img" aria-label="Landing order: Gym bump then #5138; #5158 independent but needs a rebase onto main">
+  <text class="hdr" x="14" y="22">Landing order</text>
+  <!-- legend -->
+  <rect class="boxg" x="560" y="10" width="14" height="14" rx="3"/><text class="d" x="580" y="22">lands cleanly</text>
+  <rect class="boxo" x="670" y="10" width="14" height="14" rx="3"/><text class="d" x="690" y="22">needs something first</text>
+  <rect class="boxr" x="820" y="10" width="14" height="14" rx="3"/><text class="d" x="840" y="22">breaks</text>
+
+  <line class="ln" x1="30" y1="70" x2="910" y2="70"/>
+  <text class="tb" x="30" y="58">main (Gym pinned at 9e2e5d0)</text>
+
+  <rect class="boxg" x="40" y="96" width="250" height="78" rx="8"/>
+  <text class="tb" x="52" y="118">① #5336 Gym bump</text>
+  <text class="t" x="52" y="140">pin → 0410601</text>
+  <text class="d" x="52" y="160">contains Gym #5771 (461f7e6c)</text>
+  <line class="ln" x1="165" y1="70" x2="165" y2="96"/>
+
+  <rect class="boxg" x="330" y="96" width="270" height="78" rx="8"/>
+  <text class="tb" x="342" y="118">② #5138, after ①</text>
+  <text class="t" x="342" y="140">allow_system_suffix=True</text>
+  <text class="d" x="342" y="160">Gym knows the key → starts fine</text>
+  <line class="ln" x1="290" y1="135" x2="330" y2="135"/>
+
+  <rect class="boxr" x="330" y="200" width="270" height="92" rx="8"/>
+  <text class="tb" x="342" y="222">#5138 before ①</text>
+  <text class="t" x="342" y="244">Gym 9e2e5d0: extra="forbid"</text>
+  <text class="r" x="342" y="264">ValidationError at Gym startup</text>
+  <text class="d" x="342" y="282">nemo_gym L0 test + SC_3 L1 test</text>
+  <line class="lnr" x1="465" y1="70" x2="465" y2="200"/>
+
+  <rect class="boxo" x="640" y="96" width="270" height="110" rx="8"/>
+  <text class="tb" x="652" y="118">#5158, any time</text>
+  <text class="t" x="652" y="140">rebase onto main first</text>
+  <text class="o" x="652" y="160">conflict with main (#5001),</text>
+  <text class="o" x="652" y="178">not with #5138</text>
+  <a href="https://github.com/NVIDIA-NeMo/RL/blob/18d98e61155358a76a20ef5a926127c26f83ffe6/nemo_rl/environments/nemo_gym.py#L4255"><text x="652" y="198">validate_dataset_agent_coverage</text></a>
+  <line class="ln" x1="775" y1="70" x2="775" y2="96"/>
+
+  <text class="tb" x="30" y="326">Behavior when both are in: one run, two harnesses</text>
+  <text class="t" x="30" y="350">group g1 → Claude Code harness → adds a system message → Gym admits it → RL prefix check per call</text>
+  <text class="t" x="30" y="372">group g2 → other harness       → never adds system messages → gate is on but never used</text>
+  <text class="d" x="30" y="392">Gym matches a call only to earlier calls of the same agent instance, so saved tokens never cross harnesses.</text>
+</svg>
+
+<h2>Why there is no behavior conflict</h2>
+<table>
+<tr><th>Question</th><th>Answer, from the code</th></tr>
+<tr><td>Is the new key per harness?</td><td>No. <code>allow_system_suffix</code> sits in the one global <code>token_id_capture</code> block that <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/environments/nemo_gym.py#L1411-L1435"><code>_spinup</code></a> builds, with <code>all_agents: True</code>. Every harness in a #5158 run gets it.</td></tr>
+<tr><td>Is one global key safe when only one harness adds system messages?</td><td>Yes. The key only lets Gym propose more <span class="tip" tabindex="0" data-tip="A call Gym thinks continues an earlier call, so its saved tokens may be reused. RL decides per call whether that is safe.">candidates</span>. RL's <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/vllm/chat_server.py#L298-L307">prefix check</a> runs on each call, using that call's messages and the policy's one chat template. A harness that never adds system messages never reaches it.</td></tr>
+<tr><td>Can saved tokens leak from one harness to another?</td><td>No. Gym compares a call only with earlier records from the same <span class="tip" tabindex="0" data-tip="Gym's lineage scope: the same agent instance and model server. A group in #5158 runs on one harness, so its calls share one scope.">lineage scope</span> (<a href="https://github.com/NVIDIA-NeMo/Gym/blob/041060103fc3fc441eb17142b97c91d4133f34d2/nemo_gym/models/token_capture/sink.py#L453"><code>own_records</code></a>, at the bump's Gym). #5158 keeps a whole group on one harness.</td></tr>
+<tr><td>Resume with both?</td><td>#5158 keeps a restored group on its harness, or stops the run. On #5138's side, re-rendering a call gives the same tokens, so the same decision. A saved cut whose prefix no longer matches is <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/nemo_rl/models/generation/vllm/prompt_and_capture.py#L126-L141">regenerated</a>.</td></tr>
+<tr><td>Shared test file?</td><td>Both change <code>tests/unit/environments/test_nemo_gym_utils.py</code>, and that merges cleanly today. C2's new parameter on <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/tests/unit/environments/test_nemo_gym_utils.py#L444-L480"><code>test_spinup_passes_parent_resolution_to_gym</code></a> could cause a small text conflict later; no logic depends on the other PR.</td></tr>
+</table>
+
+<h2>The merge-order blocker on #5138 (C1)</h2>
+<p>At RL's current Gym pin, <a href="https://github.com/NVIDIA-NeMo/Gym/blob/9e2e5d0ad0d1723acef1b63beb28292da16f7c5b/nemo_gym/models/token_capture/config.py#L128-L131"><code>TokenCaptureSettings</code></a> forbids unknown keys and has no <code>allow_system_suffix</code>. The existing test <a href="https://github.com/NVIDIA-NeMo/RL/blob/439d37b0ee9467d48a5c1f9c3da07a5ab0f31255/tests/unit/environments/test_nemo_gym_utils.py#L444-L480"><code>test_spinup_passes_parent_resolution_to_gym[True]</code></a> checks <code>_spinup</code>'s output with Gym's own model. The review ran it on CPU:</p>
+<table>
+<tr><th>RL code</th><th>Gym</th><th>Result</th></tr>
+<tr><td>base <code>9a7640c</code></td><td>pinned <code>9e2e5d0</code></td><td>2 passed</td></tr>
+<tr><td>#5138 head</td><td>pinned <code>9e2e5d0</code></td><td><b style="color:var(--red)">1 failed</b>: <code>allow_system_suffix Extra inputs are not permitted</code></td></tr>
+<tr><td>#5138 head</td><td><code>461f7e6c</code> (Gym #5771)</td><td>passed</td></tr>
+</table>
+<p>The PR description already says "do not merge yet", but nothing in the code enforces it. The ask is to carry the bump, or rebase on #5336, and show the <code>nemo_gym</code> L0 lane and the SC_3 context-compaction L1 test green.</p>
+<!--CREFS-->
+
+<div class="warn"><b>So what.</b> Merge #5336, then #5138. #5158 is independent of both, but needs a rebase onto current main for its own reasons. Once landed, the two features work together: one run can mix harnesses, and only the harness that adds system messages uses the new check.</div>
+
+</div>
+</body>
+</html>

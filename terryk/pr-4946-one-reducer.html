@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #4946 — one reducer picks how the loss is averaged</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3;padding-right:90px}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700} .verdict.good{color:var(--green)}
+.bg{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.bg p{margin:4px 0}
+.hl{border-left:4px solid var(--green);background:var(--surface);padding:10px 14px;margin:18px 0 0;border-radius:0 8px 8px 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600} .pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim);font-weight:400} .pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.two{display:grid;grid-template-columns:1fr;gap:0 14px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface);font-size:12.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.03em}
+.tw{overflow-x:auto}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+svg .chunk{fill:none;stroke:var(--border);stroke-width:1.2;stroke-dasharray:5 4}
+svg .okbox{fill:var(--surface);stroke:var(--green);stroke-width:1.2}
+svg .tok{fill:var(--surface2);stroke:var(--dim);stroke-width:1}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--text);font:bold 12.5px -apple-system,sans-serif}
+svg .c-txt{fill:var(--text);font:10.5px ui-monospace,Menlo,monospace}
+svg .tk{fill:var(--accent)} svg .sq{fill:var(--orange)} svg .ok{fill:var(--green)}
+svg .arr{fill:none;stroke:var(--dim);stroke-width:1.3}
+svg a text,svg .lnk{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+<h1>How the policy loss picks its average: one reducer object replaces five copies of the same <code>if</code></h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4946">PR #4946</a> · refactor(loss) · follow-up <a href="https://github.com/NVIDIA-NeMo/RL/pull/4947">#4947</a> adds a third average · permalinks pinned to <a href="https://github.com/NVIDIA-NeMo/RL/tree/d01c03a5d4481eb1635b48c3e0f08b88fa715082"><code>d01c03a5</code></a></p>
+<nav class="chain">
+  <span class="here">1 · one reducer (#4946)</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-streaming-average.html">2 · streaming average (#4946)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4947-group-token-mean.html">3 · group average (#4947)</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5276-remove-token-level-loss.html">4 · old key removed (#5276)</a>
+</nav>
+<p class="chainnote">Four pages on #4946 and the two PRs stacked after it — this one: where the averaging code lives now.</p>
+
+<div class="status"><dl>
+<dt>Before</dt><dd><code>loss_fn.token_level_loss: true/false</code> picked the average. Five places each had their own copy of the same <code>if token … else sequence …</code> branch.</dd>
+<dt>This PR</dt><dd>A new key, <code>loss_fn.normalization</code>, picks one reducer object. All five places now call it. The old key still works but warns; <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5276-remove-token-level-loss.html">#5276</a> proposes removing it.</dd>
+<dt>Status</dt><dd><span class="verdict good">Refactor — same numbers before and after.</span> Merged on 2026-11-20. It adds two startup checks that stop runs which used to go wrong quietly (table at the bottom).</dd>
+</dl></div>
+
+<div class="bg">
+<p><b>Background.</b> The policy loss starts as one number per response token. It must be averaged to one number. There are two ways:
+<b style="color:var(--accent)">global_token_mean</b> adds every token in the batch and divides by the token count, so long answers weigh more.
+<b style="color:var(--orange)">sequence_mean</b> averages inside each response first, then averages the responses, so each one weighs the same.</p>
+<p>The <span class="tip" tabindex="0" data-tip="The newer training loop: one controller process drives generation and training. Its Megatron trainer can train a step in pieces as data arrives.">single-controller</span> Megatron trainer trains one step in pieces (<span class="tip" tabindex="0" data-tip="megatron_policy_worker.train_microbatch: runs forward and backward on one piece of the step and keeps the gradients, without stepping the optimizer.">train_microbatch</span> chunks). It cannot know the batch's total count until the last chunk, so each chunk divides by 1 and the real count is applied once at the end. <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-streaming-average.html">Page 2</a> walks through that path. Dotted words have a short explanation: hover or tap them.</p>
+</div>
+
+<p>The PR adds <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L66"><code>ObjectiveReduction</code></a> with two subclasses,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L167"><code>GlobalTokenMeanReduction</code></a> and <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L208"><code>SequenceMeanReduction</code></a>.
+Each one has three methods: <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L133"><code>reduce()</code></a> turns per-token values into one number,
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L90"><code>local_counts()</code></a> counts tokens and responses in one chunk, and
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L123"><code>loss_divisor()</code></a> picks which count to divide by.
+The loss makes its reducer once, in <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L470"><code>__init__</code></a>, and every term goes through it.</p>
+
+<h2>One average, computed in two chunks</h2>
+
+<svg viewBox="0 0 940 290" role="img" aria-label="Three responses split into two chunks; both averages computed per chunk with denominator 1 then divided once at finish">
+<text x="10" y="20" class="hdr">3 responses, sent as 2 train_microbatch chunks</text>
+<text x="10" y="36" class="note">each square = one token's loss value</text>
+<text x="455" y="20" class="hdr tk">global_token_mean</text>
+<text x="610" y="20" class="hdr sq">sequence_mean</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2394"><text x="760" y="20">finish_train_step</text></a>
+<text x="455" y="36" class="note">per chunk: <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L194"><tspan class="lnk">reduce(÷1)</tspan></a></text>
+<text x="610" y="36" class="note">per chunk: <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L234"><tspan class="lnk">reduce(÷1)</tspan></a></text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/models/policy/workers/megatron_policy_worker.py#L2434"><text x="760" y="36">loss_divisor()</text></a>
+
+<rect x="6" y="48" width="736" height="88" rx="7" class="chunk"/>
+<text x="14" y="96" class="note">chunk 1</text>
+<rect x="6" y="144" width="736" height="48" rx="7" class="chunk"/>
+<text x="14" y="172" class="note">chunk 2</text>
+<text x="66" y="76" class="lbl-b">A</text><rect x="82" y="58" width="27" height="26" rx="3" class="tok"/><text x="95" y="75" class="c-txt" text-anchor="middle">.2</text><rect x="113" y="58" width="27" height="26" rx="3" class="tok"/><text x="126" y="75" class="c-txt" text-anchor="middle">.2</text><rect x="144" y="58" width="27" height="26" rx="3" class="tok"/><text x="157" y="75" class="c-txt" text-anchor="middle">.2</text><rect x="175" y="58" width="27" height="26" rx="3" class="tok"/><text x="188" y="75" class="c-txt" text-anchor="middle">.2</text><text x="278" y="75" class="note">4 tok · sum 0.8 · mean 0.2</text><text x="66" y="116" class="lbl-b">B</text><rect x="82" y="98" width="27" height="26" rx="3" class="tok"/><text x="95" y="115" class="c-txt" text-anchor="middle">.9</text><text x="278" y="115" class="note">1 tok · sum 0.9 · mean 0.9</text><text x="66" y="174" class="lbl-b">C</text><rect x="82" y="156" width="27" height="26" rx="3" class="tok"/><text x="95" y="173" class="c-txt" text-anchor="middle">.4</text><rect x="113" y="156" width="27" height="26" rx="3" class="tok"/><text x="126" y="173" class="c-txt" text-anchor="middle">.6</text><rect x="144" y="156" width="27" height="26" rx="3" class="tok"/><text x="157" y="173" class="c-txt" text-anchor="middle">.4</text><rect x="175" y="156" width="27" height="26" rx="3" class="tok"/><text x="188" y="173" class="c-txt" text-anchor="middle">.6</text><rect x="206" y="156" width="27" height="26" rx="3" class="tok"/><text x="219" y="173" class="c-txt" text-anchor="middle">.5</text><rect x="237" y="156" width="27" height="26" rx="3" class="tok"/><text x="250" y="173" class="c-txt" text-anchor="middle">.5</text><text x="278" y="173" class="note">6 tok · sum 3.0 · mean 0.5</text>
+
+<text x="455" y="84" class="lbl tk">0.8 + 0.9 = 1.7</text>
+<text x="455" y="104" class="note">count: 5 tokens</text>
+<text x="455" y="168" class="lbl tk">3.0</text>
+<text x="455" y="184" class="note">count: 6 tokens</text>
+<text x="610" y="84" class="lbl sq">0.2 + 0.9 = 1.1</text>
+<text x="610" y="104" class="note">count: 2 responses</text>
+<text x="610" y="168" class="lbl sq">0.5</text>
+<text x="610" y="184" class="note">count: 1 response</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L90"><text x="455" y="124">local_counts()</text></a>
+<text x="560" y="124" class="note">counts both, per chunk</text>
+
+<path d="M742 92 L758 110" class="arr"/>
+<path d="M742 168 L758 140" class="arr"/>
+<rect x="758" y="56" width="176" height="128" rx="7" class="box"/>
+<text x="768" y="80" class="lbl tk">(1.7+3.0)/(5+6)</text>
+<text x="768" y="98" class="lbl tk">= 4.7/11 = 0.427</text>
+<text x="768" y="134" class="lbl sq">(1.1+0.5)/(2+1)</text>
+<text x="768" y="152" class="lbl sq">= 1.6/3 = 0.533</text>
+<text x="768" y="174" class="note">summed over DP ranks</text>
+
+<rect x="6" y="206" width="928" height="76" rx="7" class="okbox"/>
+<text x="18" y="228" class="lbl ok">✓ synchronous train(): one call, real counts → 0.427 and 0.533. Same numbers.</text>
+<text x="18" y="250" class="note">Blue = global_token_mean: long answers weigh more. Orange = sequence_mean: each response weighs the same.</text>
+<text x="18" y="270" class="note">Numbers come from running the PR's two reducer classes on CPU, not from hand math.</text>
+</svg>
+
+<h2>What moved: five copies of one <code>if</code> become one object</h2>
+<p class="pclbl">The loss, before</p>
+<pre class="pc"><span class="who"># ClippedPGLossFn.__call__: policy worker, once per microbatch</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d259c9a848494c04fcad3bf8f1821d4cb9ebca26/nemo_rl/algorithms/loss/clipped_pg.py#L180">if token_level_loss</a>:                                                     <span class="cm"># copy 1: actor loss</span>
+    actor = sum(v · mask) / global_valid_toks                            <span class="cm"># token mean</span>
+else:
+    actor = sum(mean_per_response(v) · sample_mask) / global_valid_seqs  <span class="cm"># sequence mean</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d259c9a848494c04fcad3bf8f1821d4cb9ebca26/nemo_rl/algorithms/loss/loss_functions.py#L890">if TOKEN_LEVEL</a>: kl = … else: kl = …                                      <span class="cm"># copy 2: KL penalty</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d259c9a848494c04fcad3bf8f1821d4cb9ebca26/nemo_rl/algorithms/loss/loss_functions.py#L1094">if TOKEN_LEVEL</a>: actor += … else: actor += …                              <span class="cm"># copy 3: score centering</span>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/d259c9a848494c04fcad3bf8f1821d4cb9ebca26/nemo_rl/algorithms/loss/loss_functions.py#L1245">if TOKEN_LEVEL</a>: opd = … else: opd = …                                    <span class="cm"># copy 4: OPD-full</span>
+log loss, kl ÷ <a href="https://github.com/NVIDIA-NeMo/RL/blob/d259c9a848494c04fcad3bf8f1821d4cb9ebca26/nemo_rl/algorithms/loss/loss_functions.py#L545">TOKENS or SEQUENCES</a>                                       <span class="cm"># picked from loss_type</span></pre>
+<p class="pclbl">The loss, after</p>
+<pre class="pc"><span class="who"># ClippedPGLossFn: __init__ once, __call__ per microbatch</span>
+<span class="add">R = <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/interfaces.py#L252">make_objective_reduction</a>(cfg.<a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L280">resolved_normalization</a>)  <span class="cm"># GlobalTokenMean… or SequenceMean…</span></span>
+<span class="add">d = <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L897">R.loss_divisor</a>(global_valid_toks, global_valid_seqs)  <span class="cm"># toks or seqs</span></span>
+<span class="add">actor = <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/clipped_pg.py#L181">R.reduce</a>(v, masks, d)                             <span class="cm"># was copy 1</span></span>
+<span class="add">kl    = <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L941">R.reduce</a>(kl, kl_masks, d)                         <span class="cm"># was copy 2</span></span>
+<span class="add">actor += <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L1143">R.reduce</a>(adv · centering, masks, d)              <span class="cm"># was copy 3</span></span>
+<span class="add">opd   = <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L1294">R.reduce</a>(divergence, masks, d)                    <span class="cm"># was copy 4</span></span>
+log loss, kl ÷ <span class="add"><a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L588">LOSS_DIVISOR</a></span>                               <span class="cm"># whatever divided the gradient</span></pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/clipped_pg.py#L181"><code>clipped_pg_actor_objective</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L941"><code>ClippedPGLossFn.__call__</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L1294"><code>_opd_full_call.reduce_like_loss</code></a>.
+<code>mean_per_response(v)</code> is the inner <code>masked_mean(v, token_mask, dim=-1)</code>.</p>
+<p>The streaming worker's half of the change (counting each chunk and dividing once at the end) is on <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4946-streaming-average.html">page 2</a>.</p>
+
+<h2>What a user sees</h2>
+<div class="tw"><table>
+<tr><th>Case</th><th>Before</th><th>After</th></tr>
+<tr><td>Config</td><td><code>token_level_loss: true</code></td><td><code>normalization: global_token_mean</code> (the default) or <code>sequence_mean</code>. The <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L280">old key still works</a> but gives a <code>FutureWarning</code>; setting both is an error. <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5276-remove-token-level-loss.html">#5276</a> turns it into a startup error.</td></tr>
+<tr><td>MoE model with router balancing loss or z-loss, <code>sequence_mean</code>, single-controller Megatron</td><td>Trained, but with the wrong scale on the router losses' gradients: the end-of-step divide uses the response count, which is meant for the main loss only.</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1948">Fails at startup</a> with a message naming the coefficient to set to 0. Dense models and the synchronous <code>train()</code> path are not affected.</td></tr>
+<tr><td>Resume in the same <code>checkpoint_dir</code> with the other average</td><td>Resumed with buffered rollouts prepared for the old average.</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/single_controller_utils/setup.py#L351">Fails at startup</a>. Starting a new run from the weights still works. Checkpoints saved before this PR do not record the average, so they are not checked.</td></tr>
+<tr><td>Logged <code>loss</code> and <code>kl</code></td><td>Divided by tokens or responses, picked from <code>loss_type</code>.</td><td>Divided by <a href="https://github.com/NVIDIA-NeMo/RL/blob/d01c03a5d4481eb1635b48c3e0f08b88fa715082/nemo_rl/algorithms/loss/loss_functions.py#L588"><code>LOSS_DIVISOR</code></a>: always the same number that divided the gradient.</td></tr>
+</table></div>
+
+<div class="hl"><b>So what.</b> Nothing about training changes for existing configs: same averages, same gradients, checked against the old formulas and on GPU at DP2 and TP2.
+The value is the next step. A new average (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4947-group-token-mean.html">#4947</a> adds a group average) now means writing one subclass, not finding and editing five branches.
+If you run MoE with <code>sequence_mean</code> on the single-controller path, set the router loss coefficients to 0 before you update.</div>
+</div>
+</body>
+</html>

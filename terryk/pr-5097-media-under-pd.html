@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5097 — how images would reach the TQ write when prefill and decode are split</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700;--purple:#8250df}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.prop{color:var(--accent)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.hl{border-left:4px solid var(--orange);background:var(--surface);padding:10px 14px;margin:18px 0;border-radius:0 8px 8px 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface2)}
+.scroll{overflow-x:auto}
+svg{display:block;margin:14px 0;min-width:980px;max-width:100%;height:auto}
+svg .proc{fill:none;stroke:var(--dim);stroke-width:1.2;stroke-dasharray:5 4}
+svg .ph{fill:var(--dim);font:bold 11.5px -apple-system,sans-serif}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .ok{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .new{fill:var(--surface);stroke:var(--accent);stroke-width:2;stroke-dasharray:6 3}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .h{fill:var(--text);font:bold 13.5px -apple-system,sans-serif}
+svg .h2{fill:var(--dim);font:12px -apple-system,sans-serif}
+svg .t{fill:var(--text);font:bold 12px -apple-system,sans-serif}
+svg .d{fill:var(--text);font:11.5px ui-monospace,Menlo,monospace}
+svg .n{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .r{fill:var(--red);font:bold 11.5px -apple-system,sans-serif}
+svg .g{fill:var(--green);font:bold 11.5px -apple-system,sans-serif}
+svg .p{fill:var(--purple);font:bold 12px ui-monospace,Menlo,monospace}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .marr{stroke:var(--orange);stroke-width:2;fill:none;marker-end:url(#aho)}
+svg .wo{fill:var(--orange);font:bold 11.5px ui-monospace,Menlo,monospace}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+svg .lg1{fill:none;stroke:var(--green);stroke-width:2}svg .lg2{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 3}
+svg .lg3{fill:none;stroke:var(--red);stroke-width:2}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How images would reach the TQ write when prefill and decode are split</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5097">PR #5097</a> (6 of 6 in the Megatron prefill/decode stack) · main <code>a723b597</code> · #5097 head <code>751efd79</code> · Megatron-LM <code>e0a4bfed</code> · Dynamo nightly <code>1.8.0.dev20261117</code> (source read at <code>4573c9b6</code>)</p>
+
+<div class="status"><dl>
+  <dt>Before</dt><dd>Behind Dynamo (vLLM, aggregated), the frontend runs the HF processor and sends the pixel tensors to the one engine, which writes them to TQ with the call's tokens.</dd>
+  <dt>This PR</dt><dd>Megatron behind Dynamo is <b>text-only</b>: #4912 refuses a processor and #5097 refuses any call with media. So no media has to move yet.</dd>
+  <dt>Status</dt><dd><span class="verdict prop">Proposed design for the later multimodal PR — not implemented.</span> Nothing is broken today. The answer below needs no new transport: Dynamo already hands the decode leg the frontend's request extras.</dd>
+</dl></div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4912-dynamo-engines.html">#4912 · old path vs new path</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-two-backends.html">#5097 · two backends, one chat engine</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-faults-as-400.html">#5097 · server faults answered as 400</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-capture-steps.html">#5097 · TQ steps on each path</a>
+  <span class="here">#5097 · media under prefill/decode</span>
+</nav>
+<p class="chainnote">Four pages on #5097, one question each; the first chip is an earlier PR in the stack. This one: once images are allowed, who writes them to TQ, and how do they get there?</p>
+
+<div class="bg"><b>Background.</b> For an image, the <span class="tip" tabindex="0" data-tip="Hugging Face processor: turns raw images into the pixel tensors (and token placeholders) the model's vision encoder takes.">HF processor</span> turns raw pixels into model inputs. Training needs those exact inputs, so the TQ write stores them with the call's tokens. With <span class="tip" tabindex="0" data-tip="Prefill engines read the prompt (running the vision encoder for images) and build the KV cache. Decode engines import that cache and write the answer.">prefill/decode</span>, the prefill engine runs the vision encoder; the decode engine only imports the finished KV cache and writes the answer, and is the one that writes to TQ. Dotted words: hover or tap.</div>
+
+<h2>Today's single-engine flow, and the same flow split in two</h2>
+<div class="scroll"><svg viewBox="0 0 1040 560" role="img" aria-label="Media flow behind Dynamo today and the proposed flow with prefill and decode split">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--dim)"/></marker>
+<marker id="aho" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--orange)"/></marker>
+</defs>
+<text class="h" x="14" y="20">Today: vLLM behind Dynamo, one engine</text><text class="h2" x="14" y="36">main</text>
+<text class="h" x="530" y="20">Proposed: Megatron behind Dynamo, prefill + decode</text><text class="h2" x="530" y="36">later multimodal PR; nothing new to transport</text>
+
+<!-- left: today -->
+<rect class="box" x="10" y="48" width="480" height="40" rx="6"/>
+<text class="d" x="22" y="73">Gym → messages + raw image (in the request body)</text>
+<path class="arr" d="M250,88 L250,102"/>
+<rect class="proc" x="10" y="104" width="480" height="104" rx="8"/><text class="ph" x="18" y="120">Dynamo frontend process</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/dynamo/vllm/render_pool.py#L265-L274"><text x="22" y="140">render pool: HF processor</text></a>
+<text class="d" x="22" y="158">→ ids [1,9,9,9,4]  +  pixels [1, 3, 8, 6]</text>
+<text class="p" x="22" y="178">R TQ: token prefix only (no media)</text>
+<text class="n" x="22" y="198">KV router sees ids only</text>
+<path class="marr" d="M250,208 L250,262"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/dynamo/vllm/chat_engine.py#L409-L423"><text x="262" y="228">extra_args.nemo_rl.multimodal</text></a>
+<text class="wo" x="262" y="246">= pickled pixels</text>
+<rect class="proc" x="10" y="264" width="480" height="156" rx="8"/><text class="ph" x="18" y="280">vLLM worker process (one engine)</text>
+<rect class="ok" x="22" y="290" width="456" height="118" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/dynamo/vllm/adapter.py#L365-L371"><text x="32" y="310">unpickle → engine prompt</text></a>
+<text class="d" x="32" y="330">vision encoder → KV → generate</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1240-L1270"><text x="32" y="350">begin: copy pixels; R TQ earlier media</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/a723b597b630b3255319f0daff05cc14e0aad008/nemo_rl/models/generation/vllm/vllm_worker_async.py#L1586-L1602"><text x="32" y="372">finalize</text></a>
+<text class="p" x="102" y="372">W TQ once: ids, logprobs,</text>
+<text class="p" x="102" y="392">  routes, pixels</text>
+
+<!-- right: proposed -->
+<rect class="box" x="530" y="48" width="500" height="40" rx="6"/>
+<text class="d" x="542" y="73">Gym → messages + raw image (in the request body)</text>
+<path class="arr" d="M780,88 L780,102"/>
+<rect class="proc" x="530" y="104" width="500" height="104" rx="8"/><text class="ph" x="538" y="120">Dynamo frontend process</text>
+<text class="d" x="542" y="140">render pool: HF processor (as today)</text>
+<text class="d" x="542" y="158">→ ids [1,9,9,9,4]  +  pixels [1, 3, 8, 6]</text>
+<text class="p" x="542" y="178">R TQ: token prefix only (no media)</text>
+<text class="n" x="542" y="198">KV router sees ids only</text>
+<path class="marr" d="M660,208 L660,262"/>
+<text class="wo" x="560" y="238">same extra_args</text>
+<a href="https://github.com/ai-dynamo/dynamo/blob/4573c9b6e4700d303742138f425bb6352bac9ef6/lib/llm/src/kv_router/prefill_router/mod.rs#L555-L565"><text x="672" y="228">prefill leg = req.clone()</text></a>
+<path class="marr" d="M1010,208 L1010,384"/>
+<a href="https://github.com/ai-dynamo/dynamo/blob/4573c9b6e4700d303742138f425bb6352bac9ef6/lib/llm/src/kv_router/prefill_router/mod.rs#L154-L184"><text x="796" y="246">decode leg keeps extra_args</text></a>
+<rect class="proc" x="530" y="264" width="300" height="100" rx="8"/><text class="ph" x="538" y="280">prefill engine, rank 0</text>
+<rect class="ok" x="542" y="290" width="276" height="62" rx="6"/>
+<text class="d" x="552" y="310">pixels → vision encoder</text>
+<text class="d" x="552" y="330">→ prompt KV cache</text>
+<text class="n" x="552" y="346">no TQ access</text>
+<path class="arr" d="M680,364 L680,384"/>
+<a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/core/inference/disaggregation/inference_state_handoff.py#L741-L757"><text x="692" y="378">KV handoff: KV + resume state, no media</text></a>
+<rect class="proc" x="530" y="386" width="500" height="120" rx="8"/><text class="ph" x="538" y="402">decode engine, rank 0</text>
+<rect class="new" x="542" y="412" width="476" height="84" rx="6"/>
+<text class="d" x="552" y="432">import KV → generate (no pixels needed to compute)</text>
+<text class="d" x="552" y="452">begin: copy pixels from extra_args; R TQ earlier media</text>
+<text class="t" x="552" y="474">finalize</text><text class="p" x="618" y="474">W TQ once: ids, logprobs,</text>
+<text class="p" x="618" y="490">  routes, pixels</text>
+
+<!-- legend -->
+<rect class="lg1" x="14" y="438" width="16" height="12" rx="2"/><text class="n" x="38" y="449">works today</text>
+<rect class="lg2" x="14" y="460" width="16" height="12" rx="2"/><text class="n" x="38" y="471">proposed: decode does what the single engine does</text>
+<path class="marr" d="M14,488 L40,488"/><text class="n" x="48" y="492">processed pixels in the request's extra_args</text>
+<text class="n" x="14" y="530">pixels [1, 3, 8, 6] = [images, colors, height, width]: 1 RGB image, 8 pixels tall, 6 wide, after the HF processor. ids: 9 = image placeholder.</text>
+<text class="n" x="14" y="548">Dashed boxes = one OS process. Underlined names link to the code. R/W TQ = the call's one TQ read / one TQ write.</text>
+</svg></div>
+
+<h2>Why decode should write, and the pixels should ride the request</h2>
+<table>
+<tr><th>Option</th><th>What it costs</th><th>Verdict</th></tr>
+<tr><td><b>Frontend sends processed pixels in <code>extra_args</code>; decode writes once</b></td><td>Pixels travel twice (prefill needs them for the encoder; decode only to write them). No new code path: Dynamo's prefill router clones the request for prefill and <a href="https://github.com/ai-dynamo/dynamo/blob/4573c9b6e4700d303742138f425bb6352bac9ef6/lib/llm/src/kv_router/prefill_router/mod.rs#L738-L760">keeps <code>extra_args</code> on the decode request</a>, so decode already receives them.</td><td><b>Recommended.</b> Keeps one TQ write per call, with tokens, logprobs, routes and media together, and reuses today's begin/finalize code.</td></tr>
+<tr><td>Frontend writes the pixels to TQ itself</td><td>Two writes per call: a failure between them can leave tokens without their media. The frontend's TQ client also turns from read-only into a writer.</td><td>No.</td></tr>
+<tr><td>Prefill ships pixels to decode inside the KV handoff</td><td>Megatron-LM's handoff has <a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/core/inference/disaggregation/inference_state_handoff.py#L741-L757">no field for media</a>; it needs a Megatron-LM wire change.</td><td>No.</td></tr>
+<tr><td>Decode re-runs the HF processor</td><td>Wasted CPU, and the result can differ from what prefill encoded.</td><td>No.</td></tr>
+</table>
+<p><b>Two checks for the multimodal PR:</b> (1) decode imports prefill's KV by block hash, so two prompts with the same token ids but different images must not share blocks — confirm Megatron-LM's block hash covers the image, not only <code>block_hash_salt</code>; (2) #5097's adapter still marks the "decode gets the frontend's <code>extra_args</code>" fact as a DRAFT assumption (<a href="https://github.com/NVIDIA-NeMo/RL/blob/751efd79684855e0e4c2c5b682f1f8122de719cb/nemo_rl/models/generation/dynamo/megatron/adapter.py#L198-L199">adapter.py L198</a>); it holds at the pinned Dynamo nightly, so the note can cite the router code instead.</p>
+
+<div class="hl"><b>So what.</b> Images need no new transport under prefill/decode. Dynamo already gives the decode leg the frontend's request extras, so the frontend's processed pixels reach the engine that writes TQ, just as they reach the single engine today. The multimodal PR should keep the one write on decode, check the block hash, and lift the two text-only refusals (#4912's processor check and #5097's media check).</div>
+
+</div>
+</body>
+</html>

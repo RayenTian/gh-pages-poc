@@ -91,8 +91,9 @@ th{background:var(--surface)}
 <nav class="chain">
   <span class="here">1 · how a group picks its harness</span>
   <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5158-same-type-harnesses.html">2 · same-type harnesses refused</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5158-resume-guard-gap.html">3 · resume check gap</a>
 </nav>
-<p class="chainnote">Two pages on this PR, one question each. This one: what the new route does next to the old one.</p>
+<p class="chainnote">Three pages on this PR, one question each. This one: what the new route does next to the old one.</p>
 
 <div class="bg"><b>Background.</b> A <span class="tip" tabindex="0" data-tip="A named set of tasks in a Gym dataset, e.g. swe_rebench. Each task row carries task_id.taskset.">taskset</span> is a group of tasks. A <span class="tip" tabindex="0" data-tip="A Gym server entry that runs one agent on a task and has it scored. Examples: single_agent_turn, legacy_agent, harbor.">Gym Environment Server</span> runs one agent harness (OpenCode, Pi, …) on a task. GRPO scores each answer against its <b>prompt group's</b> mean reward, so all answers in one group must come from the same harness, or the model learns the gap between harnesses. Dotted words have a short explanation: hover or tap them.</div>
 

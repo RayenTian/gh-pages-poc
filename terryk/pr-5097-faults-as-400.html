@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PR #5097: server faults answered as 400 on the Megatron Gym path</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:25px;line-height:1.3;margin:0 0 6px}
+h2{font-size:19px;margin:30px 0 8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface2);padding:1px 4px;border-radius:4px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--orange)}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:6px 12px;margin:0 0 14px;font-size:14px}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;
+  background:var(--surface);color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 16px}
+.fig{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px;margin:10px 0;overflow-x:auto}
+svg{display:block;width:100%;min-width:760px;height:auto}
+svg text{font-family:-apple-system,"Segoe UI",Helvetica,sans-serif;fill:var(--text)}
+svg .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+svg .dim{fill:var(--dim)}svg .g{fill:var(--green)}svg .r{fill:var(--red)}svg .o{fill:var(--orange)}
+svg .t{font-size:13px;font-weight:600}
+svg a text{text-decoration:underline;fill:var(--accent)}
+svg .box{fill:var(--bg);stroke:var(--border);stroke-width:1.2}
+svg .boxr{fill:var(--bg);stroke:var(--red);stroke-width:1.6}
+svg .boxg{fill:var(--bg);stroke:var(--green);stroke-width:1.6}
+svg .proc{fill:none;stroke:var(--dim);stroke-dasharray:5 4}
+svg .arr{stroke:var(--dim);stroke-width:1.5;fill:none;marker-end:url(#ah)}
+svg #ah path{fill:var(--dim)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--surface2)}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;
+  max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+.hl{border-left:4px solid var(--accent);background:var(--surface);padding:8px 14px;margin:16px 0}
+.cref{margin:4px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:3px 9px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+<h1>Why a server fault on the Megatron Gym path reaches Gym as a "bad request"</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5097">PR #5097</a> (part 6 of 6) · permalinks at head <a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl">e6beabe5</a>, Megatron-LM pin <a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron">e0a4bfed</a>, ai-dynamo 1.8.0.dev20261117</p>
+<div class="status"><dl>
+<dt>Before</dt><dd>The Megatron backend did not serve NeMo-Gym behind Dynamo, so this code did not exist.</dd>
+<dt>This PR</dt><dd>Adds the Megatron decode leg for Gym calls. It wraps the whole leg in <a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L203-L208"><code>except ValueError</code></a> and answers every catch with a 400 refusal.</dd>
+<dt>Status</dt><dd><span class="verdict open">Open — not fixed in this PR.</span> Raised in review comment C2, with a one-line fix.</dd>
+</dl></div>
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-dynamo-paths.html">#4801 · where the switch sits</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5025-two-rollout-paths.html">#5025 · direct vs. through Dynamo</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-two-backends.html">#5097 · two backends, one chat engine</a>
+  <span class="here">#5097 · server faults answered as 400</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-capture-steps.html">#5097 · TQ steps on each path</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5097-media-under-pd.html">#5097 · media under prefill/decode</a>
+</nav>
+<p class="chainnote">Four pages for this PR, one question each: this one shows one bug.</p>
+<p>A <span class="tip" tabindex="0" data-tip="A Gym call that the engine refused on purpose, with an HTTP status. The chat engine turns it into that HTTP status for Gym.">refusal</span> tells Gym "your request was wrong". The comment on the catch says it is meant for one thing: Megatron-LM refusing the request, which its own endpoint answers with 400. But Python's <code>ValueError</code> is wider than that. Two server faults raise a plain <code>ValueError</code> inside the same block. One is Dynamo's check that a decode leg got its prefill result (<a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/inference/integrations/dynamo/llm_engine.py#L425">called here</a>), which fails when a decode leg arrives without one. The other is a validation error while staging the capture, after the tokens already exist.</p>
+<h2>Three different errors, one answer</h2>
+<div class="fig"><svg viewBox="0 0 960 368" role="img" aria-label="Three error sources all answered as 400"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z"/></marker></defs><a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L212"><text x="20" y="22" class="t" text-anchor="start">What can raise inside the decode leg (_serve_gym_call)</text></a><rect x="20" y="36" width="330" height="54" rx="6" class="boxg"/><text x="32" y="57" class="" text-anchor="start">(a) Megatron-LM refuses the request</text><a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/inference/integrations/dynamo/llm_engine.py#L60"><text x="32" y="77" class="mono dim" text-anchor="start">InferenceRequestRejected (a ValueError)</text></a><path d="M350,63 C385.0,63 385.0,135 420,135" class="arr"/><rect x="20" y="102" width="330" height="54" rx="6" class="boxr"/><text x="32" y="123" class="" text-anchor="start">(b) Dynamo: decode got no prefill result</text><a href="https://github.com/ai-dynamo/dynamo/blob/7a70a51372a11cf94e9146b9b3e3a6c241759d45/components/src/dynamo/common/backend/disagg.py#L52-L66"><text x="32" y="143" class="mono dim" text-anchor="start">plain ValueError (no live prefill worker)</text></a><path d="M350,129 C385.0,129 385.0,135 420,135" class="arr"/><rect x="20" y="168" width="330" height="54" rx="6" class="boxr"/><text x="32" y="189" class="" text-anchor="start">(c) Capture staging after the tokens exist</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L249-L256"><text x="32" y="209" class="mono dim" text-anchor="start">pydantic ValidationError (a ValueError)</text></a><path d="M350,195 C385.0,195 385.0,135 420,135" class="arr"/><rect x="420" y="110" width="190" height="52" rx="6" class="boxr"/><a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L205-L208"><text x="432" y="131" class="mono r" text-anchor="start">except ValueError</text></a><text x="432" y="151" class="mono dim" text-anchor="start">adapter.py:205</text><path d="M610,136 C635.0,136 635.0,136 660,136" class="arr"/><rect x="660" y="98" width="280" height="76" rx="6" class="boxr"/><text x="672" y="119" class="t r" text-anchor="start">400 "bad request" refusal</text><text x="672" y="139" class="mono dim" text-anchor="start">acknowledge=False</text><text x="672" y="159" class="dim" text-anchor="start">(a), (b), (c) all blame the caller</text><text x="20" y="262" class="t" text-anchor="start">Same faults on the vLLM backend, and after the fix</text><rect x="20" y="274" width="450" height="58" rx="6" class="box"/><text x="32" y="295" class="" text-anchor="start">vLLM: a ValueError that is not a context overflow</text><a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/chat_engine.py#L555-L558"><text x="32" y="316" class="dim" text-anchor="start">→ 500, the chat engine's rule for engine failures</text></a><rect x="490" y="274" width="450" height="58" rx="6" class="boxg"/><text x="502" y="295" class="mono g" text-anchor="start">Fix: except InferenceRequestRejected</text><text x="502" y="316" class="dim" text-anchor="start">(a) → 400 as natively · (b), (c) → 500 like vLLM</text><rect x="24" y="346" width="14" height="12" rx="2" class="boxg"/><text x="44" y="357" class="dim" text-anchor="start">right answer</text><rect x="150" y="346" width="14" height="12" rx="2" class="boxr"/><text x="170" y="357" class="dim" text-anchor="start">wrong answer today</text></svg></div>
+<h2>The fix — proposed, not in the PR</h2>
+<p class="where"><b>Where the fix lands: RL only, one source file and one test.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L205-L208"><code>adapter.py</code></a> catches only Megatron-LM's own refusal type. <a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/tests/unit/models/generation/test_dynamo_megatron_adapter.py#L509-L510"><code>test_dynamo_megatron_adapter.py</code></a> raises that type instead of a plain <code>ValueError</code>. No Megatron-LM or Dynamo change.</p>
+<p class="pclbl">Decode leg, today</p>
+<pre class="pc"><span class="who"># decode engine, rank zero, one task per Gym call</span>
+try:
+    chunk = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L212">serve_gym_call</a>()  <span class="cm"># generate (a, b), then stage (c)</span>
+except <a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L205">ValueError</a>:               <span class="cm"># catches (a), (b) and (c)</span>
+    chunk = refusal(400)                <span class="cm"># Gym: "your request was bad"</span></pre>
+<p class="pclbl">The fix, as pseudocode (proposed, not run)</p>
+<pre class="pc"><span class="who"># decode engine, rank zero, one task per Gym call</span>
+try:
+    chunk = await <a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L212">serve_gym_call</a>()  <span class="cm"># generate (a, b), then stage (c)</span>
+<span class="del">except ValueError:</span>
+<span class="add">except <a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/inference/integrations/dynamo/llm_engine.py#L60">InferenceRequestRejected</a>:</span> <span class="cm"># only (a): Megatron-LM refused it</span>
+    chunk = refusal(400)                <span class="cm"># (b), (c) raise → chat engine answers 500</span></pre>
+<p class="pcref">Megatron-LM's other plain <code>ValueError</code>s (<a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/inference/integrations/dynamo/llm_engine.py#L85-L98">sampling checks</a>) cannot be reached from a Gym call, because <a href="https://github.com/NVIDIA-NeMo/RL/blob/e6beabe5c9540fbea9bc759124f6b363a51f478d/nemo_rl/models/generation/dynamo/megatron/adapter.py#L107-L123"><code>gym_sampling_request</code></a> always sends <code>n=1</code> and log probs 0 or none.</p>
+<div class="hl"><b>So what.</b> When a decode leg arrives without its prefill result, or staging hits a bug, Gym sees a "bad request" for a request that was fine. The real cause is hidden behind a status that blames the caller, and the vLLM backend answers the same faults with 500. Catching only <code>InferenceRequestRejected</code> keeps Megatron-LM's own 400 and sends everything else down the chat engine's 500 path.</div>
+
+</div></body></html>

@@ -36,6 +36,7 @@ p.chainnote{color:var(--dim);font-size:12px;margin:0 0 16px}
   border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .mono{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
   border-radius:8px;padding:12px;overflow-x:auto;white-space:pre}
+.note2{font-size:13.5px;color:var(--dim)}
 .mono .c{color:var(--dim)} .mono .k{color:var(--accent)} .mono .g{color:var(--green)}
 ol.steps{padding-left:22px} ol.steps li{margin:0 0 6px}
 .cref{margin:6px 0 0;font-size:13px}
@@ -54,6 +55,13 @@ svg .s-once{fill:var(--accent);stroke:var(--bg);stroke-width:1}
 svg .s-comp{fill:var(--green);stroke:var(--bg);stroke-width:1}
 svg .sep{stroke:var(--border);stroke-dasharray:4 4}
 svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600} .pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)} .pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 </head>
@@ -67,28 +75,31 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 
 <h1>How a GRPO training batch is formed when completions share their prompt</h1>
 <p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4537">NVIDIA-NeMo/RL #4537</a> with its two Megatron-LM halves:
-<a href="https://github.com/NVIDIA/Megatron-LM/pull/7914">#7914</a> (the model forward) and <a href="https://github.com/NVIDIA/Megatron-LM/pull/8152">#8152</a> (the <code>megatron.rl</code> packing library, split out of #7914). RL links pin <code>f524ddc9</code>, the head this page was written for; Megatron-LM links pin <code>e1786cd6</code>, the #7914 head then. The steps below still hold at <code>1110db98</code>: since then the driver no longer prescribes execution slots, and each worker splits its own groups.
+<a href="https://github.com/NVIDIA/Megatron-LM/pull/7914">#7914</a> (the model forward) and <a href="https://github.com/NVIDIA/Megatron-LM/pull/8152">#8152</a> (the <code>megatron.rl</code> packing library, split out of #7914). Links pin RL <code>1110db98</code> (current head) and Megatron-LM <code>d37b16e2</code> (#8152). A few unchanged steps still link the earlier RL head <code>f524ddc9</code> and #7914 head <code>e1786cd6</code>. Updated for <code>1110db98</code>: an earlier version of this page showed the optional <code>training_dense_bins</code> mode.
 <!--CREF--></p>
 
 <div class="status"><dl>
 <dt>Before</dt><dd>Every completion is its own packed row with its own copy of the prompt. Rows are packed into forwards by length, and a prompt's completions can land on any rank.</dd>
-<dt>This PR</dt><dd>Adds an opt-in mode for Megatron hybrid (attention + Mamba) models: a prompt's whole group goes to one rank, and each forward stores each prompt once, with its completions as branches.</dd>
-<dt>Status</dt><dd><span class="verdict">Proposed — open, off by default.</span> It needs the unmerged Megatron-LM #7914 and #8152 and a submodule bump before it can run in RL. It refuses forest training (compaction and branches): see <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-where-sharing-lives.html">where sharing should live</a>.</dd>
+<dt>This PR</dt><dd>Adds an opt-in mode for Megatron hybrid (attention + Mamba) models: a prompt's whole group goes to one rank, and each forward stores each prompt once, with its completions as branches after it.</dd>
+<dt>Status</dt><dd><span class="verdict">Proposed — open, off by default.</span> It needs the unmerged Megatron-LM #7914 and #8152 and a submodule bump before it can run in RL. It refuses NeMo-RL's forest training (several rows per rollout, from compaction and branches): see <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-where-sharing-lives.html">where sharing should live</a>.</dd>
 </dl></div>
 
 <nav class="chain"><span class="here">how the batch is formed</span>
 <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-vs-forge-qwengyre.html">vs Forge and QwenGyre</a>
-<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-where-sharing-lives.html">where sharing should live</a></nav>
-<p class="chainnote">Three pages on this PR — this one: what a shared-prefix batch looks like, step by step.</p>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-where-sharing-lives.html">where sharing should live</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-what-rl-imports.html">what RL imports</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-who-calls-what.html">who calls what</a>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4537-row-order.html">row order fix</a></nav>
+<p class="chainnote">Six pages on this PR — this one: what a shared-prefix batch looks like, step by step.</p>
 
 <div class="bg"><b>Background.</b> In GRPO each prompt gets several sampled completions, called a <em>group</em>. Before a training step, the policy runs a forward pass over every row to get log probabilities, then trains on them. Rows are <span class="tip" tabindex="0" data-tip="Several rows laid end to end in one long sequence, so one forward pass handles them all. A token budget caps how long that sequence can be.">packed</span> into forwards under a token budget, and the batch is split across <span class="tip" tabindex="0" data-tip="Data-parallel ranks: copies of the model that each process a slice of the batch.">data-parallel ranks</span>. Dotted words have a short explanation: hover or tap them.</div>
 
-<p>The example: 4 prompts (A–D, 80–120 tokens) with 3 completions each, 12 rows, 1655 tokens. Data-parallel size 2, token budget 600, no tensor or context parallelism. The figure is real planner output: the same calls the driver and worker make, run on these lengths.</p>
+<p>The example: 4 prompts (A–D, 80–120 tokens) with 3 completions each, 12 rows, 1655 tokens. Data-parallel size 2, token budget 600, no tensor or context parallelism. The figure is real planner output: #8152's planner, run on CPU on these lengths with the settings the PR requires at data-parallel size above 1 (<code>pack_groups</code> and <code>align_data_parallel</code> on, everything else default).</p>
 
-<svg viewBox="0 0 940 470" role="img" aria-label="The same 12 rows packed two ways. Dense: 4 forwards hold 1655 tokens, every row carries its own prompt copy. Shared: whole groups stay on one rank, and each forward stores each prompt once: 1255 tokens.">
+<svg viewBox="0 0 940 490" role="img" aria-label="The same 12 rows packed two ways. Dense: 4 forwards hold 1655 tokens, every row carries its own prompt copy. Shared: whole groups stay on one rank, and each forward stores each prompt once: 855 tokens.">
 <text class="hdr" x="16" y="20">Same 12 rows, same token budget (600), 2 data-parallel ranks</text>
 <rect class="s-rep" x="16" y="32" width="14" height="12"/><text class="note" x="36" y="42">prompt, computed again for every row</text>
-<rect class="s-once" x="276" y="32" width="14" height="12"/><text class="note" x="296" y="42">prompt, computed once in this forward</text>
+<rect class="s-once" x="276" y="32" width="14" height="12"/><text class="note" x="296" y="42">prompt, computed once for all its rows</text>
 <rect class="s-comp" x="530" y="32" width="14" height="12"/><text class="note" x="550" y="42">completion (label = row)</text>
 <text class="note" x="720" y="42">numbers = tokens per forward</text>
 
@@ -130,77 +141,121 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <text class="sum" x="16" y="246">total 1655 tokens · rank 0: 950, rank 1: 705</text>
 
 <line class="sep" x1="16" y1="262" x2="924" y2="262"/>
-<text class="lane" x="16" y="288">SHARED PREFIX (this PR)</text>
-<text class="note" x="210" y="288">whole groups to a rank (A,D → rank 0; B,C → rank 1); each bin rebuilt as a forest</text>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/data_plane/preshard.py#L155"><text x="16" y="304">preshard.py · whole groups per rank</text></a>
-<a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/models/megatron/shared_prefix_dense_bins.py#L39"><text x="262" y="304">dense_bins.py · pack bins by full length</text></a>
-<a href="https://github.com/jalbericiola/Megatron-LM/blob/e1786cd6b986e0196ca2308d75817845e0994d3b/megatron/rl/shared_prefix_dense_bins.py#L72-L131"><text x="530" y="304">Megatron-LM · rebuild bin as forest</text></a>
-<text class="lbl" x="16" y="330">rank 0 · fwd 1</text>
-<rect class="s-once" x="150.0" y="314" width="93.6" height="24"><title>group A: prompt 120 tokens, stored once</title></rect><text class="seglbl" x="154.0" y="330">A prompt</text>
-<rect class="s-comp" x="243.6" y="314" width="15.6" height="24"><title>A2: completion 20, sees only prompt A + itself</title></rect>
-<rect class="s-once" x="259.2" y="314" width="62.4" height="24"><title>group D: prompt 80 tokens, stored once</title></rect><text class="seglbl" x="263.2" y="330">D prompt</text>
-<rect class="s-comp" x="321.6" y="314" width="42.9" height="24"><title>D1: completion 55, sees only prompt D + itself</title></rect><text class="seglbl" x="325.6" y="330">D1</text>
-<rect class="s-comp" x="364.5" y="314" width="7.8" height="24"><title>D2: completion 10, sees only prompt D + itself</title></rect>
-<text class="tot" x="380.3" y="330">285</text>
-<text class="lbl" x="16" y="362">rank 0 · fwd 2</text>
-<rect class="s-once" x="150.0" y="346" width="93.6" height="24"><title>group A: prompt 120 tokens, stored once</title></rect><text class="seglbl" x="154.0" y="362">A prompt</text>
-<rect class="s-comp" x="243.6" y="346" width="39.0" height="24"><title>A0: completion 50, sees only prompt A + itself</title></rect><text class="seglbl" x="247.6" y="362">A0</text>
-<rect class="s-comp" x="282.6" y="346" width="23.4" height="24"><title>A1: completion 30, sees only prompt A + itself</title></rect><text class="seglbl" x="286.6" y="362">A1</text>
-<rect class="s-once" x="306.0" y="346" width="62.4" height="24"><title>group D: prompt 80 tokens, stored once</title></rect><text class="seglbl" x="310.0" y="362">D prompt</text>
-<rect class="s-comp" x="368.4" y="346" width="54.6" height="24"><title>D0: completion 70, sees only prompt D + itself</title></rect><text class="seglbl" x="372.4" y="362">D0</text>
-<text class="tot" x="431.0" y="362">350</text>
-<text class="lbl" x="16" y="394">rank 1 · fwd 1</text>
-<rect class="s-rep" x="150.0" y="378" width="85.8" height="24"><title>C2: dense fallback</title></rect><text class="seglbl" x="154.0" y="394">C prompt</text>
-<rect class="s-comp" x="235.8" y="378" width="11.7" height="24"/>
-<rect class="s-rep" x="247.5" y="378" width="70.2" height="24"><title>B2: dense fallback</title></rect><text class="seglbl" x="251.5" y="394">B prompt</text>
-<rect class="s-comp" x="317.7" y="378" width="19.5" height="24"/><text class="seglbl" x="321.7" y="394">B2</text>
-<text class="tot" x="345.2" y="394">240  runs dense (one row per group)</text>
-<text class="lbl" x="16" y="426">rank 1 · fwd 2</text>
-<rect class="s-once" x="150.0" y="410" width="85.8" height="24"><title>group C: prompt 110 tokens, stored once</title></rect><text class="seglbl" x="154.0" y="426">C prompt</text>
-<rect class="s-comp" x="235.8" y="410" width="35.1" height="24"><title>C0: completion 45, sees only prompt C + itself</title></rect><text class="seglbl" x="239.8" y="426">C0</text>
-<rect class="s-comp" x="270.9" y="410" width="27.3" height="24"><title>C1: completion 35, sees only prompt C + itself</title></rect><text class="seglbl" x="274.9" y="426">C1</text>
-<rect class="s-once" x="298.2" y="410" width="70.2" height="24"><title>group B: prompt 90 tokens, stored once</title></rect><text class="seglbl" x="302.2" y="426">B prompt</text>
-<rect class="s-comp" x="368.4" y="410" width="46.8" height="24"><title>B0: completion 60, sees only prompt B + itself</title></rect><text class="seglbl" x="372.4" y="426">B0</text>
-<rect class="s-comp" x="415.2" y="410" width="31.2" height="24"><title>B1: completion 40, sees only prompt B + itself</title></rect><text class="seglbl" x="419.2" y="426">B1</text>
-<text class="tot" x="454.4" y="426">380</text>
-<text class="sum" x="16" y="458">total 1255 tokens (24% fewer) · rank 0: 635, rank 1: 620 · still 2 forwards per rank</text>
+<text class="lane" x="16" y="288">SHARED PREFIX (this PR, default settings at DP&gt;1)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/data_plane/preshard.py#L155"><text x="16" y="306">preshard.py · whole groups per rank</text></a>
+<a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/shared_prefix_execution.py#L181"><text x="262" y="306">#8152 · plan_shared_prefix_execution_units</text></a>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1684"><text x="600" y="306">agree forward count</text></a>
+<text class="lbl" x="16" y="332">rank 0 · fwd 1</text>
+<rect class="s-once" x="150.0" y="316" width="93.6" height="24"><title>group A: prompt 120 tokens, computed once for its 3 rows</title></rect><text class="seglbl" x="154.0" y="332">A prompt ×3</text>
+<rect class="s-comp" x="243.6" y="316" width="39.0" height="24"><title>A0: completion 50, sees only prompt A + itself</title></rect>
+<text class="seglbl" x="247.6" y="332">A0</text>
+<rect class="s-comp" x="282.6" y="316" width="23.4" height="24"><title>A1: completion 30, sees only prompt A + itself</title></rect>
+<text class="seglbl" x="286.6" y="332">A1</text>
+<rect class="s-comp" x="306.0" y="316" width="15.6" height="24"><title>A2: completion 20, sees only prompt A + itself</title></rect>
+<text class="tot" x="329.6" y="332">220</text>
+<text class="note" x="369.6" y="332">full length 460</text>
+<text class="lbl" x="16" y="364">rank 0 · fwd 2</text>
+<rect class="s-once" x="150.0" y="348" width="62.4" height="24"><title>group D: prompt 80 tokens, computed once for its 3 rows</title></rect><text class="seglbl" x="154.0" y="364">D ×3</text>
+<rect class="s-comp" x="212.4" y="348" width="54.6" height="24"><title>D0: completion 70, sees only prompt D + itself</title></rect>
+<text class="seglbl" x="216.4" y="364">D0</text>
+<rect class="s-comp" x="267.0" y="348" width="42.9" height="24"><title>D1: completion 55, sees only prompt D + itself</title></rect>
+<text class="seglbl" x="271.0" y="364">D1</text>
+<rect class="s-comp" x="309.9" y="348" width="7.8" height="24"><title>D2: completion 10, sees only prompt D + itself</title></rect>
+<text class="tot" x="325.7" y="364">215</text>
+<text class="note" x="365.7" y="364">full length 375</text>
+<text class="lbl" x="16" y="396">rank 1 · fwd 1</text>
+<rect class="s-once" x="150.0" y="380" width="85.8" height="24"><title>group C: prompt 110 tokens, computed once for its 3 rows</title></rect><text class="seglbl" x="154.0" y="396">C prompt ×3</text>
+<rect class="s-comp" x="235.8" y="380" width="35.1" height="24"><title>C0: completion 45, sees only prompt C + itself</title></rect>
+<text class="seglbl" x="239.8" y="396">C0</text>
+<rect class="s-comp" x="270.9" y="380" width="27.3" height="24"><title>C1: completion 35, sees only prompt C + itself</title></rect>
+<text class="seglbl" x="274.9" y="396">C1</text>
+<rect class="s-comp" x="298.2" y="380" width="11.7" height="24"><title>C2: completion 15, sees only prompt C + itself</title></rect>
+<text class="tot" x="317.9" y="396">205</text>
+<text class="note" x="357.9" y="396">full length 425</text>
+<text class="lbl" x="16" y="428">rank 1 · fwd 2</text>
+<rect class="s-once" x="150.0" y="412" width="70.2" height="24"><title>group B: prompt 90 tokens, computed once for its 3 rows</title></rect><text class="seglbl" x="154.0" y="428">B ×3</text>
+<rect class="s-comp" x="220.2" y="412" width="46.8" height="24"><title>B0: completion 60, sees only prompt B + itself</title></rect>
+<text class="seglbl" x="224.2" y="428">B0</text>
+<rect class="s-comp" x="267.0" y="412" width="31.2" height="24"><title>B1: completion 40, sees only prompt B + itself</title></rect>
+<text class="seglbl" x="271.0" y="428">B1</text>
+<rect class="s-comp" x="298.2" y="412" width="19.5" height="24"><title>B2: completion 25, sees only prompt B + itself</title></rect>
+<text class="tot" x="325.7" y="428">215</text>
+<text class="note" x="365.7" y="428">full length 395</text>
+<text class="sum" x="16" y="458">total 855 tokens (48% fewer) · rank 0: 435, rank 1: 420 · still 2 forwards per rank</text>
+<text class="note" x="16" y="478">Why not A and D in one forward: 220 + 215 = 435 fits 600, but the planner also checks full lengths, 460 + 375 = 835 &gt; 600.</text>
 </svg>
 
 <h2>The steps, with the example's data</h2>
 <ol class="steps">
-<li><b>The rollout records where each prompt ends.</b> One number per row, e.g. row A0 → <code>120</code>. Group identity is the existing group tag. <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/experience/rollout_reassembler.py#L822-L830">rollout_reassembler.py</a></li>
-<li><b>The trainer takes whole groups, in multiples of the rank count.</b> 4 groups ÷ 2 ranks. <code>num_prompts_per_step</code> must divide by the rank count, or setup fails. <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/algorithms/single_controller.py#L2978-L3001">single_controller.py</a></li>
-<li><b>The driver gives each rank whole groups, longest first, to the lightest rank.</b> Group sizes A 460, C 425, B 395, D 375 → rank 0 gets A and D, rank 1 gets B and C. <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/data_plane/preshard.py#L155">preshard.py</a> → <a href="https://github.com/jalbericiola/Megatron-LM/blob/e1786cd6b986e0196ca2308d75817845e0994d3b/megatron/rl/shared_prefix_metadata.py#L225-L341">plan_group_coherent_shards</a></li>
-<li><b>Each rank packs its rows into bins using their full (unshared) length.</b> This is the normal packer, so the forward count stays what dense would need: 2 per rank here. <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/models/megatron/shared_prefix_dense_bins.py#L39-L58">plan_dense_training_bins</a></li>
-<li><b>All ranks agree on the forward count in one all-reduce.</b> If a rank has fewer forwards, real rows are split to make up the difference. No dummy rows are ever added. A planning error on one rank travels in the same all-reduce, so every rank raises. <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/models/policy/workers/megatron_policy_worker.py#L277-L314">megatron_policy_worker.py</a></li>
-<li><b>Each bin is rebuilt as a forest:</b> rows with the same group and identical prompt tokens become one <span class="tip" tabindex="0" data-tip="A star is one prompt followed by its completions, each stored after the prompt. A forest is several stars in one forward.">star</span> (at most 16 branches). If any row in a bin can't share, the whole bin runs dense, like rank 1's first forward. <a href="https://github.com/jalbericiola/Megatron-LM/blob/e1786cd6b986e0196ca2308d75817845e0994d3b/megatron/rl/shared_prefix_dense_bins.py#L72-L131">share_prefixes_in_dense_training_bins</a></li>
-<li><b>The model runs the forest.</b> Each completion attends to its own prompt and its own earlier tokens, never to a sibling. <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/models/megatron/train.py#L242-L306">train.py · model_forward</a> → <a href="https://github.com/jalbericiola/Megatron-LM/blob/e1786cd6b986e0196ca2308d75817845e0994d3b/megatron/core/models/hybrid/shared_prefix_fused.py#L168-L195">Megatron-LM attention</a></li>
-<li><b>Log probabilities are copied back into the usual <code>[rows, S−1]</code> tensor,</b> and the GRPO loss runs unchanged. <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/models/megatron/train.py#L627-L654">train.py · scatter</a> → <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/models/megatron/train.py#L1024-L1045">loss input</a></li>
+<li><b>The rollout records where each prompt ends.</b> One number per row, e.g. row A0 → <code>120</code>. Group identity is the existing group tag. <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/experience/rollout_reassembler.py#L1346-L1354">rollout_reassembler.py</a></li>
+<li><b>The trainer takes whole groups, in multiples of the rank count.</b> 4 groups ÷ 2 ranks. <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/nemo_rl/algorithms/single_controller.py#L2978-L3001">single_controller.py</a></li>
+<li><b>The driver gives each rank whole groups, longest first, to the lightest rank.</b> Full group lengths A 460, C 425, B 395, D 375 → rank 0 gets A and D, rank 1 gets B and C. <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/data_plane/preshard.py#L155">preshard.py</a> → <a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/shared_prefix_metadata.py#L38">plan_group_coherent_shards</a></li>
+<li><b>Each rank cuts each group into slots by full row length.</b> A slot holds at most 16 rows whose full lengths fit the budget. Group A (460 ≤ 600) stays one slot. A group longer than the budget is cut into several slots, and each slot computes the prompt again. <a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/shared_prefix_execution.py#L272-L281">shared_prefix_execution.py</a></li>
+<li><b>Each slot whose rows share one prompt becomes a <span class="tip" tabindex="0" data-tip="One prompt followed by its completions, each stored after the prompt: [prompt, completion 1, ..., completion G].">star</span>.</b> Two stars share a forward only if their <em>full</em> lengths together still fit, because the model's multi-token-prediction head runs on full rows. A + D is 835 &gt; 600, so they stay apart. <a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/shared_prefix_execution.py#L365-L372">the full-length check</a></li>
+<li><b>All ranks agree on the forward count in one all-reduce.</b> If a rank has fewer, real rows are split to make up the difference. No dummy rows are added, and a planning error on one rank travels in the same all-reduce, so every rank raises. <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L295">megatron_policy_worker.py</a></li>
+<li><b>The model runs the star.</b> Each completion attends to its prompt and its own earlier tokens, never to a sibling. <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/megatron/train.py#L242-L306">train.py · model_forward</a> → <a href="https://github.com/jalbericiola/Megatron-LM/blob/e1786cd6b986e0196ca2308d75817845e0994d3b/megatron/core/models/hybrid/shared_prefix_fused.py#L168-L195">Megatron-LM attention</a></li>
+<li><b>Log probabilities are copied back into the usual <code>[rows, S−1]</code> tensor</b> (rows × token positions), and the GRPO loss runs unchanged. <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/megatron/train.py#L365">train.py · shared_prefix_next_token_logprobs</a></li>
 </ol>
+<p class="note2">An optional mode, <code>training_dense_bins</code>, plans the other way round: it packs full rows into bins first, then shares prompts inside each bin. Groups then split across forwards, and a bin of single rows runs dense. The same example takes 1255 tokens that way. <a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/shared_prefix_dense_bins.py#L73">share_prefixes_in_dense_training_bins</a></p>
 
-<h2>Inside one shared forward (rank 0, forward 2)</h2>
-<div class="mono"><span class="c"># rows A0, A1, D0 → one forest of two stars, 350 tokens instead of 470</span>
-<span class="k">node</span>        0      1      2      3      4
-<span class="k">is</span>       A prompt  A0     A1   D prompt  D0
-<span class="k">node_start</span>  0     120    170    200    280
-<span class="k">node_len</span>   120     50     30     80     70
-<span class="k">parent</span>     -1      0      0     -1      3     <span class="c"># -1 = a root; A0 and A1 hang off node 0</span>
+<p>A long row can force a second forward that computes the prompt again. The planner cuts each group into slots by full row length (<a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/shared_prefix_execution.py#L272-L281">shared_prefix_execution.py#L272</a>), so a row that does not fit next to its siblings runs in its own forward, with its own copy of the prompt:</p>
+<svg viewBox="0 0 940 150" role="img" aria-label="One long row splits group A: A0 and A1 share a forward, A2 runs alone and computes prompt A again.">
+<text class="hdr" x="16" y="20">When one row is long: group A with completions 180, 150 and 330, budget 600</text>
+<text class="lbl" x="16" y="50">fwd 1 · star</text>
+<rect class="s-once" x="150.0" y="34" width="93.6" height="24"/>
+<text class="seglbl" x="154.0" y="50">A prompt ×2</text>
+<rect class="s-comp" x="243.6" y="34" width="140.4" height="24"/>
+<text class="seglbl" x="247.6" y="50">A0</text>
+<rect class="s-comp" x="384.0" y="34" width="117.0" height="24"/>
+<text class="seglbl" x="388.0" y="50">A1</text>
+<text class="tot" x="509.0" y="50">450</text>
+<text class="note" x="545.0" y="50">full 300 + 270 = 570 ≤ 600</text>
+<text class="lbl" x="16" y="82">fwd 2 · alone</text>
+<rect class="s-rep" x="150.0" y="66" width="93.6" height="24"/>
+<text class="seglbl" x="154.0" y="82">A prompt again</text>
+<rect class="s-comp" x="243.6" y="66" width="257.4" height="24"/>
+<text class="seglbl" x="247.6" y="82">A2</text>
+<text class="tot" x="509.0" y="82">450</text>
+<text class="note" x="545.0" y="82">full 450: no room next to A0 or A1</text>
+<text class="sum" x="16" y="118">900 tokens instead of 1020 dense: prompt A is computed twice, once per forward</text>
+<text class="note" x="16" y="140">Real output of #8152's planner on these lengths (TP1/CP1). The forward count is 2 either way.</text>
+</svg>
 
-<span class="k">position ids</span>  A prompt 0..119 · A0 120..169 · A1 120..149 <span class="c"># every branch restarts after its prompt</span>
-<span class="k">A1 attends to</span> A prompt + A1's own earlier tokens   <span class="c"># not A0, not anything in D</span>
-<span class="k">row A0 logprobs</span> cols 0..118 = shared prompt predictions (computed once, copied to A0 and A1)
-                cols 119..168 = A0's own; col 119 (A0's first token) is predicted from position 119, the last prompt token</div>
-<p>Source: <a href="https://github.com/jalbericiola/Megatron-LM/blob/e1786cd6b986e0196ca2308d75817845e0994d3b/megatron/rl/tree_layout.py#L69-L105">PackedTreeLayout</a> stores start, length and parent per node, and <a href="https://github.com/jalbericiola/Megatron-LM/blob/e1786cd6b986e0196ca2308d75817845e0994d3b/megatron/rl/tree_layout.py#L184-L197">computes positions</a>. Mamba layers copy the recurrent state at a chunk boundary inside the prompt into each branch, then replay the rest of the prompt per branch; see <a href="https://github.com/jalbericiola/Megatron-LM/blob/e1786cd6b986e0196ca2308d75817845e0994d3b/docs/developer/shared_prefix.md#L50-L59">the Megatron-LM doc</a>.</p>
+<p class="pclbl">How a rank plans its forwards, as pseudocode</p>
+<div class="pc"><span class="who"># Megatron worker, once per training call (before: no planning, one packer)</span>
+bins = pack(rows, budget=600, length=full_len)                       <span class="cm"># dense today: 12 rows → 2 bins per rank</span>
+<span class="add">slots = []</span>
+<span class="add">for group in rows.by_group():</span>                                        <span class="cm"># A, D on rank 0</span>
+<span class="add">    slots += first_fit(group, budget, length=full_len, max_rows=16)</span>  <span class="cm"># A: 460 ≤ 600 → one slot</span>
+<span class="add">stars = [star(slot) for slot in slots if same_prompt(slot)]</span>          <span class="cm"># A star: 120 + 50 + 30 + 20 = 220</span>
+<span class="add">fwds = merge(stars, budget, also_full_len_fits=True)</span>                 <span class="cm"># A + D full = 835 &gt; 600 → 2 forwards</span>
+<span class="add">n = all_reduce_max(len(fwds))</span>                                        <span class="cm"># every rank runs n forwards</span>
+<span class="add">fwds = split_real_rows_until(len(fwds) == n)</span></div>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L1603">_plan_shared_prefix_execution_units</a>, <a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/shared_prefix_execution.py#L181">plan_shared_prefix_execution_units</a>, <a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/shared_prefix_packing.py#L393">pack_shared_prefix_groups</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1110db98de00e2a9ce185f0d0efb897baa09d0f7/nemo_rl/models/policy/workers/megatron_policy_worker.py#L295">_agree_shared_prefix_execution_count</a>.</p>
+
+<h2>Inside one shared forward (rank 0, forward 1)</h2>
+<div class="mono"><span class="c"># rows A0, A1, A2 → one star, 220 tokens instead of 460</span>
+<span class="k">node</span>        0         1      2      3
+<span class="k">is</span>       A prompt    A0     A1     A2
+<span class="k">node_start</span>  0        120    170    200
+<span class="k">node_len</span>   120        50     30     20
+<span class="k">parent</span>     -1         0      0      0     <span class="c"># -1 = the root; every completion hangs off the prompt</span>
+
+<span class="k">position ids</span>  A prompt 0..119 · A0 120..169 · A1 120..149 · A2 120..139 <span class="c"># every branch restarts after the prompt</span>
+<span class="k">A1 attends to</span> A prompt + A1's own earlier tokens   <span class="c"># not A0, not A2</span>
+<span class="k">row A0 logprobs</span> cols 0..118 = prompt predictions (computed once, copied to A0, A1, A2)
+                cols 119..168 = A0's own; col 119 (A0's first token) is predicted from the last prompt token</div>
+<p>Source: <a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/tree_layout.py#L31">PackedTreeLayout</a> stores start, length and parent per node, and <a href="https://github.com/jalbericiola/Megatron-LM/blob/d37b16e23960ee3811ff93496719b54c580818df/megatron/rl/tree_layout.py#L194">computes positions</a>. These numbers are the planner's real output for group A. Mamba layers copy the recurrent state at a chunk boundary inside the prompt into each branch, then replay the rest of the prompt per branch; see <a href="https://github.com/jalbericiola/Megatron-LM/blob/e1786cd6b986e0196ca2308d75817845e0994d3b/docs/developer/shared_prefix.md#L50-L59">the Megatron-LM doc</a>.</p>
 
 <h2>Where the two paths meet, and what still differs</h2>
 <p>Both paths end at the same loss: a <code>[rows, S−1]</code> log-probability tensor with the same masks and the same token counts. They differ before that point in three ways:</p>
 <ul>
 <li><b>Which rank gets which rows:</b> dense scatters a group, shared keeps it on one rank.</li>
-<li><b>How many tokens each forward computes:</b> 1255 instead of 1655 here.</li>
+<li><b>How many tokens each forward computes:</b> 855 instead of 1655 here, in the same number of forwards.</li>
 <li><b>How the numbers are added up:</b> shared and dense are both valid arithmetic, but in BF16 their gradients are not bit-identical. The PR's <a href="https://github.com/NVIDIA-NeMo/RL/blob/f524ddc9fc4cbf96f8c7f128e828614810faaff9/docs/design-docs/shared-prefix-execution.md#L161-L172">design doc</a> measures that difference and says it is still open.</li>
 </ul>
 
-<div class="hl"><b>So what.</b> At the same budget, shared mode does the same number of forwards, each with fewer tokens (24% fewer here), because the budget still counts every row at full length. Raising the budget also cuts the number of forwards: at 3× (1800) this example becomes <b>one forward per rank, 855 tokens instead of 1655</b>. The PR's large-scale run changed both at once, so its speedup mixes the two effects. One thing can undo it: a failed-rollout placeholder row cannot share, and it makes its whole bin run dense.</div>
+<div class="hl"><b>So what.</b> With the default settings, shared mode keeps every group in one forward and computes each prompt once: 855 tokens instead of 1655 here. It still runs the same number of forwards as dense, because the budget also counts every row at full length, so each forward is less full. Raising the budget to 3× (1800) puts A and D in one forward: <b>one forward per rank</b>. The PR's large-scale run changed the budget and sharing at once, so its speedup mixes the two effects. A failed-rollout placeholder row (prompt length 0) cannot share, and runs dense.</div>
 <p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4537#discussion_r4611467855">review comment — shared-prefix-execution.md:47 (separate the two effects)</a></p>
 
 </div>

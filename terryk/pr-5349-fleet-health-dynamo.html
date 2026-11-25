@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5349 — how fleet health keeps Dynamo's frontends off a lost shard</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 20px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.good{color:var(--green)}
+.bg{border-left:3px solid var(--accent);background:var(--surface);padding:10px 14px;margin:0 0 16px;font-size:14px;border-radius:0 8px 8px 0}
+.hl{border-left:3px solid var(--orange);background:var(--surface);padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .shared{fill:var(--surface2);stroke:var(--accent);stroke-width:1.3}
+svg .new{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+svg .col{fill:var(--accent);font:bold 14px -apple-system,sans-serif}
+svg .q{fill:var(--dim);font:bold 11.5px -apple-system,sans-serif;letter-spacing:.04em}
+svg .t{fill:var(--text);font:12.5px -apple-system,sans-serif}
+svg .m{fill:var(--text);font:11.5px ui-monospace,Menlo,monospace}
+svg .ok{fill:var(--green);font:bold 12px -apple-system,sans-serif}
+svg .bad{fill:var(--red);font:bold 12px -apple-system,sans-serif}
+svg .dim{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .barok{fill:var(--green)}
+svg .barbad{fill:var(--red)}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .ahf{fill:var(--dim)}
+svg a text{text-decoration:underline;fill:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface2)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim);font-weight:400}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 0}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How fleet health keeps Dynamo's frontends off a lost generation shard</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5349">NVIDIA-NeMo/RL #5349</a> · replaces <a href="https://github.com/NVIDIA-NeMo/RL/pull/4955">#4955</a> · all links pinned to head <code>99b65276c5</code></p>
+
+<div class="status"><dl>
+  <dt>Before</dt>
+  <dd>Turning on fleet health with <code>policy.generation.dynamo: true</code> stopped the run at startup (<a href="https://github.com/NVIDIA-NeMo/RL/blob/6331e5bf6f40910e48ae1e4411c2125ab45882fd/nemo_rl/models/generation/vllm/vllm_generation.py#L244-L250">the refusal, linked at the base</a>).</dd>
+  <dt>This PR</dt>
+  <dd>The controller tells the generation backend which shards are in service. Behind Dynamo, each engine then takes itself out of, or back into, the frontends' list of engines.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict good">New behavior, works in the author's GB200 runs.</span> One review ask is open: no CI job runs the new register/unregister calls (comment C11).</dd>
+</dl></div>
+
+<div class="bg"><b>Background.</b> A <i>shard</i> is one vLLM engine (here: 3 of them, numbered 0, 1, 2).
+<span class="tip" tabindex="0" data-tip="async_rl.generation_fleet_health: the SingleController probes every generation shard every few seconds and takes failed ones out of service, optionally restarting them.">Fleet health</span>
+probes each shard every 5 s and keeps a list of shards that may get requests.
+Behind <span class="tip" tabindex="0" data-tip="NVIDIA Dynamo. Its HTTP frontends receive requests and pick an engine themselves, from a list kept in etcd (a small key-value store). Each engine adds its own entry when it starts.">Dynamo</span>,
+requests go to frontends, and the frontends pick the engine from a list in
+<span class="tip" tabindex="0" data-tip="Each engine's entry is tied to a 30 s lease. If the process dies, the entry disappears when the lease runs out.">etcd</span>, not from NeMo RL's list.
+Dotted words have a short explanation: hover or tap them.</div>
+
+<p>Both paths start from the same fact: the fleet monitor's
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/fleet_health.py#L194-L196"><code>serving_shards()</code></a>.
+Natively, NeMo RL picks the engine for every request from that list
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/vllm/vllm_generation.py#L1650-L1653"><code>fleet_selector.next_shard()</code></a>),
+so a shard off the list gets nothing. Behind Dynamo nobody read that list, so the frontends kept sending to a dead shard.
+This PR copies the list into etcd: after every probe and before every resume, the controller calls the new hook
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/interfaces.py#L615-L634"><code>set_serving_shards</code></a>,
+and each engine whose state changed adds or removes its own etcd entry.</p>
+
+<svg viewBox="0 0 940 600" role="img" aria-label="Native vs Dynamo: shard 1 dies, then comes back">
+<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" class="ahf"/></marker></defs>
+<!-- shared top -->
+<rect x="20" y="10" width="900" height="62" rx="8" class="shared"/>
+<text x="34" y="32" class="q">① SAME IN BOTH — FLEET MONITOR, IN THE SINGLECONTROLLER</text>
+<text x="34" y="54" class="t">Shard 1 fails 3 probes in a row (about 15 s) → DEAD.</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/fleet_health.py#L194-L196"><text x="470" y="54" class="m">serving_shards() = {0, 2}</text></a>
+<line x1="237" y1="72" x2="237" y2="96" class="arr"/>
+<line x1="702" y1="72" x2="702" y2="96" class="arr"/>
+<!-- column headers -->
+<text x="20" y="114" class="col">Native vLLM</text>
+<text x="485" y="114" class="col">Behind Dynamo (this PR)</text>
+<!-- row 2 -->
+<text x="20" y="140" class="q">② WHO PICKS THE ENGINE FOR A REQUEST?</text>
+<rect x="20" y="148" width="435" height="64" rx="7" class="box"/>
+<rect x="20" y="148" width="5" height="64" class="barok"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/vllm/vllm_generation.py#L1650-L1653"><text x="34" y="171" class="m">fleet_selector.next_shard()</text></a>
+<text x="34" y="191" class="t">NeMo RL picks from {0, 2}.</text>
+<text x="34" y="207" class="ok">shard 1 is never picked</text>
+<rect x="485" y="148" width="435" height="64" rx="7" class="box"/>
+<rect x="485" y="148" width="5" height="64" class="barbad"/>
+<text x="499" y="171" class="t">Each frontend picks from etcd's list: {0, 1, 2}.</text>
+<text x="499" y="191" class="t">The fleet monitor's list does not reach it.</text>
+<text x="499" y="207" class="bad">shard 1 still gets requests, and they fail</text>
+<!-- row 3 -->
+<text x="20" y="242" class="q">③ WHAT TAKES SHARD 1 OUT?</text>
+<rect x="20" y="250" width="435" height="150" rx="7" class="box"/>
+<rect x="20" y="250" width="5" height="150" class="barok"/>
+<text x="34" y="274" class="t">Nothing more is needed.</text>
+<text x="34" y="294" class="t">The selector already reads {0, 2}.</text>
+<rect x="485" y="250" width="435" height="150" rx="7" class="new"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/algorithms/single_controller.py#L4188-L4216"><text x="499" y="272" class="m">set_serving_shards({0,2}, quarantined={1})</text></a>
+<text x="499" y="292" class="t">Compare with the engines in etcd: {0,2} vs {0,1,2}</text>
+<text x="499" y="310" class="t">→ only shard 1 changed: ask it to leave.</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/dynamo/engine_adapter.py#L103-L116"><text x="499" y="332" class="m">answers: unregister_endpoint_instance()</text></a>
+<text x="519" y="349" class="dim">its own entry goes; requests in flight finish</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/vllm/vllm_generation.py#L954-L961"><text x="499" y="369" class="m">dead or silent 2 s: ray.kill its workers</text></a>
+<text x="519" y="386" class="dim">entry goes when its 30 s etcd lease runs out</text>
+<!-- row 4 -->
+<text x="20" y="430" class="q">④ A RESTARTED SHARD 1 COMES BACK (restart_dead_shards)</text>
+<rect x="20" y="438" width="435" height="104" rx="7" class="box"/>
+<rect x="20" y="438" width="5" height="104" class="barok"/>
+<text x="34" y="461" class="t">New process loads → old weights, not in service.</text>
+<text x="34" y="481" class="t">Refit → current weights → serving {0, 1, 2}.</text>
+<text x="34" y="501" class="t">The selector picks it again.</text>
+<rect x="485" y="438" width="435" height="104" rx="7" class="new"/>
+<text x="499" y="461" class="t">New process loads with no Dynamo endpoint,</text>
+<text x="499" y="479" class="t">so it is not in etcd yet. Refit → push {0, 1, 2}:</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/vllm/vllm_worker_async.py#L877-L897"><text x="499" y="499" class="m">set_dynamo_routed_async(True)</text></a>
+<text x="499" y="519" class="t">starts its endpoint, which adds it to etcd.</text>
+<text x="499" y="536" class="ok">frontends see {0, 1, 2} only after the refit</text>
+<!-- legend -->
+<rect x="20" y="562" width="12" height="12" class="barok"/><text x="38" y="573" class="dim">shard 1 gets no requests</text>
+<rect x="210" y="562" width="12" height="12" class="barbad"/><text x="228" y="573" class="dim">shard 1 still gets requests</text>
+<rect x="410" y="560" width="22" height="16" rx="3" class="new"/><text x="440" y="573" class="dim">new in this PR</text>
+<text x="580" y="573" class="dim">Example: 3 shards, probe every 5 s, 2 s to answer</text>
+</svg>
+
+<h2>The change, as pseudocode</h2>
+<p class="pclbl">Before: startup refused the combination</p>
+<pre class="pc"><span class="who"># driver, at startup</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/6331e5bf6f40910e48ae1e4411c2125ab45882fd/nemo_rl/models/generation/vllm/vllm_generation.py#L244-L250">validate_settings</a>(cfg):
+    if dynamo and fleet_health.enabled:  <span class="cm"># refused before this PR</span>
+        raise ValueError(...)            <span class="cm"># &quot;the frontend picks engines itself&quot;</span></pre>
+<p class="pclbl">After, 1 of 3: the controller pushes the list</p>
+<pre class="pc"><span class="who"># SingleController event loop: the probe pump and every refit</span>
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/algorithms/single_controller.py#L4045">_gen_fleet_probe_pump</a>():               <span class="cm"># every probe_interval_s (5 s)</span>
+    probe every shard; fold results into the fleet monitor
+<span class="add">    if not recovering_from_refit:                <span class="cm"># skipped mid-recovery</span></span>
+<span class="add">        await <a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/algorithms/single_controller.py#L4188">_push_serving_shards</a>()</span>
+
+async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/algorithms/single_controller.py#L5304">_sync_weights</a>():   # the refit
+    pause; transfer weights; mark shards healthy
+<span class="add">    await _push_serving_shards()                 <span class="cm"># before resume, so a returned shard</span></span>
+    resume generation                            <span class="cm"># gets requests at once</span>
+
+<span class="add">async def _push_serving_shards():</span>
+<span class="add">    async with lock:                             <span class="cm"># one push at a time</span></span>
+<span class="add">        await to_thread(gen.<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/vllm/vllm_generation.py#L886">set_serving_shards</a>,  <span class="cm"># in a thread</span></span>
+<span class="add">            serving=monitor.serving_shards(),    <span class="cm"># {0, 2}</span></span>
+<span class="add">            quarantined=dead_or_retired,         <span class="cm"># {1}: DEAD or RETIRED only</span></span>
+<span class="add">            timeout_s=probe_timeout_s)           <span class="cm"># 2 s</span></span></pre>
+<p class="pclbl">After, 2 of 3: the backend asks only the shards that changed</p>
+<pre class="pc"><span class="who"># VllmGeneration.set_serving_shards (a no-op without Dynamo)</span>
+<span class="add">routed = _dynamo_routed_shards                               <span class="cm"># {0: leader0, 1: leader1, 2: leader2}</span></span>
+<span class="add">for shard whose leader was replaced: del routed[shard]       <span class="cm"># restarted: drop, no call yet</span></span>
+<span class="add">calls = {s: leader(s).<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/vllm/vllm_worker_async.py#L877">set_dynamo_routed_async</a>(s in serving)  <span class="cm"># {0,2} ^ {0,1,2} = {1}</span></span>
+<span class="add">         for s in serving ^ routed}</span>
+<span class="add">ray.wait(calls, timeout=timeout_s)                           <span class="cm"># wait up to 2 s</span></span>
+<span class="add">for shard, result in calls:                                  <span class="cm"># shard 1:</span></span>
+<span class="add">    ok and leaving   -&gt; del routed[shard]                    <span class="cm">#   answered: unregistered</span></span>
+<span class="add">    ActorDiedError   -&gt; del routed[shard]                    <span class="cm">#   dead process: lease drops it</span></span>
+<span class="add">    else, quarantined -&gt; <a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/vllm/vllm_generation.py#L960">ray.kill</a>(its workers)               <span class="cm">#   silent + quarantined</span></span>
+<span class="add">    else             -&gt; keep, retry                          <span class="cm">#   anything else: next push asks again</span></span></pre>
+<p class="pclbl">After, 3 of 3: the engine edits its own etcd entry</p>
+<pre class="pc"><span class="who"># engine process, its asyncio loop (DynamoEngineAdapter)</span>
+<span class="add">async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/dynamo/engine_adapter.py#L99">on_endpoint_ready</a>(endpoint):                        <span class="cm"># Dynamo&#x27;s Worker calls this once</span></span>
+<span class="add">    self._endpoint = endpoint                                 <span class="cm"># before it registers</span></span>
+<span class="add">async def <a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/dynamo/engine_adapter.py#L103">set_routed</a>(routed):</span>
+<span class="add">    if routed == self._routed: return                         <span class="cm"># already there: nothing to do</span></span>
+<span class="add">    if routed: await endpoint.<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/dynamo/engine_adapter.py#L113">register_endpoint_instance</a>()    <span class="cm"># back in every frontend</span></span>
+<span class="add">    else:      await endpoint.<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/dynamo/engine_adapter.py#L115">unregister_endpoint_instance</a>()  <span class="cm"># requests in flight finish</span></span></pre>
+<p class="sub" style="margin-top:6px">Also new: behind Dynamo the probe itself
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/99b65276c5e206dd2e85c95eaf1b96fcd6e84aec/nemo_rl/models/generation/vllm/vllm_worker_async.py#L903-L916"><code>is_alive</code></a>)
+fails when the engine's Dynamo endpoint stopped or vLLM reports its engine core dead, because a failed call through a frontend does not say which engine failed it.
+The Dynamo calls were checked against <a href="https://github.com/ai-dynamo/dynamo/blob/4573c9b6e4700d303742138f425bb6352bac9ef6/lib/backend-common/src/worker.rs#L1087">Dynamo's source</a> at the commit matching the pinned 1.8 nightly.</p>
+
+<h2>Where the two paths still differ</h2>
+<table>
+<tr><th></th><th>Native vLLM</th><th>Behind Dynamo</th></tr>
+<tr><td>Shard 1 stops getting requests</td><td>On the next request after it is marked DEAD</td><td>In the same probe round, if it answers; up to 30 s later if its process is gone</td></tr>
+<tr><td>A DEAD shard that does not answer</td><td>Left running</td><td>Its workers are killed (DEAD never comes back without a restart, so nothing is lost)</td></tr>
+<tr><td>An engine that hangs without dying</td><td>Seen through failed requests</td><td>Not seen (a follow-up PR, per the PR description)</td></tr>
+</table>
+
+<div class="hl"><b>So what.</b> Fleet health now works with Dynamo, and NeMo RL's list of shards in service becomes the frontends' list within one probe.
+The one gap the review asks to close: CI runs this lane with a single shard, so the push never changes anything there, and the
+register/unregister calls are tested only by the author's hand runs. The author already has a 2-GPU check against real frontends; committing it as a fast CI test would cover the new path.
+</div>
+
+</div>
+</body>
+</html>

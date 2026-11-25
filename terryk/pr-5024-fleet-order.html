@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR 5024: fleet order</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);margin:0;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:25px;line-height:1.3;margin:0 0 6px}
+h2{font-size:18px;margin:28px 0 8px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface2);padding:1px 5px;border-radius:4px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.open{color:var(--red)}.verdict.good{color:var(--green)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 14px;font-size:14px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.fig{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px;margin:12px 0;overflow-x:auto}
+svg{display:block;width:100%;min-width:720px;height:auto}
+svg text{fill:var(--text);font:13px -apple-system,Segoe UI,Helvetica,Arial,sans-serif}
+svg .dim{fill:var(--dim)}svg .mono{font:12px ui-monospace,Menlo,monospace}
+svg .hdr{font-weight:700;font-size:14px}
+svg a text{text-decoration:underline}
+svg .pf{fill:none;stroke:var(--orange);stroke-width:2}svg .dc{fill:none;stroke:var(--accent);stroke-width:2}
+svg .new{fill:none;stroke:var(--green);stroke-width:2;stroke-dasharray:5 3}
+svg .bad{fill:none;stroke:var(--red);stroke-width:2}
+svg .same{fill:none;stroke:var(--border);stroke-width:1.5}
+svg .ln{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg .sep{stroke:var(--border);stroke-width:1}
+svg .tpf{fill:var(--orange)}svg .tdc{fill:var(--accent)}svg .tred{fill:var(--red)}svg .tgrn{fill:var(--green)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}.pc .who{color:var(--orange)}.pc .bad{color:var(--red);font-weight:600}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.hl{border-left:4px solid var(--accent);background:var(--surface);padding:10px 14px;margin:18px 0 0}
+.sc{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}.sc th,.sc td{border:1px solid var(--border);padding:6px 8px;vertical-align:top;text-align:left}.sc th{background:var(--surface2)}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How the Megatron prefill/decode engine fleet now orders refit, shutdown and startup</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">PR #5024</a> (4 of 6, reviewed against <a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">#5023</a>) · reviewed at <code>ea1a6e22</code>, re-checked at <code>9df434a7</code> (the reviewed files are unchanged since <code>d2e22762</code>) · review still pending</p>
+
+<div class="status"><dl>
+<dt>Before</dt><dd>PR 3 suspended every engine at once, stopped them in index order at shutdown, and built them one at a time.</dd>
+<dt>This PR</dt><dd>Suspends prefill, then decode. Shutdown stops decode first and reports each stopped decode engine to prefill before stopping it. Builds up to 8 engines at once.</dd>
+<dt>Status</dt><dd><span class="verdict open">Open — two parts need changes in this PR.</span> The report step at shutdown can stall teardown for hours and frees nothing (C3). Code for a refit wait that a later commit removed is still there (C4). At 1,000 engines, startup and shutdown still go one engine (or 8 engines) at a time; see <a href="#scale">the last section</a> (review comments C9–C11).</dd>
+</dl></div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
+<span class="here">what changed</span>
+<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5024-shutdown-attest.html">why the shutdown report stalls</a>
+</nav>
+<p class="chainnote">Two pages on this PR, one question each. This one: what the PR changes compared with PR 3.</p>
+
+<div class="bg"><b>Background.</b> A <span class="tip" tabindex="0" data-tip="An engine that only runs the prompt and keeps its KV cache blocks on the GPU until a decode engine has copied them.">prefill</span> engine reads the prompt and keeps its KV blocks <em>pinned</em> until a <span class="tip" tabindex="0" data-tip="An engine that generates tokens. It pulls the prompt's KV blocks from a prefill engine, then decodes.">decode</span> engine has pulled them. A <span class="tip" tabindex="0" data-tip="Copying new trainer weights into the inference engines between training steps.">refit</span> suspends every engine, copies the new weights in, and resumes them. Engines run the <code>persist</code> KV mode, so suspend and resume leave the KV memory, the block allocator and the pinned blocks alone. Dotted words have a short explanation: hover or tap them.</div>
+
+<p>Example fleet: 1 prefill engine <b>P0</b> and 2 decode engines <b>D0</b>, <b>D1</b>. Each row is one operation in <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L283"><code>MegatronDynamoGeneration</code></a>, PR 3 on the left, this PR on the right. Boxes in one column run at the same time; arrows mean "then".</p>
+
+<div class="fig">
+<svg viewBox="0 0 940 430" role="img" aria-label="Before and after order of suspend, resume, shutdown and build">
+<text x="160" y="22" class="hdr">PR 3 (base)</text>
+<text x="550" y="22" class="hdr">PR 4 (this PR)</text>
+<line class="sep" x1="10" y1="34" x2="930" y2="34"/>
+<line class="sep" x1="540" y1="34" x2="540" y2="420"/>
+
+<!-- row 1 suspend -->
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L865"><text x="12" y="70" class="hdr">Refit: suspend</text></a>
+<rect class="pf" x="160" y="52" width="40" height="26" rx="5"/><text x="170" y="70" class="tpf">P0</text>
+<rect class="dc" x="206" y="52" width="40" height="26" rx="5"/><text x="216" y="70" class="tdc">D0</text>
+<rect class="dc" x="252" y="52" width="40" height="26" rx="5"/><text x="262" y="70" class="tdc">D1</text>
+<text x="304" y="70" class="dim">one wave</text>
+<rect class="pf" x="550" y="52" width="40" height="26" rx="5"/><text x="560" y="70" class="tpf">P0</text>
+<path class="ln" d="M596 65 L622 65 M616 60 L622 65 L616 70"/>
+<rect class="dc" x="628" y="52" width="40" height="26" rx="5"/><text x="638" y="70" class="tdc">D0</text>
+<rect class="dc" x="674" y="52" width="40" height="26" rx="5"/><text x="684" y="70" class="tdc">D1</text>
+<text x="726" y="64" class="tgrn">prefill, then decode</text>
+<text x="726" y="80" class="dim">no wait for pinned blocks</text>
+<line class="sep" x1="10" y1="100" x2="930" y2="100"/>
+
+<!-- row 2 resume -->
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L952"><text x="12" y="136" class="hdr">Refit: resume</text></a>
+<rect class="same" x="160" y="118" width="40" height="26" rx="5"/><text x="170" y="136" class="dim">P0</text>
+<rect class="same" x="206" y="118" width="40" height="26" rx="5"/><text x="216" y="136" class="dim">D0</text>
+<rect class="same" x="252" y="118" width="40" height="26" rx="5"/><text x="262" y="136" class="dim">D1</text>
+<text x="304" y="136" class="dim">one wave</text>
+<rect class="same" x="550" y="118" width="40" height="26" rx="5"/><text x="560" y="136" class="dim">P0</text>
+<rect class="same" x="596" y="118" width="40" height="26" rx="5"/><text x="606" y="136" class="dim">D0</text>
+<rect class="same" x="642" y="118" width="40" height="26" rx="5"/><text x="652" y="136" class="dim">D1</text>
+<text x="694" y="136" class="dim">one wave, unchanged</text>
+<line class="sep" x1="10" y1="166" x2="930" y2="166"/>
+
+<!-- row 3 shutdown -->
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1365"><text x="12" y="212" class="hdr">Shutdown</text></a>
+<rect class="pf" x="160" y="196" width="40" height="26" rx="5"/><text x="170" y="214" class="tpf">P0</text>
+<path class="ln" d="M204 209 L222 209 M216 204 L222 209 L216 214"/>
+<rect class="dc" x="226" y="196" width="40" height="26" rx="5"/><text x="236" y="214" class="tdc">D0</text>
+<path class="ln" d="M270 209 L288 209 M282 204 L288 209 L282 214"/>
+<rect class="dc" x="292" y="196" width="40" height="26" rx="5"/><text x="302" y="214" class="tdc">D1</text>
+<text x="344" y="214" class="dim">index order, then services</text>
+
+<rect class="dc" x="550" y="196" width="40" height="26" rx="5"/><text x="560" y="214" class="tdc">D0</text>
+<path class="ln" d="M594 209 L604 209"/>
+<rect class="dc" x="606" y="196" width="40" height="26" rx="5"/><text x="616" y="214" class="tdc">D1</text>
+<path class="ln" d="M650 209 L668 209 M662 204 L668 209 L662 214"/>
+<rect class="bad" x="672" y="190" width="150" height="38" rx="5"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1455"><text x="680" y="206" class="tred mono">report D0, D1</text></a>
+<text x="680" y="221" class="tred">≤610 s each</text>
+<path class="ln" d="M826 209 L844 209 M838 204 L844 209 L838 214"/>
+<rect class="pf" x="848" y="196" width="40" height="26" rx="5"/><text x="858" y="214" class="tpf">P0</text>
+<text x="550" y="250" class="tred">C3: frees nothing, can stall teardown</text>
+<line class="sep" x1="10" y1="266" x2="930" y2="266"/>
+
+<!-- row 4 build -->
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1122"><text x="12" y="306" class="hdr">Startup: build</text></a>
+<rect class="pf" x="160" y="290" width="40" height="26" rx="5"/><text x="170" y="308" class="tpf">P0</text>
+<path class="ln" d="M204 303 L222 303 M216 298 L222 303 L216 308"/>
+<rect class="dc" x="226" y="290" width="40" height="26" rx="5"/><text x="236" y="308" class="tdc">D0</text>
+<path class="ln" d="M270 303 L288 303 M282 298 L288 303 L282 308"/>
+<rect class="dc" x="292" y="290" width="40" height="26" rx="5"/><text x="302" y="308" class="tdc">D1</text>
+<text x="344" y="308" class="dim">one at a time</text>
+<rect class="new" x="546" y="284" width="148" height="38" rx="6"/>
+<rect class="pf" x="552" y="290" width="40" height="26" rx="5"/><text x="562" y="308" class="tpf">P0</text>
+<rect class="dc" x="598" y="290" width="40" height="26" rx="5"/><text x="608" y="308" class="tdc">D0</text>
+<rect class="dc" x="644" y="290" width="40" height="26" rx="5"/><text x="654" y="308" class="tdc">D1</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1235"><text x="704" y="300" class="tgrn mono">ThreadPoolExecutor</text></a>
+<text x="704" y="316" class="dim">rounds of up to 8 engines</text>
+<text x="550" y="344" class="dim">registered in launch order (refit rank order)</text>
+<line class="sep" x1="10" y1="362" x2="930" y2="362"/>
+
+<!-- legend -->
+<rect class="pf" x="14" y="384" width="22" height="16" rx="4"/><text x="42" y="397">prefill</text>
+<rect class="dc" x="104" y="384" width="22" height="16" rx="4"/><text x="132" y="397">decode</text>
+<rect class="new" x="194" y="384" width="22" height="16" rx="4"/><text x="222" y="397">new: run at once</text>
+<rect class="bad" x="346" y="384" width="22" height="16" rx="4"/><text x="374" y="397">problem (review comment)</text>
+<rect class="same" x="560" y="384" width="22" height="16" rx="4"/><text x="588" y="397">unchanged</text>
+</svg>
+</div>
+
+<h2>The same change as pseudocode</h2>
+<p class="pclbl">Refit suspend · driver process</p>
+<pre class="pc"><span class="who"># driver, MegatronDynamoGeneration.suspend_for_refit</span>
+<span class="del">call_engines(all engines, suspend)</span>                     <span class="cm"># PR 3: one wave</span>
+<span class="add">call_engines(<a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L905-L910">prefill</a>, suspend)</span>                         <span class="cm"># each wave: Ray calls in parallel</span>
+<span class="add">call_engines(<a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L912-L917">decode</a>, suspend)</span>                          <span class="cm"># no wait for pinned blocks</span>
+on failure: resume every engine the suspend reached       <span class="cm"># then re-raise</span></pre>
+<p class="pclbl">Shutdown · driver process</p>
+<pre class="pc"><span class="who"># driver, MegatronDynamoGeneration.shutdown</span>
+<span class="del">for engine in engines: stop(engine)</span>                       <span class="cm"># PR 3: index order</span>
+<span class="add">owners = read handoff owner from each decode rank 0</span>      <span class="cm"># ≤600 s</span>
+<span class="add">for d in decode: stop(d)</span>                                  <span class="cm"># one at a time</span>
+<span class="bad">for owner in owners:                                      # C3: one Ray call per owner</span>
+<span class="bad">    prefill0.confirm_decode_terminated(owner)             # ≤ 600 + 10 s each</span>
+<span class="add">for p in prefill: stop(p)</span>                                 <span class="cm"># frees every pinned block anyway</span>
+stop frontend, NATS, etcd</pre>
+<p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/868942a08ca58e3806f26e4e5ecd3f62bb303189/nemo_rl/models/generation/megatron/dynamo_generation.py#L1191-L1215">PR 3 <code>shutdown</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1365-L1427">PR 4 <code>shutdown</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1455-L1498"><code>_confirm_decode_terminated</code></a>.</p>
+<p class="pcref">The 600 s is today's default <code>dynamo_cfg.control_timeout_s</code>. <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688633017">C1</a> removes that key (following #4801 C9), so the caller's timeout or a fixed shutdown constant takes its place. The problem does not depend on the number: each report still waits its full timeout, one after another.</p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688633297">review comment C3 — dynamo_generation.py:1381</a></p>
+
+<h2>Left behind: a pause for a wait that is gone</h2>
+<p>An earlier commit in this PR paused prefill, waited for decode to pull every pinned block, then suspended. A later commit (<code>ef48e301</code>) removed the wait, because with a deep decode backlog the pins did not drain for over an hour. The worker pieces stayed: <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/megatron_worker.py#L2492"><code>pause_for_refit</code></a>, a paused flag read in four places, and <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L198"><code>pinned_handoff_block_count</code></a>. Only tests call them, here and in PRs 5 and 6. The class docstring, the PR title and the PR body still describe the wait.</p>
+<p>The fix changed after the review of PR 2. <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">#4912 C7</a> asks PR 2 to rewrite the worker's <code>_sleep</code>/<code>_wake</code>: every wait for an engine state gets a timeout, and wake looks at the engine's real state instead of a saved flag. So C4 asks this PR to take PR 2's version of those four functions as it is, not to restore the older untimed one or keep this PR's own change to when the flags are set.</p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688633450">review comment C4 — megatron_worker.py:2492</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688633680">C5 — dynamo_generation.py:307</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688633849">C6 — PR body</a></p>
+
+<h2 id="scale">Will this hold up at 1,000 engines?</h2>
+<p>Take 500 prefill and 500 decode engines. vLLM, plain Megatron and TRT-LLM's own prefill/decode mode on main each keep every engine's workers in one worker group, so each step is <b>one wave</b>: send the call to every worker, then wait once (<a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/distributed/worker_groups.py#L1056">run_all_workers_single_data</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/models/generation/trtllm/trtllm_generation.py#L891-L921">TRT-LLM P/D wake and sleep</a>). A wave costs as long as its slowest engine, however many engines there are. This PR keeps one wave for the weight transfer, the KV rebuild and the resume: <a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L642-L663"><code>_call_engines</code></a> sends every call before it waits on any. Three steps don't:</p>
+<div class="fig">
+<svg viewBox="0 0 940 322" role="img" aria-label="Number of waves per step: main versus this PR at 1,000 engines">
+<text x="170" y="22" class="hdr">main (vLLM, Megatron, TRT-LLM)</text>
+<text x="470" y="22" class="hdr">this PR · 500 prefill + 500 decode</text>
+<line class="sep" x1="10" y1="34" x2="930" y2="34"/>
+<line class="sep" x1="460" y1="34" x2="460" y2="282"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L871-L935"><text x="12" y="62" class="hdr">Refit: suspend</text></a>
+<rect class="same" x="170" y="45" width="250" height="26" rx="5"/><text x="180" y="63" class="dim">1 wave · slowest engine</text>
+<rect class="pf" x="470" y="45" width="130" height="26" rx="5"/><text x="480" y="63" class="tpf">500 prefill</text>
+<path class="ln" d="M604 58 L620 58 M614 53 L620 58 L614 63"/>
+<rect class="dc" x="624" y="45" width="130" height="26" rx="5"/><text x="634" y="63" class="tdc">500 decode</text>
+<text x="766" y="63" class="tred">2 waves, no need</text>
+<line class="sep" x1="10" y1="84" x2="930" y2="84"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L958-L985"><text x="12" y="112" class="hdr">Refit: resume</text></a>
+<rect class="same" x="170" y="95" width="250" height="26" rx="5"/><text x="180" y="113" class="dim">1 wave · slowest engine</text>
+<rect class="same" x="470" y="95" width="284" height="26" rx="5"/><text x="480" y="113" class="dim">1 wave · slowest engine</text>
+<text x="766" y="113" class="tgrn">same as main</text>
+<line class="sep" x1="10" y1="134" x2="930" y2="134"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L1197-L1265"><text x="12" y="162" class="hdr">Startup: build</text></a>
+<rect class="same" x="170" y="145" width="250" height="26" rx="5"/><text x="180" y="163" class="dim">1 wave · slowest engine</text>
+<rect class="bad" x="470" y="143" width="440" height="22" rx="4"/><text x="478" y="159" class="tred">reserve GPUs + read node IP: 1,000 times, one by one</text>
+<rect class="pf" x="470" y="172" width="13" height="18" rx="2"/><rect class="dc" x="487" y="172" width="13" height="18" rx="2"/><rect class="pf" x="504" y="172" width="13" height="18" rx="2"/><rect class="dc" x="521" y="172" width="13" height="18" rx="2"/><rect class="pf" x="538" y="172" width="13" height="18" rx="2"/><rect class="dc" x="555" y="172" width="13" height="18" rx="2"/><rect class="pf" x="572" y="172" width="13" height="18" rx="2"/><rect class="dc" x="589" y="172" width="13" height="18" rx="2"/><rect class="pf" x="606" y="172" width="13" height="18" rx="2"/><rect class="dc" x="623" y="172" width="13" height="18" rx="2"/><rect class="pf" x="640" y="172" width="13" height="18" rx="2"/><rect class="dc" x="657" y="172" width="13" height="18" rx="2"/><rect class="pf" x="674" y="172" width="13" height="18" rx="2"/><rect class="dc" x="691" y="172" width="13" height="18" rx="2"/><rect class="pf" x="708" y="172" width="13" height="18" rx="2"/><rect class="dc" x="725" y="172" width="13" height="18" rx="2"/><rect class="pf" x="742" y="172" width="13" height="18" rx="2"/><rect class="dc" x="759" y="172" width="13" height="18" rx="2"/><rect class="pf" x="776" y="172" width="13" height="18" rx="2"/><rect class="dc" x="793" y="172" width="13" height="18" rx="2"/><rect class="pf" x="810" y="172" width="13" height="18" rx="2"/><rect class="dc" x="827" y="172" width="13" height="18" rx="2"/><rect class="pf" x="844" y="172" width="13" height="18" rx="2"/><rect class="dc" x="861" y="172" width="13" height="18" rx="2"/><rect class="pf" x="878" y="172" width="13" height="18" rx="2"/>
+<text x="470" y="208" class="tred">125 rounds of 8; each round waits for its slowest engine</text>
+<line class="sep" x1="10" y1="220" x2="930" y2="220"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L1381-L1442"><text x="12" y="248" class="hdr">Shutdown</text></a>
+<rect class="same" x="170" y="231" width="250" height="26" rx="5"/><text x="180" y="249" class="dim">1 wave · slowest engine</text>
+<rect class="dc" x="470" y="232" width="4" height="18"/><rect class="dc" x="476" y="232" width="4" height="18"/><rect class="dc" x="482" y="232" width="4" height="18"/><rect class="dc" x="488" y="232" width="4" height="18"/><rect class="dc" x="494" y="232" width="4" height="18"/><rect class="dc" x="500" y="232" width="4" height="18"/><rect class="dc" x="506" y="232" width="4" height="18"/><rect class="dc" x="512" y="232" width="4" height="18"/><rect class="dc" x="518" y="232" width="4" height="18"/><rect class="dc" x="524" y="232" width="4" height="18"/><rect class="dc" x="530" y="232" width="4" height="18"/><rect class="dc" x="536" y="232" width="4" height="18"/><rect class="dc" x="542" y="232" width="4" height="18"/><rect class="dc" x="548" y="232" width="4" height="18"/><rect class="dc" x="554" y="232" width="4" height="18"/><rect class="dc" x="560" y="232" width="4" height="18"/><rect class="dc" x="566" y="232" width="4" height="18"/><rect class="dc" x="572" y="232" width="4" height="18"/><rect class="dc" x="578" y="232" width="4" height="18"/><rect class="dc" x="584" y="232" width="4" height="18"/><rect class="dc" x="590" y="232" width="4" height="18"/><rect class="dc" x="596" y="232" width="4" height="18"/><rect class="dc" x="602" y="232" width="4" height="18"/><rect class="dc" x="608" y="232" width="4" height="18"/><rect class="dc" x="614" y="232" width="4" height="18"/><rect class="dc" x="620" y="232" width="4" height="18"/><rect class="dc" x="626" y="232" width="4" height="18"/><rect class="dc" x="632" y="232" width="4" height="18"/><rect class="dc" x="638" y="232" width="4" height="18"/><rect class="dc" x="644" y="232" width="4" height="18"/><rect class="bad" x="650" y="230" width="40" height="22" rx="3"/><rect class="pf" x="696" y="232" width="4" height="18"/><rect class="pf" x="702" y="232" width="4" height="18"/><rect class="pf" x="708" y="232" width="4" height="18"/><rect class="pf" x="714" y="232" width="4" height="18"/><rect class="pf" x="720" y="232" width="4" height="18"/><rect class="pf" x="726" y="232" width="4" height="18"/><rect class="pf" x="732" y="232" width="4" height="18"/><rect class="pf" x="738" y="232" width="4" height="18"/><rect class="pf" x="744" y="232" width="4" height="18"/><rect class="pf" x="750" y="232" width="4" height="18"/><rect class="pf" x="756" y="232" width="4" height="18"/><rect class="pf" x="762" y="232" width="4" height="18"/><rect class="pf" x="768" y="232" width="4" height="18"/><rect class="pf" x="774" y="232" width="4" height="18"/><rect class="pf" x="780" y="232" width="4" height="18"/><rect class="pf" x="786" y="232" width="4" height="18"/><rect class="pf" x="792" y="232" width="4" height="18"/><rect class="pf" x="798" y="232" width="4" height="18"/><rect class="pf" x="804" y="232" width="4" height="18"/><rect class="pf" x="810" y="232" width="4" height="18"/><rect class="pf" x="816" y="232" width="4" height="18"/><rect class="pf" x="822" y="232" width="4" height="18"/><rect class="pf" x="828" y="232" width="4" height="18"/><rect class="pf" x="834" y="232" width="4" height="18"/><rect class="pf" x="840" y="232" width="4" height="18"/><rect class="pf" x="846" y="232" width="4" height="18"/><rect class="pf" x="852" y="232" width="4" height="18"/><rect class="pf" x="858" y="232" width="4" height="18"/><rect class="pf" x="864" y="232" width="4" height="18"/><rect class="pf" x="870" y="232" width="4" height="18"/>
+<text x="470" y="272" class="tred">1,000 stops one by one, plus one report per decode engine (C3)</text>
+<line class="sep" x1="10" y1="284" x2="930" y2="284"/>
+<rect class="pf" x="14" y="298" width="22" height="16" rx="4"/><text x="42" y="311">prefill</text>
+<rect class="dc" x="104" y="298" width="22" height="16" rx="4"/><text x="132" y="311">decode</text>
+<rect class="same" x="194" y="298" width="22" height="16" rx="4"/><text x="222" y="311">one wave: send to all, wait once</text>
+<rect class="bad" x="470" y="298" width="22" height="16" rx="4"/><text x="498" y="311">one at a time, or a wait with no reason</text>
+</svg>
+</div>
+
+<table class="sc">
+<tr><th>Step</th><th>This PR</th><th>Cost at 1,000 engines</th><th>Ask (review comment)</th></tr>
+<tr><td>Suspend</td><td>a prefill wave, then a decode wave (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L911-L923">L911-L923</a>)</td><td>slowest prefill + slowest decode: up to 2 waves, not a cascade</td><td>One wave. The order only existed so prefill could pause while decode drained the pins (PR body, "Refit ordering"), and <code>ef48e301</code> removed that wait. The PR's own <a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L959-L966">resume docstring</a> says no order is needed in <code>persist</code> mode, and the two facts it uses hold on the way down too: a suspended prefill engine still serves pulls, and a handoff to a sleeping decode engine is queued.</td></tr>
+<tr><td>Startup</td><td>GPU reservation and a node-IP lookup per engine, one by one (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L1197-L1238">L1197</a>); then rounds of <a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L323-L325">8</a> (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L1246-L1258">L1246</a>)</td><td>The PR's own comment: 64 engines one at a time took about 2 h, about 110 s each. 1,000 engines = 125 rounds × at least 110 s ≈ <b>3.8 h</b>, more whenever one engine in a round is slow.</td><td>Reserve and start every engine at once, as <a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/distributed/worker_groups.py#L776">RayWorkerGroup</a> does for its workers, then wait once. If a limit is needed, use a pool that starts the next engine as soon as any one finishes, not rounds.</td></tr>
+<tr><td>Shutdown</td><td>one engine at a time: decode (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L1409">L1409</a>), one report per decode engine, then prefill (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L1424">L1424</a>)</td><td>1,000 stops back to back; a hung endpoint adds up to 600 s each</td><td>After <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688633297">C3</a> deletes the report, no role order is left to keep: stop every engine at once, as <a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/models/generation/vllm/vllm_generation.py#L1813-L1830"><code>VllmGeneration.shutdown</code></a> does (one cleanup call per worker, at most 30 s, then kill). On main, <a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/distributed/worker_groups.py#L1292-L1327">worker_group.shutdown</a> stops a whole group in one wave.</td></tr>
+</table>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688796224">review comment C9 — suspend in one wave</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688796377">C10 — build at once</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688796514">C11 — stop every engine at once</a></p>
+<div class="hl"><b>So what.</b> The refit order is safe: upstream Megatron-LM keeps a suspended prefill engine serving pulls and releases in <code>persist</code> mode, and records the weight version per token. For the same reason it doesn't need to be an order at all: suspend can be one wave, like resume. The PR should drop the shutdown report step (C3) and the leftover pause code (C4), and fix the docs (C5, C6). At 1,000 engines the real cost is startup (hours, in rounds of 8) and shutdown (one engine at a time); startup should be one wave, and so should shutdown, as on main.</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #4912 — why every prefill/decode engine fails to build at the pinned Megatron-LM</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--red)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.hl{border-left:4px solid var(--orange);background:var(--surface);padding:10px 14px;margin:18px 0;border-radius:0 8px 8px 0}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .ok{fill:var(--surface);stroke:var(--green);stroke-width:1.8}
+svg .hdr{fill:var(--text);font:bold 13.5px -apple-system,sans-serif}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .redt{fill:var(--red);font:bold 12px ui-monospace,Menlo,monospace}
+svg .grn{fill:var(--green);font:bold 12px ui-monospace,Menlo,monospace}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg .line{stroke:var(--dim);stroke-width:2}
+svg .dot{fill:var(--surface);stroke:var(--dim);stroke-width:2}
+svg .dotg{fill:var(--green);stroke:var(--green);stroke-width:2}
+svg .dotr{fill:var(--red);stroke:var(--red);stroke-width:2}
+svg a text{text-decoration:underline;fill:var(--accent);font:12px ui-monospace,Menlo,monospace}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Why every prefill/decode engine fails to build at the pinned Megatron-LM</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">PR #4912</a> (2 of 6) ·
+RL head <code>1cb4fef4</code> (cited code unchanged at <code>44035e16</code>) · Megatron-LM pinned at <code>e0a4bfed</code> (through Megatron-Bridge <code>ae0a1b02</code>)</p>
+
+<div class="status"><dl>
+  <dt>Before</dt>
+  <dd>No Megatron engine passes a role to Megatron-LM's inference config.</dd>
+  <dt>This PR</dt>
+  <dd>Each prefill/decode engine adds <code>disaggregation_role</code> to that config. The field exists only in a Megatron-LM commit newer than the one the repo installs.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Open — not fixed in this PR, and no later PR in the stack moves the pin.</span> Review comment C3 asks for a clear startup error (a guard), not a Megatron-LM bump in this PR. Nothing has run on a GPU yet, which is why no test has caught it.</dd>
+</dl></div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4912-dynamo-engines.html">1 · old path vs new path</a>
+  <span class="here">2 · engine build fails at the pin</span>
+</nav>
+<p class="chainnote">Two pages on this PR, one question each — this one: why the engine build fails, and what fixes it.</p>
+
+<p>The Dynamo worker adds two fields to Megatron-LM's engine config through
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L73-L81"><code>_inference_config_overrides()</code></a>.
+The worker merges them in and calls
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/megatron_worker.py#L733-L735"><code>InferenceConfig(**kwargs)</code></a>.
+At the pinned Megatron-LM, <code>InferenceConfig</code> is a
+<a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/core/inference/config.py#L491-L492">plain dataclass</a>
+with <a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/core/inference/config.py#L761-L767"><code>kv_transport_backend</code> but no <code>disaggregation_role</code></a>.
+A dataclass refuses unknown keyword arguments, so the call raises before the engine exists.</p>
+
+<h2>What the engine build sees</h2>
+
+<svg viewBox="0 0 940 436" role="img" aria-label="The role field reaches a Megatron-LM version that lacks it">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--dim)"/></marker></defs>
+<rect class="box" x="10" y="14" width="440" height="96" rx="7"/>
+<text class="hdr" x="22" y="36">prefill-0 worker, first refit</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L73-L81"><text x="22" y="58">_inference_config_overrides()</text></a>
+<text class="lbl" x="22" y="80">{kv_transport_backend: "nixl",</text>
+<text class="lbl" x="22" y="98"> disaggregation_role: "prefill"}</text>
+<path class="arr" d="M230,110 L230,128"/>
+<rect class="bad" x="10" y="130" width="440" height="96" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/megatron_worker.py#L733-L735"><text x="22" y="152">InferenceConfig(**kwargs)</text></a>
+<text class="note" x="200" y="152">Megatron-LM e0a4bfed</text>
+<text class="redt" x="22" y="178">TypeError: InferenceConfig.__init__() got an</text>
+<text class="redt" x="22" y="196">unexpected keyword argument 'disaggregation_role'</text>
+<text class="note" x="22" y="216">every engine, both roles, before any weight moves</text>
+<!-- fields box -->
+<rect class="box" x="480" y="14" width="450" height="212" rx="7"/>
+<text class="hdr" x="492" y="36">InferenceConfig fields at the pin</text>
+<a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/core/inference/config.py#L761-L767"><text x="492" y="60">config.py L761-L767</text></a>
+<text class="lbl" x="492" y="84">…</text>
+<text class="lbl" x="492" y="104">disaggregation_shards</text>
+<text class="grn" x="760" y="104">✓</text>
+<text class="lbl" x="492" y="124">kv_transport_backend</text>
+<text class="grn" x="760" y="124">✓ "nixl"</text>
+<text class="lbl" x="492" y="144">disaggregation_role</text>
+<text class="redt" x="760" y="144">✕ missing</text>
+<text class="note" x="492" y="176">The field arrives in upstream commit 84c7f168</text>
+<text class="note" x="492" y="194">("decode engines skip the Mamba prefix cache by role")</text>
+<!-- timeline -->
+<text class="hdr" x="14" y="266">Megatron-LM commits, oldest to newest</text>
+<line class="line" x1="60" y1="316" x2="880" y2="316"/>
+<circle class="dotr" cx="100" cy="316" r="8"/>
+<a href="https://github.com/NVIDIA/Megatron-LM/tree/e0a4bfed7f1e233b857187ceff0104645858d7d1"><text x="60" y="296">e0a4bfed</text></a>
+<text class="lbl" x="44" y="342">RL installs this</text>
+<text class="note" x="44" y="360">(Bridge ae0a1b02)</text>
+<text class="note" x="250" y="308">+185 commits</text>
+<circle class="dot" cx="520" cy="316" r="8"/>
+<a href="https://github.com/NVIDIA/Megatron-LM/tree/fbc9562e70851ec2575a2567493616e894d2f33c"><text x="480" y="296">fbc9562e</text></a>
+<text class="lbl" x="440" y="342">Bridge main pins this</text>
+<text class="redt" x="440" y="360">still no field</text>
+<text class="note" x="640" y="308">+4</text>
+<circle class="dotg" cx="800" cy="316" r="8"/>
+<a href="https://github.com/NVIDIA/Megatron-LM/commit/84c7f168baa9f53b4db73d6ac4551d0f6734947f"><text x="760" y="296">84c7f168</text></a>
+<text class="lbl" x="730" y="342">adds the field</text>
+<text class="grn" x="730" y="360">needed</text>
+<text class="note" x="14" y="400">Red dot = what runs today. Green dot = the first commit that works. Underlined names link to the code.</text>
+<text class="note" x="14" y="420">So a plain Bridge bump to its main is not enough: Bridge has to move its Megatron-LM pin first.</text>
+</svg>
+
+<p>The tests miss it because the
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/tests/unit/models/generation/test_megatron_dynamo_worker_mixin.py#L92-L99">mixin test</a>
+only compares the returned dict. It never hands that dict to a real <code>InferenceConfig</code>. The
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L30-L42">"is the Dynamo integration installed" check</a>
+also passes at the pin, because the module it imports does exist there.</p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4672549057">review comment C3 — dynamo_worker_mixin.py:80</a></p>
+
+<h2>The fix — a startup guard, proposed, not in the PR</h2>
+<p class="where"><b>Where the fix lands: RL only, in this PR.</b>
+The existing check <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L30-L42"><code>require_megatron_dynamo_integration()</code></a>
+already runs in the worker's constructor, before the model loads. It also checks for the field, so an old Megatron-LM gets a clear error at startup instead of a <code>TypeError</code> at the first refit.
+<b>No Megatron-LM bump in this PR:</b> a bump is a large change with convergence risk, so it lands on its own. The feature just needs to say plainly which Megatron-LM it requires.</p>
+<p>Nothing below is implemented.</p>
+<p class="pclbl">The guard, as pseudocode (proposed, not run)</p>
+<pre class="pc"><span class="who"># dynamo worker constructor, every rank, before the model loads</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L30-L42">require_megatron_dynamo_integration</a>():
+    import megatron.inference.integrations.dynamo.dynamic_engine   <span class="cm"># today's only check: passes at the pin</span>
+<span class="add">    if "disaggregation_role" not in fields(InferenceConfig):</span>      <span class="cm"># the field 84c7f168 adds</span>
+<span class="add">        raise RuntimeError("needs Megatron-LM with InferenceConfig.disaggregation_role "</span>
+<span class="add">                           "(84c7f168, #9534); use a newer one or drop dynamo")</span></pre>
+<p>Plus a CPU test that swaps in a fake <code>InferenceConfig</code> without the field and expects that error. A second Megatron-LM gap later in the stack (<code>ChatRenderer</code>, used by #5097's render workers) gets the same kind of check on #5097.</p>
+<p><b>Do not just delete the field.</b> Without it, a decode engine of a hybrid (Mamba) model keeps the prefix-cache budget that
+<code>prefix_caching_mamba_gb</code> gives, and the pinned Megatron-LM then
+<a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/core/inference/disaggregation/inference_state_handoff.py#L295-L301">refuses the KV handoff</a>
+at the first refit. The field is what turns that budget off for decode.</p>
+
+<div class="hl"><b>So what.</b> As written, the whole six-PR stack ships an engine that cannot be built: the error moves from setup to the first refit, but it always fires. The fix in this PR is a guard plus one small test, so anyone on today's Megatron-LM gets a plain "this needs a newer Megatron-LM" at startup. The Megatron-LM bump that makes the feature run is a separate change, and needs Bridge to move its pin first.</div>
+
+</div>
+</body>
+</html>

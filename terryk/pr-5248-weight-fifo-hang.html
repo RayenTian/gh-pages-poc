@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #5248 — why weight_fifo can wait forever on one leftover group</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 16px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 14px;font-size:14px}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .ok{fill:var(--surface);stroke:var(--green);stroke-width:2}
+svg .lbl{fill:var(--text);font:12.5px ui-monospace,Menlo,monospace}
+svg .lbl-b{fill:var(--text);font:bold 13px -apple-system,sans-serif}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .hdr{fill:var(--accent);font:bold 13px -apple-system,sans-serif}
+svg .red{fill:var(--red);font:bold 12px ui-monospace,Menlo,monospace}
+svg .grn{fill:var(--green);font:bold 12px ui-monospace,Menlo,monospace}
+svg .g-ok{fill:var(--green);opacity:.55}
+svg .g-bad{fill:var(--red);opacity:.5}
+svg .g-wait{fill:var(--dim);opacity:.35}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none}
+svg a text{text-decoration:underline;fill:var(--accent);font:11.5px ui-monospace,Menlo,monospace}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .del{color:var(--red);text-decoration:line-through}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 0}
+.pcref{font-size:12.5px;color:var(--dim);margin:2px 0 10px}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px;font-size:14px}
+.hl{border-left:3px solid var(--orange);background:var(--surface);padding:12px 16px;margin:18px 0;border-radius:0 8px 8px 0}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+table{border-collapse:collapse;width:100%;margin:8px 0 6px;font-size:14px}
+th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface);font-size:12.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.03em}
+td:first-child{white-space:nowrap;color:var(--dim)}
+.note2{color:var(--dim);font-size:13.5px;margin:4px 0 0}
+@media (max-width:600px){td:first-child{white-space:normal}}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>Why <code>weight_fifo</code> can now wait forever on one leftover group</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248">NVIDIA-NeMo/RL #5248</a>
+· review comment C2
+· permalinks pin head <code>b52f74b</code></p>
+
+<div class="status"><dl>
+  <dt>Before</dt>
+  <dd>The same setup crashed at once on the trainer's even-split check.</dd>
+  <dt>This PR</dt>
+  <dd>The sampler now takes only whole multiples of groups. With <code>weight_fifo</code> that can leave one group it will never take, so the step waits until the stall watchdog fires: a crash turned into a hang.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Open — not fixed in this PR.</span> Review comment C2 asks setup to reject this combination. No shipped recipe uses <code>weight_fifo</code> with streaming.</dd>
+</dl></div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-chunk-alignment.html">1 · 5 groups on 3 ranks</a>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5248-end-of-data.html">2 · short step crashes (open)</a>
+  <span class="here">3 · weight_fifo hang (open)</span>
+</nav>
+<p class="chainnote">Three pages on this PR, one question each — this one: why one sampler can stall.</p>
+
+<div class="bg"><b>Background.</b> Each finished group is stamped with a
+<span class="tip" tabindex="0" data-tip="The oldest policy weight version among the group's samples. If new weights are loaded into the generation engines (a refit) while a batch is still generating, some groups end up stamped with the old version and some with the new one.">weight version</span>:
+the oldest version of the policy that generated any of its samples
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/experience/rollout_reassembler.py#L1317"><code>group_min_wv</code></a>).
+If new weights land while a batch is still generating, one step's groups split across two versions.
+The <span class="tip" tabindex="0" data-tip="async_rl.sampler.name: weight_fifo. It trains a step only from groups made by a single weight version, oldest first.">weight_fifo</span>
+sampler only takes groups from the <b>oldest</b> version still in its window
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/async_utils/staleness_sampler.py#L690-L697"><code>target_version = min(in_window)</code></a>),
+and it moves on to a newer version only once the older one is empty. Dotted words have a short explanation: hover or tap them.</div>
+
+<h2>4 groups, two weight versions, multiple 2</h2>
+
+<svg viewBox="0 0 900 360" role="img" aria-label="Three groups made under weight v0 and one under v1. On main the sampler takes all three v0 groups and the split crashes. With the PR it takes two, then the third v0 group can never make a pair and v1 is never read, so the step waits forever.">
+  <rect class="g-ok" x="560" y="10" width="14" height="14"/><text class="note" x="580" y="22">trained</text>
+  <rect class="g-bad" x="636" y="10" width="14" height="14"/><text class="note" x="656" y="22">crashes</text>
+  <rect class="g-wait" x="722" y="10" width="14" height="14"/><text class="note" x="742" y="22">stuck</text>
+  <text class="hdr" x="14" y="22">step target 4 groups · group multiple m = 2 · trainer at v1</text>
+
+  <text class="lbl-b" x="14" y="62">Buffer</text>
+  <rect class="box" x="110" y="40" width="230" height="40" rx="6"/>
+  <text class="note" x="118" y="54">made under weight v0 (oldest)</text>
+  <text class="lbl" x="118" y="73">g0   g1   g2</text>
+  <rect class="box" x="360" y="40" width="160" height="40" rx="6"/>
+  <text class="note" x="368" y="54">made under v1</text>
+  <text class="lbl" x="368" y="73">g3</text>
+
+  <line x1="14" y1="98" x2="886" y2="98" style="stroke:var(--border)"/>
+
+  <text class="lbl-b" x="14" y="132">main</text>
+  <rect class="g-bad" x="110" y="116" width="26" height="24"/><rect class="g-bad" x="140" y="116" width="26" height="24"/><rect class="g-bad" x="170" y="116" width="26" height="24"/>
+  <text class="lbl" x="210" y="133">poll 1: takes all of v0 = 3 groups</text>
+  <text class="red" x="560" y="133">✗ even-split check fails at once</text>
+  <text class="note" x="210" y="152">3 groups' samples do not divide evenly (the same check as page 1), so the run stops right away</text>
+
+  <line x1="14" y1="170" x2="886" y2="170" style="stroke:var(--border)"/>
+
+  <text class="lbl-b" x="14" y="204">This PR</text>
+  <rect class="g-ok" x="110" y="188" width="26" height="24"/><rect class="g-ok" x="140" y="188" width="26" height="24"/>
+  <text class="lbl" x="210" y="205">poll 1: takes g0, g1 (a whole multiple of 2)</text>
+  <text class="grn" x="660" y="205">✓ trains</text>
+  <rect class="g-wait" x="110" y="222" width="26" height="24"/>
+  <text class="lbl" x="210" y="239">poll 2, 3, …: oldest is v0 with only g2 → nothing</text>
+  <text class="red" x="660" y="239">waits forever</text>
+  <text class="note" x="210" y="258">g3 (v1) is never read while v0 is not empty, and v0 never empties: this step cannot finish</text>
+  <text class="note" x="210" y="276">→ the step stalls until the stall watchdog stops the run</text>
+
+  <line x1="14" y1="294" x2="886" y2="294" style="stroke:var(--border)"/>
+
+  <text class="lbl-b" x="14" y="326">C2 fix</text>
+  <text class="lbl" x="110" y="326">setup: ValueError "GRPO streaming with async_rl.sampler.name='weight_fifo'</text>
+  <text class="lbl" x="110" y="344">       cannot align chunks to 2 prompt groups ..." → the run never starts</text>
+</svg>
+<p class="pcref">The "This PR" row is a real run of <code>WeightFifoSampler.select</code> at <code>b52f74b</code> with group multiple 2: polls took <code>[2, 0, 0]</code> groups, leaving weight versions <code>[0, 1]</code>. With multiple 1 the same buffer gave <code>[3, 1]</code> and emptied.</p>
+
+<h2>The fix — proposed, not in the PR</h2>
+<p>Nothing below is implemented. It is the suggestion in review comment C2.</p>
+<p class="where"><b>Where the fix lands: RL only, setup.</b> One check at the end of
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1971"><code>resolve_grpo_chunk_alignment</code></a>.
+Setup already rejects single-weight samplers for the same kind of reason: with a drop budget
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1337">config.py:1337</a>)
+and with dynamic sampling
+(<a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1638">config.py:1638</a>).</p>
+
+<p class="pclbl">The fix, as pseudocode (proposed; run on CPU)</p>
+<pre class="pc"><span class="who"># setup, once, when the trainer is built</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/b52f74bb77c5fed1ce4232821c0b584943f9c29d/nemo_rl/algorithms/single_controller_utils/config.py#L1971">resolve_grpo_chunk_alignment</a>(cfg, dp):
+    m = resolve_grpo_group_multiple(cfg, dp)          <span class="cm"># 2 here</span>
+    ...                                               <span class="cm"># step size and cap checks</span>
+<span class="add">    if m &gt; 1 and streaming and sampler_reads_one_weight_version:</span>
+<span class="add">        raise ValueError("... cannot align chunks to 2 prompt groups ...")</span>
+    return m</pre>
+<p class="pcref">Full-batch <code>weight_fifo</code> (floor = <code>num_prompts_per_step</code>) and any run with <code>m = 1</code> still pass. The check's test fails at head and passes with the fix.</p>
+
+<div class="hl"><b>So what.</b> Low priority: no shipped recipe runs <code>weight_fifo</code> with streaming. But the failure mode got worse: what used to fail fast now ties up the whole allocation until the watchdog fires. Rejecting the combination at setup turns it back into a fast, clear error.
+<span class="cref" data-c="C2"><a href="https://github.com/NVIDIA-NeMo/RL/pull/5248#discussion_r4670284337">review comment C2 · config.py:2035</a></span></div>
+
+</div>
+</body>
+</html>

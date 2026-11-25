@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVIDIA-NeMo/RL #4912 — how Megatron prefill/decode engines behind Dynamo differ from one Megatron inference policy</title>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;
+  --dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 70px}
+h1{font-size:22px;margin:0 0 8px;line-height:1.3}
+h2{font-size:18px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:var(--surface2);padding:1.5px 5px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;
+  font:13px/1 ui-monospace,monospace;cursor:pointer}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}
+.verdict.open{color:var(--red)}
+nav.chain{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0}
+nav.chain a,nav.chain span{display:inline-block;padding:5px 11px;border:1px solid var(--border);
+  border-radius:20px;background:var(--surface);text-decoration:none;color:var(--accent);
+  font-size:12.5px;line-height:1.3;white-space:nowrap}
+nav.chain a:hover{background:var(--surface2)}
+nav.chain span.here{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+p.chainnote{color:var(--dim);font-size:12px;margin:0 0 18px}
+.bg{border-left:4px solid var(--dim);background:var(--surface);padding:8px 14px;margin:0 0 16px;font-size:14px}
+.hl{border-left:4px solid var(--orange);background:var(--surface);padding:10px 14px;margin:18px 0;border-radius:0 8px 8px 0}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);
+  font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;
+  width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;
+  font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:10px 0}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface2)}
+.pc{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:6px 0 4px}
+.pc .add{color:var(--green);font-weight:600}
+.pc .cm{color:var(--dim)}
+.pc .who{color:var(--orange)}
+.pc a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.pclbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 0}
+svg{max-width:100%;height:auto;display:block;margin:14px 0}
+svg .box{fill:var(--surface);stroke:var(--border);stroke-width:1.3}
+svg .new{fill:var(--surface);stroke:var(--green);stroke-width:1.8}
+svg .bad{fill:var(--surface);stroke:var(--red);stroke-width:2}
+svg .proc{fill:none;stroke:var(--dim);stroke-width:1.2;stroke-dasharray:5 4}
+svg .hdr{fill:var(--text);font:bold 13.5px -apple-system,sans-serif}
+svg .hdr2{fill:var(--dim);font:12px -apple-system,sans-serif}
+svg .lbl{fill:var(--text);font:12px ui-monospace,Menlo,monospace}
+svg .note{fill:var(--dim);font:11.5px -apple-system,sans-serif}
+svg .redt{fill:var(--red);font:bold 12px ui-monospace,Menlo,monospace}
+svg .grn{fill:var(--green);font:bold 12px ui-monospace,Menlo,monospace}
+svg .arr{stroke:var(--dim);stroke-width:1.4;fill:none;marker-end:url(#ah)}
+svg a text{text-decoration:underline;fill:var(--accent);font:12px ui-monospace,Menlo,monospace}
+svg .lg-new{fill:none;stroke:var(--green);stroke-width:2}
+svg .lg-bad{fill:none;stroke:var(--red);stroke-width:2}
+svg .lg-box{fill:none;stroke:var(--border);stroke-width:1.5}
+</style>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
+  document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+</head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+  function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+  function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+    b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+      else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+  document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How Megatron prefill/decode engines behind Dynamo differ from one Megatron inference policy</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4912">PR #4912</a> (2 of 6:
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/4801">#4801</a> → <b>#4912</b> →
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5023">#5023</a> →
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5024">#5024</a> →
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a> →
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5097">#5097</a>) ·
+permalinks pinned to head <code>1cb4fef4</code> (cited code unchanged at <code>44035e16</code>) · Megatron-LM at the repo's pin <code>e0a4bfed</code></p>
+
+<div class="status"><dl>
+  <dt>Before</dt>
+  <dd><code>backend: megatron</code> builds one <code>MegatronGeneration</code>: one inference policy over the whole inference cluster, joined to the weight refit as one block.</dd>
+  <dt>This PR</dt>
+  <dd>With <code>dynamo: true</code>, a new sibling class builds one <code>MegatronGeneration</code> per prefill or decode engine, each on its own one-node cluster, and fans every refit call out to them. Rollouts stay refused until <a href="https://github.com/NVIDIA-NeMo/RL/pull/5025">#5025</a>.</dd>
+  <dt>Status</dt>
+  <dd><span class="verdict open">Open — the engines cannot be built yet at the pinned Megatron-LM.</span> Each engine asks Megatron-LM's config for a field it does not have. See the second page.</dd>
+</dl></div>
+
+<nav class="chain">
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-stack-overview.html" style="font-weight:600">★ all 6 PRs: what each does</a>
+  <span class="here">1 · old path vs new path</span>
+  <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4912-role-field-missing.html">2 · engine build fails at the pin</a>
+</nav>
+<p class="chainnote">Two pages on this PR, one question each — this one: what the new class does next to the old one. The stack's first PR has its own page: <a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-4801-dynamo-paths.html">where the Dynamo switch sits</a>.</p>
+
+<div class="bg"><b>Background.</b> A
+<span class="tip" tabindex="0" data-tip="Prefill engines read the prompt and build its KV cache. Decode engines take that cache over and write the answer token by token.">prefill/decode split</span>
+runs prompt reading and answer writing on different engines; Dynamo's frontend routes each request across them. A
+<span class="tip" tabindex="0" data-tip="After each training step the trainer ranks send their new weights to every inference rank over one shared NCCL group. Each rank needs a fixed place (rank number) in that group.">refit</span>
+pushes new weights from the trainer into every engine after each step. Dotted words have a short explanation: hover or tap them.</div>
+
+<p>The new class, <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_generation.py#L257-L288"><code>MegatronDynamoGeneration</code></a>, is not a subclass of <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/megatron_generation.py#L57"><code>MegatronGeneration</code></a>. It <i>holds</i> several of them. <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/__init__.py#L26-L40"><code>megatron_generation_cls</code></a> picks it when <code>dynamo: true</code>. The example below uses 16 trainer ranks and one inference node of 8 GPUs, split as 1 prefill engine at TP 4 and 2 decode engines at TP 2.</p>
+
+<h2>One policy vs. one policy per engine</h2>
+
+<svg viewBox="0 0 940 600" role="img" aria-label="Plain Megatron inference path next to the new prefill/decode path">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--dim)"/></marker></defs>
+<text class="hdr" x="14" y="22">Before / dynamo: false</text>
+<text class="hdr2" x="14" y="38">one inference policy</text>
+<text class="hdr" x="484" y="22">This PR / dynamo: true</text>
+<text class="hdr2" x="484" y="38">one policy per prefill or decode engine</text>
+<!-- row 1 config -->
+<rect class="box" x="10" y="48" width="446" height="54" rx="7"/>
+<text class="lbl" x="22" y="70">backend: megatron   dynamo: false</text>
+<text class="lbl" x="22" y="90">mcore_generation_config: {tp: 2}</text>
+<rect class="box" x="480" y="48" width="450" height="54" rx="7"/>
+<text class="lbl" x="492" y="70">backend: megatron   dynamo: true   1 P : 2 D</text>
+<text class="lbl" x="492" y="90">prefill_engine: {tp: 4}  decode_engine: {tp: 2}</text>
+<path class="arr" d="M233,102 L233,120"/><path class="arr" d="M705,102 L705,120"/>
+<!-- row 2 class pick -->
+<rect class="box" x="10" y="122" width="446" height="50" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/__init__.py#L26-L40"><text x="22" y="142">megatron_generation_cls</text></a>
+<text class="lbl" x="22" y="162">→ MegatronGeneration</text>
+<rect class="new" x="480" y="122" width="450" height="50" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/__init__.py#L26-L40"><text x="492" y="142">megatron_generation_cls</text></a>
+<text class="grn" x="492" y="162">→ MegatronDynamoGeneration</text>
+<path class="arr" d="M233,172 L233,190"/><path class="arr" d="M705,172 L705,190"/>
+<!-- row 3 build -->
+<rect class="box" x="10" y="192" width="446" height="124" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/megatron_generation.py#L392-L404"><text x="22" y="214">Policy(cluster)</text></a>
+<text class="note" x="22" y="234">one worker group over all 8 inference GPUs</text>
+<rect class="proc" x="22" y="246" width="420" height="58" rx="5"/>
+<text class="lbl" x="34" y="266">MegatronPolicyWorker × 8</text>
+<text class="lbl" x="34" y="288">one Megatron world: 8 ranks, TP 2 × DP 4</text>
+<rect class="new" x="480" y="192" width="450" height="124" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_generation.py#L71-L110"><text x="492" y="214">role_policy_config</text></a>
+<text class="note" x="640" y="214">per role: dynamo off + its _dynamo_role</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_generation.py#L905-L933"><text x="492" y="236">_start_engines</text></a>
+<text class="note" x="610" y="236">a one-node cluster + MegatronGeneration each</text>
+<rect class="proc" x="492" y="246" width="140" height="58" rx="5"/>
+<text class="lbl" x="502" y="266">prefill-0</text>
+<text class="lbl" x="502" y="288">4 GPUs, TP 4</text>
+<rect class="proc" x="642" y="246" width="136" height="58" rx="5"/>
+<text class="lbl" x="652" y="266">decode-0</text>
+<text class="lbl" x="652" y="288">2 GPUs, TP 2</text>
+<rect class="proc" x="788" y="246" width="130" height="58" rx="5"/>
+<text class="lbl" x="798" y="266">decode-1</text>
+<text class="lbl" x="798" y="288">2 GPUs, TP 2</text>
+<path class="arr" d="M233,316 L233,334"/><path class="arr" d="M705,316 L705,334"/>
+<!-- row 4 worker -->
+<rect class="box" x="10" y="336" width="446" height="104" rx="7"/>
+<text class="lbl" x="22" y="358">worker class: MegatronPolicyWorker</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/megatron_worker.py#L733-L735"><text x="22" y="380">InferenceConfig(**kwargs)</text></a>
+<text class="note" x="210" y="380">hooks return nothing extra</text>
+<text class="lbl" x="22" y="402">engine: DynamicInferenceEngine</text>
+<text class="note" x="22" y="424">serves through NeMo RL's own HTTP server</text>
+<rect class="bad" x="480" y="336" width="450" height="104" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/policy/lm_policy.py#L321-L332"><text x="492" y="358">Policy sees _dynamo_role</text></a>
+<text class="grn" x="672" y="358">→ MegatronDynamoPolicyWorker</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L73-L81"><text x="492" y="380">InferenceConfig(**kwargs, nixl, disaggregation_role)</text></a>
+<text class="redt" x="492" y="402">✕ TypeError at the pinned Megatron-LM (page 2)</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L83-L101"><text x="492" y="424">DynamoDynamicInferenceEngine + KV handoff</text></a>
+<path class="arr" d="M233,440 L233,458"/><path class="arr" d="M705,440 L705,458"/>
+<!-- row 5 refit -->
+<rect class="box" x="10" y="460" width="446" height="70" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/megatron_generation.py#L431"><text x="22" y="482">init_collective</text></a>
+<text class="note" x="140" y="482">one call to one worker group</text>
+<text class="lbl" x="22" y="504">refit ranks: trainer 0..15 | inference 16..23</text>
+<rect class="new" x="480" y="460" width="450" height="70" rx="7"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_generation.py#L570-L641"><text x="492" y="482">init_collective + engine_rank_offsets</text></a>
+<text class="lbl" x="492" y="504">offsets 16, 20, 22  (16 + 4 = 20, 20 + 2 = 22)</text>
+<text class="note" x="492" y="522">one call per engine, in engine order</text>
+<!-- legend -->
+<rect class="lg-box" x="14" y="550" width="16" height="12" rx="2"/><text class="note" x="38" y="561">same as before</text>
+<rect class="lg-new" x="160" y="550" width="16" height="12" rx="2"/><text class="note" x="184" y="561">new in this PR</text>
+<rect class="lg-bad" x="300" y="550" width="16" height="12" rx="2"/><text class="note" x="324" y="561">new, and fails at the pinned Megatron-LM</text>
+<text class="note" x="14" y="588">Dashed boxes = one Ray worker group (one Megatron world). Underlined names link to the code.</text>
+</svg>
+
+<p><b>Where they meet:</b> each Dynamo engine <i>is</i> a plain <code>MegatronGeneration</code> built from a copied config, so the worker code is the same. They split in exactly three
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/megatron_worker.py#L358-L376">hooks on the worker</a> —
+extra config fields, which engine class to build, and where the coordinator listens. The plain worker returns the old answers; <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L45-L106"><code>MegatronDynamoGenerationMixin</code></a> returns the Dynamo ones.</p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4672549057">review comment C3 — dynamo_worker_mixin.py:80</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4672926891">C10 — one worker class</a> <a href="https://github.com/NVIDIA-NeMo/RL/pull/4912#discussion_r4673684069">C13 — names</a></p>
+
+<table>
+<tr><th></th><th>Before (<code>MegatronGeneration</code>)</th><th>This PR (<code>MegatronDynamoGeneration</code>)</th></tr>
+<tr><td>Inference worlds</td><td>1, over the whole inference cluster</td><td>1 per engine, each on one node; engines may differ in TP</td></tr>
+<tr><td>Weights at start</td><td>loaded at build</td><td>none until the first refit (<code>skip_weight_load=True</code>)</td></tr>
+<tr><td>Refit ranks</td><td>one block after the trainers</td><td>engine <i>i</i> starts after the trainers plus the widths of engines before it</td></tr>
+<tr><td>Failed suspend</td><td>the error goes up</td><td>tries to resume every engine, then the error goes up</td></tr>
+<tr><td>Pickled copy (sent to the controller)</td><td>the whole object</td><td><a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_generation.py#L404-L418">records and worker handles only</a>; it can drive a refit but cannot shut an engine down</td></tr>
+</table>
+
+<h2>The refit, as pseudocode</h2>
+<p class="pclbl">Before: one block</p>
+<pre class="pc"><span class="who"># driver / controller, one call</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/megatron_generation.py#L431">init_collective</a>(ip, port, world_size=24):
+    policy.init_collective(ip, port, world_size)  <span class="cm"># all 8 workers, ranks 16..23</span></pre>
+<p class="pclbl">This PR: one call per engine</p>
+<pre class="pc"><span class="who"># driver / controller, one call each, in engine order</span>
+def <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_generation.py#L570">init_collective</a>(ip, port, world_size=24, train_world_size=16):
+<span class="add">    offsets = <a href="https://github.com/NVIDIA-NeMo/RL/blob/1cb4fef41a20976dd44f3992278671defd4ff98a/nemo_rl/models/generation/megatron/dynamo_generation.py#L631-L641">engine_rank_offsets</a>(16)</span>             <span class="cm"># [16, 20, 22] from widths (4, 2, 2)</span>
+<span class="add">    for engine, off in zip(engines, offsets):</span>
+<span class="add">        engine.workers.init_collective(..., rank_offset=off)</span>  <span class="cm"># prefill-0: 16..19, decode-0: 20..21, decode-1: 22..23</span></pre>
+
+<div class="hl"><b>So what.</b> The design is clean: the plain Megatron path gains three small hooks and no Dynamo branches, and every Dynamo-only piece lives in its own class and mixin. But nothing in this PR has run on a GPU, and the engine build cannot pass at the repo's Megatron-LM pin. That fix belongs in this PR, because no later PR in the stack moves the pin.</div>
+
+</div>
+</body>
+</html>
