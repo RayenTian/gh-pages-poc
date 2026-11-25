@@ -199,7 +199,9 @@ send(rows)                                                  <span class="cm"># a
 <p class="pcref">Real code: <a href="https://github.com/NVIDIA-NeMo/RL/blob/d421014edd26c3de5063b09737a4f0e89c2fe54b/nemo_rl/experience/rollout_manager.py#L2190-L2216"><code>_nemo_gym_task_indices</code></a>, its call in <a href="https://github.com/NVIDIA-NeMo/RL/blob/d421014edd26c3de5063b09737a4f0e89c2fe54b/nemo_rl/experience/rollout_manager.py#L3286-L3314"><code>_generate_for_finalization_attempt</code></a>, and the saved field <a href="https://github.com/NVIDIA-NeMo/RL/blob/d421014edd26c3de5063b09737a4f0e89c2fe54b/nemo_rl/experience/rollout_recovery.py#L320-L324"><code>environment_task_index</code></a>. Old snapshots (schemas 2–8) still load, without the number.</p>
 
 <div class="hl"><b>So what.</b> Recipes can keep their typed Gym servers with <code>rollout_recovery.target_level: turn</code> or <code>prefix</code>; no more swapping to <code>legacy_agent</code>. The review asks for one unit test that checks the dispatch path above really passes the kept number to both the rows and the ledger: removing either still leaves every CPU test green. Before using this on a server with <code>max_concurrent_episodes</code> set, read the second page.</div>
-<!--CREF-C2-->
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5340#discussion_r4690759242">review comment C2 — rollout_manager.py:3288 (missing wiring test)</a></p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5340#discussion_r4690759414">review comment C1 — capped servers (reply on gym_checkpoint_adapter.py:190)</a></p>
+<p class="cref">🟡 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5340#discussion_r4690759645">review comment C3 — older-schema comment (reply on rollout_recovery.py:2074)</a></p>
 
 </div>
 </body>
