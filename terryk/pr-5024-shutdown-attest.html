@@ -71,8 +71,8 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 
 <div class="status"><dl>
 <dt>Before</dt><dd>PR 3's shutdown stopped every engine in index order, then the frontend, NATS and etcd.</dd>
-<dt>This PR</dt><dd>After stopping the decode engines, it reports each one to the prefill coordinators as "gone for good", one Ray call per engine, before it stops prefill.</dd>
-<dt>Status</dt><dd><span class="verdict open">Open — not fixed in this PR.</span> Raised as review comment C3, which asks to drop the step.</dd>
+<dt>This PR</dt><dd>Stops the decode engines one by one. Then, for each decode engine, it makes one call that tells the prefill engines "this decode engine is gone, let go of the KV blocks you kept for it". Only then does it stop prefill.</dd>
+<dt>Status</dt><dd><span class="verdict open">Open — not fixed in this PR.</span> Raised as review comment C3, which asks to delete the report step, with nothing in its place.</dd>
 </dl></div>
 
 <nav class="chain">
@@ -83,8 +83,11 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 <p class="chainnote">Two pages on this PR, one question each. This one: the report step at shutdown.</p>
 
 <div class="bg"><b>Background.</b> A prefill engine keeps a prompt's KV blocks pinned until the decode engine that asked for them has copied them. It tracks each decode engine by an <span class="tip" tabindex="0" data-tip="A random ID each decode engine makes when its endpoint starts. Prefill files the blocks it pins under this ID.">owner ID</span>. If a decode engine dies mid-copy, those blocks stay pinned. Upstream's fix is <a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/inference/integrations/dynamo/handoff_recovery.py#L42-L66"><code>confirm_terminated(address, owner)</code></a>: it tells a prefill <span class="tip" tabindex="0" data-tip="The process on prefill rank 0 that routes requests to the engine. It holds the owner-ID-to-pinned-blocks map in memory only.">coordinator</span> that the owner is gone, so it unpins the blocks. Dotted words have a short explanation: hover or tap them.</div>
+<div class="bg"><b>It is not a reference count that has to reach zero.</b> Prefill does not need the report to exit. It can stop at any time, and when it stops, every block it kept goes with it. The report only helps when prefill <i>keeps running</i> after a decode engine dies, which is the case upstream wrote it for. At full shutdown prefill stops one step later, so the report frees nothing that stopping prefill doesn't.</div>
 
 <p>Example: 1 prefill engine P0, whose coordinator answered the address lookup but then hangs; 3 decode engines D0–D2; the default <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_config.py#L95"><code>control_timeout_s</code> = 600</a> (<a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688633017">C1</a> removes this key; with any per-call timeout <i>T</i>, the wait is decode engines × <i>T</i>). Each report waits up to 600 s in the worker plus a 10 s margin in the driver, and <code>confirm_terminated</code> <a href="https://github.com/NVIDIA/Megatron-LM/blob/e0a4bfed7f1e233b857187ceff0104645858d7d1/megatron/inference/integrations/dynamo/handoff_recovery.py#L54">waits its full timeout</a> with no retry when nobody answers.</p>
+<p><b>Where the wait comes from.</b> Not from stopping decode: that is usually quick. It comes from the reports:</p>
+<ol><li>The decode engines stop, one after another (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L1409-L1419">L1409</a>).</li><li>Then one report per decode engine, <b>one after another</b> (<a href="https://github.com/NVIDIA-NeMo/RL/blob/9df434a77b4365d0d95fbcedd1a550c29861b953/nemo_rl/models/generation/megatron/dynamo_generation.py#L1492-L1504">L1492</a>). Each report asks every prefill coordinator.</li><li>If one coordinator never answers, <i>each</i> report waits its full 610 s before the next one starts: 3 × 610 s ≈ 30.5 min.</li><li>Only then does prefill stop, and that would have freed the same blocks anyway.</li></ol>
 
 <div class="fig">
 <svg viewBox="0 0 940 300" role="img" aria-label="Shutdown timeline with and without the report step">
@@ -122,17 +125,26 @@ document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoad
 
 <h2>What would fix it — proposed, not in the PR</h2>
 <p class="where"><b>Where the fix lands: RL only, two files.</b> <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1365"><code>dynamo_generation.py</code></a> (<code>shutdown</code> and three helpers) and <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L407"><code>dynamo_worker_mixin.py</code></a> (three worker reads). <b>No Megatron-LM change:</b> the hook stays for a later PR that replaces a decode engine live.</p>
-<p>Nothing below is implemented.</p>
+<p>Nothing below is implemented. The report is deleted, not made faster: nothing replaces it, because stopping prefill already frees the blocks.</p>
 <p class="pclbl">Shutdown, after the fix (proposed, not run) · driver process</p>
 <pre class="pc"><span class="who"># driver, MegatronDynamoGeneration.shutdown</span>
 <span class="del">owners = read handoff owner from each decode rank 0</span>
-for d in decode: stop(d)                                  <span class="cm"># first: nobody still pulls from prefill</span>
+<span class="del">for d in decode: stop(d)</span>
+<span class="add">stop(all decode engines at once)</span>                          <span class="cm"># C11; first, so no decode is mid-pull (C3)</span>
 <span class="del">for owner in owners: prefill0.confirm_decode_terminated(owner)</span>
-for p in prefill: stop(p)                                 <span class="cm"># frees every pinned block</span>
+<span class="del">for p in prefill: stop(p)</span>
+<span class="add">stop(all prefill engines at once)</span>                         <span class="cm"># C11; frees every kept block</span>
 stop frontend, NATS, etcd</pre>
 <p class="pcref">Delete too: <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1334"><code>_prefill_coordinator_addresses</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1428"><code>_handoff_owners</code></a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_generation.py#L1455"><code>_confirm_decode_terminated</code></a>, and the worker's <a href="https://github.com/NVIDIA-NeMo/RL/blob/ea1a6e22b8aa314d6992cd6f043af9c557487f30/nemo_rl/models/generation/megatron/dynamo_worker_mixin.py#L407"><code>confirm_decode_terminated</code></a>.</p>
 <p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5024#discussion_r4688633297">review comment C3 — dynamo_generation.py:1381</a></p>
 
+<h2>Why stop gracefully at all?</h2>
+<p>Mostly, it doesn't need to. At the end of a run nothing is saved here: partial checkpoints are taken while the run is live, not at shutdown. On main:</p>
+<ul>
+<li>The SingleController never calls the generation fleet's shutdown. The engines die when the Ray job ends.</li>
+<li>vLLM behind Dynamo (<a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/models/generation/vllm/vllm_generation.py#L1813-L1830"><code>VllmGeneration.shutdown</code></a>) asks every worker to clean up at once, waits at most <a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/distributed/worker_groups.py#L1292-L1336">30 s</a>, kills them all, then stops the services. No per-engine order, no report.</li>
+</ul>
+<p>Two things still need an explicit stop: the frontend, NATS and etcd, which run as <a href="https://github.com/NVIDIA-NeMo/RL/blob/edf015f65f6a4325d42fd1c70fb48c0f685234d8/nemo_rl/models/generation/dynamo/managed_runtime.py#L223">their own processes</a> outside Ray, and the engines' placement groups, if the Ray cluster outlives the run. C3 and C11 ask for less than vLLM's model (they keep decode first); copying vLLM's one-wave kill would be simpler still.</p>
 <div class="warn"><b>So what.</b> With one prefill coordinator that does not answer, shutdown waits about (number of decode engines) × 610 s: 30.5 min for 3 decode engines, over 5 hours for 32, about 3.5 days for 500. It buys nothing, because stopping prefill frees the same blocks. Drop the step; batching the calls would cap the wait but still free nothing. Decode still stops first, but all decode engines can stop at once, then all prefill engines (<a href="https://terrykong.github.io/gh-pages-poc/terryk/pr-5024-fleet-order.html#scale">at 1,000 engines</a>, C11).</div>
 </div>
 </body>
