@@ -238,7 +238,13 @@ def <a href="https://github.com/NVIDIA-NeMo/RL/blob/67c4c0c0b47ecef2c2ae1220274d
 <h2>What the review asks</h2>
 <div class="hl">The design holds up: one merge function now serves both the native frontends and Dynamo, and Gym accepts the merged receipt. The asks: stop each frontend warning about calls it doesn't hold (C5). Send <code>media_family</code> to child frontends, which VLM capture needs, and test that the forwarded settings match the function (C1). Test the startup wiring, where removing any one of three lines turns the feature off with every test still green (C4). Add a CI run with 2 frontends (C2). Bring the description and benchmark up to this design (C6).</div>
 <p class="cref">
-<!--CREF-->
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4690759738">C6 — description + benchmark · generation_cut_route.py:156</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4690759536">C5 — false warnings · generation_cut_route.py:205</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4690759353">C1 — media_family + settings test · vllm_worker_async.py:1073</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528667">C4 — startup wiring tests · vllm_worker_async.py:826</a>
+<a href="https://github.com/NVIDIA-NeMo/RL/pull/5267#discussion_r4610528642">C2 — CI run with 2 frontends · nemo-gym-integration.md:84</a>
+</p>
+<p class="pcref">These links open for others once the review is published.
 </p>
 
 </div>
