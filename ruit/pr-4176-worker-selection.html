@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PR 4176: one way to pick a worker class</title>
+<script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--dim:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922}
+:root[data-theme="light"]{--bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--border:#d0d7de;--text:#1f2328;--dim:#59636e;--accent:#0969da;--green:#1a7f37;--red:#cf222e;--orange:#9a6700}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:26px;line-height:1.25;margin:0 0 6px}
+h2{font-size:19px;margin:30px 0 8px;padding-top:6px;border-top:1px solid var(--border)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font:13px ui-monospace,Menlo,monospace;background:var(--surface2);padding:1px 5px;border-radius:4px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 16px}
+.status{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:2px 16px 10px;margin:0 0 20px}
+.status dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:12px 0 0}
+.status dt{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;padding-top:2px}
+.status dd{margin:0;font-size:14px}
+.verdict{font-weight:700}.verdict.good{color:var(--green)}.verdict.open{color:var(--red)}
+.bg{border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:8px 16px;margin:0 0 18px;font-size:14px}
+.bg b{display:block;margin-bottom:2px}
+.bg ul{margin:4px 0 4px 18px;padding:0}
+.tip{border-bottom:1px dotted var(--dim);cursor:help;position:relative;outline:none}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.7em;z-index:60;width:max-content;max-width:min(340px,80vw);white-space:normal;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font:13px/1.45 -apple-system,sans-serif;font-weight:400;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.fig{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px;margin:14px 0;overflow-x:auto}
+.fig svg{display:block;width:100%;min-width:640px;height:auto}
+svg text{fill:var(--text);font-family:-apple-system,"Segoe UI",sans-serif;font-size:13px}
+svg .m{font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+svg .d{fill:var(--dim);font-size:12px}
+svg .h{font-weight:700;font-size:14px}
+svg a text{text-decoration:underline;fill:var(--accent)}
+svg .box{fill:var(--surface2);stroke:var(--border)}
+svg .good{fill:none;stroke:var(--green);stroke-width:2}
+svg .bad{fill:none;stroke:var(--red);stroke-width:2}
+svg .off{fill:none;stroke:var(--dim);stroke-width:1.5;stroke-dasharray:4 3}
+svg .tg{fill:var(--green)}svg .tr{fill:var(--red)}svg .td{fill:var(--dim)}
+.diff{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;margin:10px 0}
+.diff .add{color:var(--green)}.diff .del{color:var(--red)}.diff .hunk{color:var(--accent)}
+.where{border-left:4px solid var(--accent);background:var(--surface);padding:6px 12px;margin:6px 0 10px;font-size:14px}
+.warn{border:1px solid var(--orange);border-left-width:4px;background:var(--surface);border-radius:6px;padding:8px 14px;margin:18px 0;font-size:15px}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+#theme-toggle{position:fixed;top:14px;right:16px;z-index:200;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:20px;padding:6px 12px;font:13px/1 ui-monospace,monospace;cursor:pointer}
+</style></head>
+<body>
+<button id="theme-toggle" aria-label="Toggle light/dark theme">🌙 dark</button>
+<script>(function(){var r=document.documentElement,K='gh-pages-theme';
+function lbl(){var b=document.getElementById('theme-toggle');if(b)b.textContent=r.getAttribute('data-theme')==='light'?'☀ light':'🌙 dark';}
+function wire(){var b=document.getElementById('theme-toggle');if(!b)return;
+b.onclick=function(){if(r.getAttribute('data-theme')==='light'){r.removeAttribute('data-theme');try{localStorage.setItem(K,'dark')}catch(e){}}
+else{r.setAttribute('data-theme','light');try{localStorage.setItem(K,'light')}catch(e){}}lbl();};lbl();}
+document.readyState!=='loading'?wire():document.addEventListener('DOMContentLoaded',wire);})();</script>
+<div class="wrap">
+
+<h1>How a policy or vLLM worker class gets picked, and what changes when quantization is on</h1>
+<p class="sub"><a href="https://github.com/NVIDIA-NeMo/RL/pull/4176">NVIDIA-NeMo/RL #4176</a> · closes <a href="https://github.com/NVIDIA-NeMo/RL/issues/4032">#4032</a> · permalinks pinned to <a href="https://github.com/NVIDIA-NeMo/RL/tree/c9aec4e81bc2ee12d7329692930fd954f331429c">c9aec4e</a></p>
+
+<div class="status"><dl>
+<dt>Before</dt><dd>Two ways to swap the worker, with different rules. A config value was rejected whenever <code>quant_cfg</code> was set, even if it was the right worker. A constructor argument skipped that check.</dd>
+<dt>This PR</dt><dd>The config value becomes the only path. One shared function decides the worker and checks it against quantization. The constructor argument still works but warns, and feeds the same function.</dd>
+<dt>Status</dt><dd><span class="verdict good">Fixes the gap, still in review.</span> Not merged. Lint and other quick checks pass; the GPU CI has not run yet.</dd>
+</dl></div>
+
+<div class="bg"><b>Background: the words on this page</b>
+Dotted words have a short explanation: hover or tap them.
+<ul>
+<li>A <span class="tip" tabindex="0" data-tip="A Ray actor class that does the real work on each GPU: training for the policy, generation for vLLM. NeMo RL starts one per GPU group.">worker class</span> runs the model. The default one comes from the backend (Megatron, Automodel, vLLM sync or async).</li>
+<li><span class="tip" tabindex="0" data-tip="Config key holding the full Python path of a worker class to use instead of the default. It exists under policy and under policy.generation.">worker_extension_cls_fqn</span> lets a user swap in their own subclass.</li>
+<li><span class="tip" tabindex="0" data-tip="Quantization settings from NVIDIA ModelOpt. When set, training and generation must use the special ModelOpt worker for the backend.">quant_cfg</span> turns on quantization, which needs a matching quantized worker.</li>
+</ul></div>
+
+<p>One shared function, <a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/utils/config.py#L31-L66"><code>resolve_worker_cls</code></a>, now decides the worker for both the policy and vLLM. It takes the default class, the config, and the quantized class (or <code>None</code> when quantization is off). If quantization is on and the config names nothing, it fills in the quantized worker and warns. If the config names exactly that worker, it accepts. If it names anything else, it raises before any GPU is allocated.</p>
+
+<h2>Same four inputs, before and after</h2>
+
+<div class="fig">
+<svg viewBox="0 0 940 372" role="img" aria-label="Four quantized-run inputs and what each does before and after this PR">
+<text class="h" x="14" y="22">Input (quant_cfg is set in all four)</text>
+<text class="h" x="262" y="22">Before: main</text>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/utils/config.py#L31-L66"><text class="h" x="610" y="22">After: this PR</text></a>
+
+<!-- row A -->
+<rect class="box" x="10" y="36" width="238" height="60" rx="6"/>
+<text class="m" x="20" y="60">worker_extension_cls_fqn: null</text>
+<text class="d" x="20" y="80">nothing chosen</text>
+<rect class="good" x="258" y="36" width="332" height="60" rx="6"/>
+<text class="m tg" x="268" y="60">→ MegatronQuantPolicyWorker</text>
+<text class="d" x="268" y="80">picked silently</text>
+<rect class="good" x="606" y="36" width="320" height="60" rx="6"/>
+<text class="m tg" x="616" y="60">→ MegatronQuantPolicyWorker</text>
+<text class="d" x="616" y="80">same worker, plus a warning with its name</text>
+
+<!-- row B -->
+<rect class="box" x="10" y="106" width="238" height="60" rx="6"/>
+<text class="m" x="20" y="130">config: fqn = "MyWorker"</text>
+<text class="d" x="20" y="150">custom class, set in config</text>
+<rect class="off" x="258" y="106" width="332" height="60" rx="6"/>
+<text class="m td" x="268" y="130">ValueError</text>
+<text class="d" x="268" y="150">"mutually exclusive"</text>
+<rect class="off" x="606" y="106" width="320" height="60" rx="6"/>
+<text class="m td" x="616" y="130">ValueError: quant_cfg requires</text>
+<text class="d" x="616" y="150">fqn='MegatronQuantPolicyWorker'</text>
+
+<!-- row C -->
+<rect class="box" x="10" y="176" width="238" height="60" rx="6"/>
+<a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/models/policy/lm_policy.py#L133-L140"><text class="m" x="20" y="200">Policy(fqn="MyWorker")</text></a>
+<text class="d" x="20" y="220">custom class, set in code</text>
+<rect class="bad" x="258" y="176" width="332" height="60" rx="6"/>
+<text class="m tr" x="268" y="200">→ MyWorker</text>
+<text class="d" x="268" y="220">quantization check skipped</text>
+<rect class="off" x="606" y="176" width="320" height="60" rx="6"/>
+<text class="m td" x="616" y="200">DeprecationWarning, then ValueError</text>
+<text class="d" x="616" y="220">same message as the row above</text>
+
+<!-- row D -->
+<rect class="box" x="10" y="246" width="238" height="60" rx="6"/>
+<text class="m" x="20" y="270">config: fqn = exact quant worker</text>
+<text class="d" x="20" y="290">the right class, on purpose</text>
+<rect class="bad" x="258" y="246" width="332" height="60" rx="6"/>
+<text class="m tr" x="268" y="270">ValueError "mutually exclusive"</text>
+<text class="d" x="268" y="290">rejected although it is the right class</text>
+<rect class="good" x="606" y="246" width="320" height="60" rx="6"/>
+<text class="m tg" x="616" y="270">→ MegatronQuantPolicyWorker</text>
+<text class="d" x="616" y="290">accepted, no warning</text>
+
+<!-- legend -->
+<rect class="good" x="14" y="326" width="22" height="14" rx="3"/><text class="d" x="42" y="338">works as it should</text>
+<rect class="bad" x="190" y="326" width="22" height="14" rx="3"/><text class="d" x="218" y="338">the gap this PR closes</text>
+<rect class="off" x="404" y="326" width="22" height="14" rx="3"/><text class="d" x="432" y="338">rejected on purpose</text>
+<text class="d" x="14" y="362">"After" results come from running the real resolve_worker_cls on these inputs. "Before" comes from reading the old code in lm_policy.py.</text>
+</svg>
+</div>
+
+<p>Two rows matter most. Row <b>D</b> was the bug in issue #4032: the right class, written by hand, was refused. Row <b>C</b> was the hole: a class passed in code skipped the quantization check, so a custom worker could run with <code>quant_cfg</code> set and no check that it was the quantized one. Rows A and B behave as before, except that A now warns and B now names the class you need.</p>
+
+<h2>What moved</h2>
+
+<p class="where"><b>Where the change lands: RL only, no Gym change.</b>
+Resolver: <a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/utils/config.py#L31-L66"><code>utils/config.py</code></a>, called from <a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/models/policy/utils.py#L166-L176"><code>resolve_policy_worker_cls</code></a> and <a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/models/generation/vllm/utils.py#L1304"><code>resolve_generation_worker_cls</code></a>.
+Callers: <a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/models/policy/lm_policy.py#L123-L140"><code>Policy.__init__</code></a> and <a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/models/generation/vllm/vllm_generation.py#L387-L389"><code>VllmGeneration</code></a>.</p>
+
+<pre class="diff"><span class="hunk">@@ lm_policy.py L133-L140 · Policy.__init__ (trimmed)</span>
+<span class="del">-        if configured_extension_fqn is not None and config.get("quant_cfg") is not None:
+-            raise ValueError(
+-                "worker_extension_cls_fqn and quant_cfg are mutually exclusive: "
+-                "a custom policy worker cannot be combined with ModelOpt quantization"</span>
+<span class="add">+        if worker_extension_cls_fqn is not None:
++            warnings.warn(
++                "Policy(worker_extension_cls_fqn=...) is deprecated; set "
++                "policy.worker_extension_cls_fqn in the config instead.",
++                DeprecationWarning,
++                stacklevel=2,
+             )
++            # from here on, the config is the one source of truth
++            config["worker_extension_cls_fqn"] = worker_extension_cls_fqn</span>
+
+<span class="hunk">@@ policy/utils.py L166-L176 · resolve_policy_worker_cls</span>
+<span class="del">-    if config.get("quant_cfg") is None:
+-        return default_cls
+-    return POLICY_WORKER_OVERRIDES.get(default_cls, default_cls)</span>
+<span class="add">+    return resolve_worker_cls(          # the shared check from the figure
++        default_cls,
++        config,
++        quantized_cls=(
++            POLICY_WORKER_OVERRIDES.get(default_cls, default_cls)
++            if config.get("quant_cfg") is not None
++            else None
++        ),
++    )</span></pre>
+
+<p>The first hunk removes the blanket "mutually exclusive" error and turns the constructor argument into a config write. The second sends every decision through the shared function. Around those two:</p>
+<p>
+• <code>Policy</code> and <code>VllmGeneration</code> now check that the final worker is in the <span class="tip" tabindex="0" data-tip="A table mapping each worker class to the Python environment it runs in. A class missing from it fails when Ray tries to start it, which is late and confusing.">environment registry</span> before they allocate GPUs, even for default workers (<a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/models/policy/lm_policy.py#L344">lm_policy.py L344</a>, <a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/models/generation/vllm/vllm_generation.py#L389">vllm_generation.py L389</a>).<br>
+• SFTv2 now sets the config field to its worker and refuses any other value (<a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/algorithms/sft_v2.py#L575-L581">sft_v2.py L575-L581</a>). The research template moved the same choice into its YAML (<a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/research/template_project/configs/grpo_math_1B.yaml#L95">L95</a>).<br>
+• A frozen teacher drops the copied field, so it always runs the plain Megatron worker (<a href="https://github.com/NVIDIA-NeMo/RL/blob/c9aec4e81bc2ee12d7329692930fd954f331429c/nemo_rl/models/policy/teacher_worker_group.py#L219">teacher_worker_group.py L219</a>).</p>
+
+<div class="warn"><b>Break to know about (this is the <code>!</code> in the title).</b> With <code>quant_cfg</code> set, a custom subclass is now refused on both paths: the config and the constructor. Before, the constructor path let it through. Without quantization, custom workers work as before. SFTv2 likewise accepts only its own worker, not a subclass of it. Old quantized recipes that leave the field empty keep working; they just print a warning with the class to write down.</div>
+
+</div>
+</body></html>
