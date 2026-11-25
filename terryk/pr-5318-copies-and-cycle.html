@@ -173,6 +173,7 @@ finally: consume_stream = None
 <span class="add">         streams.clear(); drain finished</span>  <span class="cm"># the cancelled task is no longer held here</span>
 <span class="add">         task = None</span>                      <span class="cm"># nor by the frame a failed stream's traceback keeps</span></pre>
 <p class="pcref">With both lines, a deadline test and a failed-stream test pass (both fail at head), and so does the PR's own weakref test.</p>
+<p class="cref">🔴 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5318#discussion_r4690768467">review comment C1 — rollout_manager.py:1591</a></p>
 
 <div class="hl"><b>So what.</b> Copies that grew with the square of the group size are gone from the per-completion path, and finished results no longer pile up between garbage-collector runs. Correctness does not change: the new reads return the same values as the old copies. One gap is left: on the group deadline or a failed stream, results still wait for the collector. Two more lines in the same <code>finally</code> close it (C1).</div>
 </div></body></html>
