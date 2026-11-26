@@ -53,6 +53,10 @@ svg .hdr{fill:var(--accent);font:bold 12px -apple-system,sans-serif}
 svg .red{fill:var(--red);font:bold 11.5px -apple-system,sans-serif}
 svg .grn{fill:var(--green);font:bold 11.5px -apple-system,sans-serif}
 svg a text{text-decoration:underline;fill:var(--accent);font:11px ui-monospace,Menlo,monospace}
+.cref{margin:6px 0 0;font-size:13px}
+.cref a{display:inline-block;padding:4px 10px;border:1px solid var(--border);
+  border-radius:16px;background:var(--surface);font:12.5px ui-monospace,Menlo,monospace}
+.cref a:hover{background:var(--surface2);text-decoration:none}
 </style>
 <script>(function(){try{if(localStorage.getItem('gh-pages-theme')==='light')
   document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -175,6 +179,7 @@ uses, so the figure matches what the test checks. Policy: weight&nbsp;1.0, adapt
 is what makes the test possible: a frozen LoRA base weight is a <code>Parameter</code> with <code>requires_grad=False</code>.
 Buffers and the <code>_extra_state</code> entries (for example FP8 scales) are not <code>Parameter</code>s, so they are still swapped.
 Full-model runs have <code>peft.enabled=False</code> and skip nothing.</p>
+<p class="cref">💬 <a href="https://github.com/NVIDIA-NeMo/RL/pull/5289#discussion_r4704929018">review comment — megatron_policy_worker.py:3386 (same skip written three times)</a></p>
 
 <pre class="diff"><span class="hunk">@@ megatron_policy_worker.py L3366-L3435 · use_reference_model (error path, shape only)</span>
 <span class="add">+        try:                                   # always put the forward hook back
@@ -193,6 +198,7 @@ Full-model runs have <code>peft.enabled=False</code> and skip nothing.</p>
 The forward-hook re-enable now also depends on the hook having been on at entry
 (<a href="https://github.com/NVIDIA-NeMo/RL/blob/5a1f4c112771eb16c998d39d7ab24d656c30dac9/nemo_rl/models/policy/workers/megatron_policy_worker.py#L3374"><code>:3374</code></a>),
 so a hook that was already off is not switched on by the exit.</p>
+<p class="cref">❓ <a href="https://github.com/NVIDIA-NeMo/RL/pull/5289#discussion_r4704929014">review comment — megatron_policy_worker.py:3380 (what do the try/finally blocks catch?)</a></p>
 
 <div class="warn">
 <strong>So what.</strong> On the author's measurement (Qwen3-0.6B, LoRA rank 32, one H100), CPU memory held for the reference copy and policy backup falls from
